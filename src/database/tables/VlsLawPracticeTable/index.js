@@ -6,18 +6,20 @@ export const vlslawpracticeTable = (Sequelize, sequelize) => {
       type: Sequelize.STRING,
       allowNull: true,
     },
+
     mobile: {
       type: Sequelize.STRING,
-      allowNull: false,
+      allowNull: true,
     },
+
     email: {
       type: Sequelize.STRING,
-      allowNull: false,
+      allowNull: true,
     },
 
     amount: {
       type: Sequelize.STRING,
-      allowNull: false,
+      allowNull: true,
     },
 
     razorpay_order_id: {
@@ -63,7 +65,5 @@ export const vlslawpracticeTable = (Sequelize, sequelize) => {
       allowNull: true,
       field: "updated_at",
     },
-
-    
   });
 };

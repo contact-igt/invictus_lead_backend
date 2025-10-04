@@ -1,7 +1,7 @@
 import { tableName } from "../tableName.js";
 
-export const vlsLawAcademyTable = (Sequelize, sequelize) => {
-  return sequelize.define(tableName?.VLSLAWACADEMY, {
+export const ramananFinancialTable = (Sequelize, sequelize) => {
+  return sequelize.define(tableName?.RAMANANFINANCIAL, {
     name: {
       type: Sequelize.STRING,
       allowNull: true,
@@ -14,7 +14,11 @@ export const vlsLawAcademyTable = (Sequelize, sequelize) => {
       type: Sequelize.STRING,
       allowNull: true,
     },
-    course_interested: {
+    area_of_interest: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+    message: {
       type: Sequelize.TEXT,
       allowNull: true,
     },

@@ -6,6 +6,7 @@ import db from "./database/index.js";
 import VlsLawPracticeRouter from "./models/VlsLawPrcticeModels/vlslawpractice.routes.js";
 import ManagementRouter from "./models/ManagementModels/management.routes.js";
 import VlsLawAcademyRouter from "./models/VlsLawAcademyModels/vlslawacademy.routes.js";
+import PixelEyeRouter from "./models/PixelEyeModels/pixeleye.routes.js"
 
 const app = express();
 const corsOptions = {
@@ -34,7 +35,7 @@ const connect_mysql = async () => {
 
 connect_mysql();
 
-app.use("/api/v1", VlsLawPracticeRouter, ManagementRouter, VlsLawAcademyRouter);
+app.use("/api/v1", VlsLawPracticeRouter, ManagementRouter, VlsLawAcademyRouter , PixelEyeRouter);
 
 app.listen(
   ServerEnvironmentConfig?.server?.line == "production"
