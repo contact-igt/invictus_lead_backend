@@ -84,3 +84,25 @@ export const getAllPixelRegisterService = async (req, res) => {
     throw err;
   }
 };
+
+export const getByIdPixelRegisterService = async (id) => {
+  const Query = `SELECT * FROM ${tableName?.PIXELEYE} WHERE id = ?`;
+
+  try {
+    const [result] = await db.sequelize.query(Query, { replacements: [id] });
+    return result[0];
+  } catch (err) {
+    throw err;
+  }
+};
+
+export const deleteByIdPixelRegisterService = async (id) => {
+  const Query = `DELETE FROM ${tableName?.PIXELEYE} WHERE id = ?`;
+
+  try {
+    const [result] = await db.sequelize.query(Query, { replacements: [id] });
+    return result;
+  } catch (err) {
+    throw err;
+  }
+};

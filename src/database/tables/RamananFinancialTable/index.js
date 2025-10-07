@@ -6,14 +6,17 @@ export const ramananFinancialTable = (Sequelize, sequelize) => {
       type: Sequelize.STRING,
       allowNull: true,
     },
+
     mobile: {
       type: Sequelize.STRING,
       allowNull: true,
     },
+
     email: {
       type: Sequelize.STRING,
       allowNull: true,
     },
+
     area_of_interest: {
       type: Sequelize.STRING,
       allowNull: true,
@@ -21,6 +24,11 @@ export const ramananFinancialTable = (Sequelize, sequelize) => {
     message: {
       type: Sequelize.TEXT,
       allowNull: true,
+    },
+
+    registered_date: {
+      type: Sequelize.DATE,
+      allowNull: false,
     },
 
     createdAt: {

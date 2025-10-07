@@ -1,14 +1,14 @@
 import dayjs from "dayjs";
 import { missingFieldsChecker } from "../../utils/missingFieldChecker.js";
 import {
-  createRegisterService,
-  deleteRegisterService,
-  getAllRegisterService,
-  getByIdRegisterService,
-} from "./vlslawacademy.service.js";
+  createRamananFinancialRegisterService,
+  deleteByIdRamananFinancialRegisterService,
+  getAllRamananFinancialRegisterService,
+  getByIdRamananFinancialRegisterService,
+} from "./ramananfinancial.service.js";
 
-export const createRegisterController = async (req, res) => {
-  const { name, email, mobile, message } = req.body;
+export const createRamananFinancialRegisterController = async (req, res) => {
+  const { name, email, mobile, area_of_interest, message } = req.body;
 
   const requiredFields = {
     mobile,
@@ -26,10 +26,11 @@ export const createRegisterController = async (req, res) => {
   const registered_date = dayjs().format("YYYY-MM-DD hh:mm:ss");
 
   try {
-    await createRegisterService(
+    await createRamananFinancialRegisterService(
       name ? name : null,
       email ? email : null,
       mobile ? mobile : null,
+      area_of_interest ? area_of_interest : null,
       message ? message : null,
       registered_date
     );
@@ -44,9 +45,9 @@ export const createRegisterController = async (req, res) => {
   }
 };
 
-export const getAllRegisterController = async (req, res) => {
+export const getAllRamananFinancialRegisterController = async (req, res) => {
   try {
-    const response = await getAllRegisterService();
+    const response = await getAllRamananFinancialRegisterService();
 
     const output = response?.map((item) => ({
       ...item,
@@ -64,11 +65,11 @@ export const getAllRegisterController = async (req, res) => {
   }
 };
 
-export const getByIdRegisterController = async (req, res) => {
+export const getByIdRamananFinancialRegisterController = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const response = await getByIdRegisterService(id);
+    const response = await getByIdRamananFinancialRegisterService(id);
 
     return res.status(200).json({
       message: "Data fetched successfully",
@@ -81,11 +82,14 @@ export const getByIdRegisterController = async (req, res) => {
   }
 };
 
-export const deleteRegisterController = async (req, res) => {
+export const deleteByIdRamananFinancialRegisterController = async (
+  req,
+  res
+) => {
   const { id } = req.params;
 
   try {
-    await deleteRegisterService(id);
+    await deleteByIdRamananFinancialRegisterService(id);
 
     return res.status(200).json({
       message: "Data removed successfully",

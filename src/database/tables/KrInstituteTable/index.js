@@ -1,21 +1,24 @@
 import { tableName } from "../tableName.js";
 
-export const vlsLawAcademyTable = (Sequelize, sequelize) => {
-  return sequelize.define(tableName?.VLSLAWACADEMY, {
+export const krInstituteTable = (Sequelize, sequelize) => {
+  return sequelize.define(tableName?.KRINSTITUTE, {
     name: {
       type: Sequelize.STRING,
       allowNull: true,
     },
+
     mobile: {
       type: Sequelize.STRING,
       allowNull: true,
     },
+
     email: {
       type: Sequelize.STRING,
       allowNull: true,
     },
-    message: {
-      type: Sequelize.TEXT,
+
+    course: {
+      type: Sequelize.STRING,
       allowNull: true,
     },
 

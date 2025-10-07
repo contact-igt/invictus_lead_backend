@@ -1,21 +1,29 @@
 import { tableName } from "../tableName.js";
 
-export const vlsLawAcademyTable = (Sequelize, sequelize) => {
-  return sequelize.define(tableName?.VLSLAWACADEMY, {
+export const mirraBuildersTable = (Sequelize, sequelize) => {
+  return sequelize.define(tableName?.MIRRABUILDERS, {
     name: {
       type: Sequelize.STRING,
       allowNull: true,
     },
+
     mobile: {
       type: Sequelize.STRING,
       allowNull: true,
     },
-    email: {
-      type: Sequelize.STRING,
+
+    interest_green_building: {
+      type: Sequelize.ENUM("yes", "no"),
       allowNull: true,
     },
-    message: {
-      type: Sequelize.TEXT,
+
+    plot_build: {
+      type: Sequelize.ENUM("yes", "no"),
+      allowNull: true,
+    },
+
+    budget: {
+      type: Sequelize.STRING,
       allowNull: true,
     },
 

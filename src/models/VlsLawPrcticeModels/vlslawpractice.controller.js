@@ -17,7 +17,7 @@ export const createRegisterController = async (req, res) => {
     razorpay_signature,
     payment_status,
     captured,
-    domain_source
+    page_name
   } = req.body;
 
   const requiredFields = {
@@ -25,7 +25,7 @@ export const createRegisterController = async (req, res) => {
     mobile,
     amount,
     payment_status,
-    domain_source
+    page_name,
   };
 
   const missingFields = await missingFieldsChecker(requiredFields);
@@ -47,7 +47,7 @@ export const createRegisterController = async (req, res) => {
       razorpay_signature ? razorpay_signature : null,
       payment_status,
       captured ? captured : true,
-      domain_source
+      page_name
     );
 
     return res.status(200).json({

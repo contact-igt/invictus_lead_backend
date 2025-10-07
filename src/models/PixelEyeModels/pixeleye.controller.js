@@ -1,26 +1,21 @@
+import dayjs from "dayjs";
 import { missingFieldsChecker } from "../../utils/missingFieldChecker.js";
 import {
   createPixelRegisterService,
+  deleteByIdPixelRegisterService,
   findPixeRegisterUserService,
   getAllPixelRegisterService,
+  getByIdPixelRegisterService,
   updatePixelRegistereUserService,
 } from "./pixeleye.service.js";
 
 export const createPixelRegisterController = async (req, res) => {
-  const {
-    name,
-    mobile,
-    age,
-    city,
-    ip_address,
-    utm_source,
-    page_name,
-    enquiry_count,
-    registered_date,
-  } = req.body;
+  const { name, mobile, age, city, ip_address, utm_source, page_name } =
+    req.body;
 
   const requiredFields = {
     mobile,
+    page_name,
   };
 
   const missingFields = await missingFieldsChecker(requiredFields);
@@ -30,6 +25,8 @@ export const createPixelRegisterController = async (req, res) => {
       message: `The missing fields are  ${missingFields.join(", ")} `,
     });
   }
+
+  const registered_date = dayjs().format("YYYY-MM-DD hh:mm:ss");
 
   try {
     const alreadyRegister = await findPixeRegisterUserService(
@@ -46,7 +43,7 @@ export const createPixelRegisterController = async (req, res) => {
         ip_address ? ip_address : null,
         utm_source ? utm_source : null,
         page_name,
-        enquiry_count ? enquiry_count : 1,
+        1,
         registered_date
       );
     } else {
@@ -74,9 +71,14 @@ export const getAllPixelRegisterController = async (req, res) => {
   try {
     const response = await getAllPixelRegisterService();
 
+    const output = await response.map((item) => ({
+      ...item,
+      time: dayjs(item?.registered_date).format("hh:mm A"),
+    }));
+
     return res.status(200).json({
       message: "Data fetched successfully",
-      data: response,
+      data: output,
     });
   } catch (err) {
     return res.status(500).json({
@@ -85,4 +87,38 @@ export const getAllPixelRegisterController = async (req, res) => {
   }
 };
 
-export const getByIdPixelRegisterController = async (req, res) => {};
+export const getByIdPixelRegisterController = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const response = await getByIdPixelRegisterService(id);
+
+    return res.status(200).json({
+      message: "Data fetched successfully",
+      data: {
+        ...response,
+        time: dayjs(response?.registered_date).format("hh:mm A"),
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({
+      message: err?.message,
+    });
+  }
+};
+
+export const deleteByIdPixelRegisterController = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await deleteByIdPixelRegisterService(id);
+
+    return res.status(200).json({
+      message: "Data removed successfully",
+    });
+  } catch (err) {
+    return req.status(500).json({
+      message: err?.message,
+    });
+  }
+};

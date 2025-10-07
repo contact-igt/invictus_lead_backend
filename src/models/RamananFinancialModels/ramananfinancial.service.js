@@ -1,25 +1,34 @@
 import db from "../../database/index.js";
 import { tableName } from "../../database/tables/tableName.js";
 
-export const createRegisterService = async (
+export const createRamananFinancialRegisterService = async (
   name,
   email,
   mobile,
+  area_of_interest,
   message,
   registered_date
 ) => {
-  const Query = `INSERT INTO ${tableName?.VLSLAWACADEMY} 
+  const Query = `INSERT INTO ${tableName?.RAMANANFINANCIAL} 
   (  
   name,
   email,
   mobile,
+  area_of_interest,
   message,
   registered_date
   ) 
-  VALUES (?,?,?,?,?)`;
+  VALUES (?,?,?,?,?,?)`;
 
   try {
-    const values = [name, email, mobile, message, registered_date];
+    const values = [
+      name,
+      email,
+      mobile,
+      area_of_interest,
+      message,
+      registered_date,
+    ];
 
     const [result] = await db.sequelize.query(Query, { replacements: values });
     return result;
@@ -28,8 +37,8 @@ export const createRegisterService = async (
   }
 };
 
-export const getAllRegisterService = async () => {
-  const Query = `SELECT * FROM ${tableName?.VLSLAWACADEMY} ORDER BY registered_date DESC`;
+export const getAllRamananFinancialRegisterService = async () => {
+  const Query = `SELECT * FROM ${tableName?.RAMANANFINANCIAL} ORDER BY registered_date DESC`;
 
   try {
     const [result] = await db.sequelize.query(Query);
@@ -39,8 +48,8 @@ export const getAllRegisterService = async () => {
   }
 };
 
-export const getByIdRegisterService = async (id) => {
-  const Query = `SELECT * FROM ${tableName?.VLSLAWACADEMY} WHERE id = ?`;
+export const getByIdRamananFinancialRegisterService = async (id) => {
+  const Query = `SELECT * FROM ${tableName?.RAMANANFINANCIAL} WHERE id = ?`;
 
   try {
     const [result] = await db.sequelize.query(Query, { replacements: [id] });
@@ -50,8 +59,8 @@ export const getByIdRegisterService = async (id) => {
   }
 };
 
-export const deleteRegisterService = async (id) => {
-  const Query = `DELETE FROM ${tableName?.VLSLAWACADEMY} WHERE id = ?`;
+export const deleteByIdRamananFinancialRegisterService = async (id) => {
+  const Query = `DELETE FROM ${tableName?.RAMANANFINANCIAL} WHERE id = ?`;
 
   try {
     const [result] = await db.sequelize.query(Query, { replacements: [id] });

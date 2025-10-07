@@ -1,7 +1,7 @@
 import { tableName } from "../tableName.js";
 
-export const vlslawpracticeTable = (Sequelize, sequelize) => {
-  return sequelize.define(tableName?.VLSLAWPRACTISE, {
+export const wellinitTable = (Sequelize, sequelize) => {
+  return sequelize.define(tableName?.WELLINIT, {
     name: {
       type: Sequelize.STRING,
       allowNull: true,
@@ -17,38 +17,18 @@ export const vlslawpracticeTable = (Sequelize, sequelize) => {
       allowNull: true,
     },
 
-    amount: {
+    provider: {
       type: Sequelize.STRING,
       allowNull: true,
     },
 
-    razorpay_order_id: {
-      type: Sequelize.STRING,
+    message: {
+      type: Sequelize.TEXT,
       allowNull: true,
     },
 
-    razorpay_payment_id: {
-      type: Sequelize.STRING,
-      allowNull: true,
-    },
-
-    razorpay_signature: {
-      type: Sequelize.STRING,
-      allowNull: true,
-    },
-
-    payment_status: {
-      type: Sequelize.ENUM("paid", "failed", "attempted", "cancelled"),
-      allowNull: false,
-    },
-
-    captured: {
-      type: Sequelize.BOOLEAN,
-      defaultValue: true,
-    },
-
-    page_name: {
-      type: Sequelize.ENUM("decoding-of-practice", "decoding-of-law-practice"),
+    registered_date: {
+      type: Sequelize.DATE,
       allowNull: false,
     },
 
@@ -67,6 +47,3 @@ export const vlslawpracticeTable = (Sequelize, sequelize) => {
     },
   });
 };
-
-
-

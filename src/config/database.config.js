@@ -10,6 +10,13 @@ const DatabaseEnvironmentConfig = {
     databse: process.env.DATABASE_PRO_DB,
   },
 
+  development: {
+    host: process.env.DATABASE_DEV_HOST,
+    user: process.env.DATABASE_DEV_USER,
+    password: process.env.DATABASE_DEV_PASSWORD,
+    databse: process.env.DATABASE_DEV_DB,
+  },
+
   local: {
     host: process.env.DATABASE_HOST,
     user: process.env.DATABASE_USER,
@@ -19,5 +26,3 @@ const DatabaseEnvironmentConfig = {
 };
 
 export default DatabaseEnvironmentConfig;
-
-
