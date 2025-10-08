@@ -8,7 +8,15 @@ import {
 } from "./ramananfinancial.service.js";
 
 export const createRamananFinancialRegisterController = async (req, res) => {
-  const { name, email, mobile, area_of_interest, message } = req.body;
+  const {
+    name,
+    email,
+    mobile,
+    area_of_interest,
+    message,
+    ip_address,
+    utm_source,
+  } = req.body;
 
   const requiredFields = {
     mobile,
@@ -32,7 +40,9 @@ export const createRamananFinancialRegisterController = async (req, res) => {
       mobile ? mobile : null,
       area_of_interest ? area_of_interest : null,
       message ? message : null,
-      registered_date
+      registered_date,
+      ip_address ? ip_address : null,
+      utm_source ? utm_source : null
     );
 
     return res.status(200).json({
@@ -73,7 +83,10 @@ export const getByIdRamananFinancialRegisterController = async (req, res) => {
 
     return res.status(200).json({
       message: "Data fetched successfully",
-      data: response,
+      data: {
+        ...response,
+        time: dayjs(response?.registered_date).format("hh:mm A"),
+      },
     });
   } catch (err) {
     return res.status(500).json({

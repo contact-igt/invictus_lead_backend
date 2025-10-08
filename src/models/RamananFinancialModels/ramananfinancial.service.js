@@ -7,7 +7,9 @@ export const createRamananFinancialRegisterService = async (
   mobile,
   area_of_interest,
   message,
-  registered_date
+  registered_date,
+  ip_address,
+  utm_source
 ) => {
   const Query = `INSERT INTO ${tableName?.RAMANANFINANCIAL} 
   (  
@@ -16,9 +18,11 @@ export const createRamananFinancialRegisterService = async (
   mobile,
   area_of_interest,
   message,
-  registered_date
+  registered_date,
+  ip_address ,	
+  utm_source
   ) 
-  VALUES (?,?,?,?,?,?)`;
+  VALUES (?,?,?,?,?,?,?,?)`;
 
   try {
     const values = [
@@ -28,6 +32,8 @@ export const createRamananFinancialRegisterService = async (
       area_of_interest,
       message,
       registered_date,
+      ip_address,
+      utm_source,
     ];
 
     const [result] = await db.sequelize.query(Query, { replacements: values });

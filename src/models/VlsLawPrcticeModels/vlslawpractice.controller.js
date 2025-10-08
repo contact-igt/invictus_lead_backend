@@ -20,6 +20,8 @@ export const createRegisterController = async (req, res) => {
     payment_status,
     captured,
     page_name,
+    ip_address,
+    utm_source,
   } = req.body;
 
   const requiredFields = {
@@ -53,7 +55,9 @@ export const createRegisterController = async (req, res) => {
       razorpay_signature ? razorpay_signature : null,
       payment_status,
       captured ? captured : true,
-      page_name
+      page_name,
+      ip_address ? ip_address : null,
+      utm_source ? utm_source : null
     );
 
     return res.status(200).json({
@@ -94,7 +98,7 @@ export const getByIdRegisterController = async (req, res) => {
 
     return res.status(200).json({
       message: "Data fetched successfully",
-      data: response,
+      data:  {...response , time : dayjs(response?.registered_date).format("hh:mm A")},
     });
   } catch (err) {
     return res.status(500).json({

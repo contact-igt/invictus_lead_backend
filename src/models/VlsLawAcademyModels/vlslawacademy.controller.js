@@ -8,7 +8,7 @@ import {
 } from "./vlslawacademy.service.js";
 
 export const createRegisterController = async (req, res) => {
-  const { name, email, mobile, message } = req.body;
+  const { name, email, mobile, message, ip_address, utm_source } = req.body;
 
   const requiredFields = {
     mobile,
@@ -31,7 +31,9 @@ export const createRegisterController = async (req, res) => {
       email ? email : null,
       mobile ? mobile : null,
       message ? message : null,
-      registered_date
+      registered_date,
+      ip_address ? ip_address : null,
+      utm_source ? utm_source : null
     );
 
     return res.status(200).json({
@@ -72,7 +74,10 @@ export const getByIdRegisterController = async (req, res) => {
 
     return res.status(200).json({
       message: "Data fetched successfully",
-      data: response,
+      data: {
+        ...response,
+        time: dayjs(response?.registered_date).format("hh:mm A"),
+      },
     });
   } catch (err) {
     return res.status(500).json({

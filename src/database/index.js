@@ -10,6 +10,7 @@ import { krInstituteTable } from "./tables/KrInstituteTable/index.js";
 import { mirraBuildersTable } from "./tables/MirraBuildersTable/index.js";
 import { wellinitTable } from "./tables/WellinitTable/index.js";
 import { invictusTable } from "./tables/InvictusTable/index.js";
+import { invictusMetaTable } from "./tables/InvictusMetaTable/index.js";
 
 const dbconfig =
   ServerEnvironmentConfig?.server?.line === "production"
@@ -43,5 +44,9 @@ db.KrInstitute = krInstituteTable(Sequelize, sequelize);
 db.MirraBuilders = mirraBuildersTable(Sequelize, sequelize);
 db.wellinit = wellinitTable(Sequelize, sequelize);
 db.invictus = invictusTable(Sequelize, sequelize);
+db.invictusmeta = invictusMetaTable(Sequelize , sequelize);
 
 export default db;
+
+
+

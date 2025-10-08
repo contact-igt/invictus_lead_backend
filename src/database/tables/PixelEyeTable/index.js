@@ -31,7 +31,7 @@ export const pixelEyeTable = (Sequelize, sequelize) => {
     },
 
     page_name: {
-      type: Sequelize.ENUM("lasik", "retina", "squint", "cataract"),
+      type: Sequelize.STRING,
       allowNull: false,
     },
 
@@ -39,6 +39,7 @@ export const pixelEyeTable = (Sequelize, sequelize) => {
       type: Sequelize.INTEGER,
       allowNull: false,
     },
+
 
     registered_date: {
       type: Sequelize.DATE,
@@ -60,5 +61,3 @@ export const pixelEyeTable = (Sequelize, sequelize) => {
     },
   });
 };
-
-

@@ -6,7 +6,9 @@ export const createRegisterService = async (
   email,
   mobile,
   message,
-  registered_date
+  registered_date,
+  ip_address,
+  utm_source
 ) => {
   const Query = `INSERT INTO ${tableName?.VLSLAWACADEMY} 
   (  
@@ -14,12 +16,22 @@ export const createRegisterService = async (
   email,
   mobile,
   message,
-  registered_date
+  registered_date,
+  ip_address,
+  utm_source
   ) 
-  VALUES (?,?,?,?,?)`;
+  VALUES (?,?,?,?,?,?,?)`;
 
   try {
-    const values = [name, email, mobile, message, registered_date];
+    const values = [
+      name,
+      email,
+      mobile,
+      message,
+      registered_date,
+      ip_address,
+      utm_source,
+    ];
 
     const [result] = await db.sequelize.query(Query, { replacements: values });
     return result;

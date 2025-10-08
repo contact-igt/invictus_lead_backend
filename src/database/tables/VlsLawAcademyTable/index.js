@@ -24,6 +24,16 @@ export const vlsLawAcademyTable = (Sequelize, sequelize) => {
       allowNull: false,
     },
 
+    ip_address: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+
+    utm_source: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+
     createdAt: {
       type: "TIMESTAMP",
       defaultValue: sequelize.literal("CURRENT_TIMESTAMP"),

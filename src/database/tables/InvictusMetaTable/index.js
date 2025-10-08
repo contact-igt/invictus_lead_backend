@@ -38,24 +38,28 @@ export const invictusMetaTable = (Sequelize, sequelize) => {
     },
 
     package_interested: {
-      type: Sequelize.ENUM("starter", "growth", "premium", "not sure yet"),
+      type: Sequelize.STRING,
       allowNull: true,
     },
 
     planning_to_start: {
-      type: Sequelize.ENUM(
-        "immediately",
-        "within 1 week",
-        "in 2-3 weeks",
-        "next month",
-        "just exploring"
-      ),
+      type: Sequelize.STRING,
       allowNull: false,
     },
 
     registered_date: {
       type: Sequelize.DATE,
       allowNull: false,
+    },
+
+    ip_address: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+
+    utm_source: {
+      type: Sequelize.STRING,
+      allowNull: true,
     },
 
     createdAt: {

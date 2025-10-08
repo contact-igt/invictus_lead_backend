@@ -13,7 +13,9 @@ export const createRegisterService = async (
   razorpay_signature,
   payment_status,
   captured,
-  page_name
+  page_name,
+  ip_address,
+  utm_source
 ) => {
   const Query = `INSERT INTO ${tableName?.VLSLAWPRACTISE} 
   (name, 
@@ -27,8 +29,12 @@ export const createRegisterService = async (
   razorpay_signature,	
   payment_status,	
   captured, 
-  page_name) 
-  VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`;
+  page_name,
+    ip_address,
+    utm_source
+  
+  ) 
+  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
   try {
     const values = [
@@ -44,6 +50,8 @@ export const createRegisterService = async (
       payment_status,
       captured,
       page_name,
+      ip_address,
+      utm_source,
     ];
 
     const [result] = await db.sequelize.query(Query, { replacements: values });
