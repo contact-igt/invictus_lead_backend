@@ -11,6 +11,9 @@ import { mirraBuildersTable } from "./tables/MirraBuildersTable/index.js";
 import { wellinitTable } from "./tables/WellinitTable/index.js";
 import { invictusTable } from "./tables/InvictusTable/index.js";
 import { invictusMetaTable } from "./tables/InvictusMetaTable/index.js";
+import { naitrikaTable } from "./tables/NaitrikaTable/index.js";
+import { netralyaTable } from "./tables/NetralayaTable/index.js";
+import { mahimmyfoodsTable } from "./tables/MahimmyfoodsTable/index.js";
 
 const dbconfig =
   ServerEnvironmentConfig?.server?.line === "production"
@@ -44,9 +47,9 @@ db.KrInstitute = krInstituteTable(Sequelize, sequelize);
 db.MirraBuilders = mirraBuildersTable(Sequelize, sequelize);
 db.wellinit = wellinitTable(Sequelize, sequelize);
 db.invictus = invictusTable(Sequelize, sequelize);
-db.invictusmeta = invictusMetaTable(Sequelize , sequelize);
+db.invictusmeta = invictusMetaTable(Sequelize, sequelize);
+db.naitrika = naitrikaTable(Sequelize, sequelize);
+db.netralya = netralyaTable(Sequelize, sequelize);
+db.mahimmyfoods = mahimmyfoodsTable(Sequelize, sequelize);
 
 export default db;
-
-
-

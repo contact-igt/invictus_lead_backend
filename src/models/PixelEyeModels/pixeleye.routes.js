@@ -5,12 +5,25 @@ import {
   getAllPixelRegisterController,
   getByIdPixelRegisterController,
 } from "./pixeleye.controller.js";
+import { authenticateManagementToken } from "../../middlewares/auth/authMiddlewares.js";
 
 const Router = express.Router();
 
 Router.post("/pixel-eye", createPixelRegisterController);
-Router.get("/pixel-eyes", getAllPixelRegisterController);
-Router.get("/pixel-eye/:id", getByIdPixelRegisterController);
-Router.delete("/pixel-eye/:id", deleteByIdPixelRegisterController);
+Router.get(
+  "/pixel-eyes",
+  authenticateManagementToken,
+  getAllPixelRegisterController
+);
+Router.get(
+  "/pixel-eye/:id",
+  authenticateManagementToken,
+  getByIdPixelRegisterController
+);
+Router.delete(
+  "/pixel-eye/:id",
+  authenticateManagementToken,
+  deleteByIdPixelRegisterController
+);
 
 export default Router;

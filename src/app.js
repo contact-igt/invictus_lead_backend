@@ -6,8 +6,16 @@ import db from "./database/index.js";
 import VlsLawPracticeRouter from "./models/VlsLawPrcticeModels/vlslawpractice.routes.js";
 import ManagementRouter from "./models/ManagementModels/management.routes.js";
 import VlsLawAcademyRouter from "./models/VlsLawAcademyModels/vlslawacademy.routes.js";
-import PixelEyeRouter from "./models/PixelEyeModels/pixeleye.routes.js"
-import RamananFinancialRouter from "./models/RamananFinancialModels/ramananfinancial.routes.js"
+import PixelEyeRouter from "./models/PixelEyeModels/pixeleye.routes.js";
+import RamananFinancialRouter from "./models/RamananFinancialModels/ramananfinancial.routes.js";
+import KrinstituteRouter from "./models/KrinstituteModels/krinstitute.routes.js";
+import WellinitRouter from "./models/WellinitModels/wellinit.routes.js";
+import NaitrikaRouter from "./models/NaitrikaModels/naitrika.routes.js";
+import NetralyaRouter from "./models/NetralyaModels/netralaya.routes.js";
+import MahimmyfoodsRouter from "./models/MahimmyfoodsModels/mahimmyfoods.routes.js";
+import InvictusRouter from "./models/InvictusModels/invictus.routes.js";
+import InvictusMetaRouter from "./models/InvictusMetaModels/invictusmeta.routes.js";
+import MirraBuilderRouter from "./models/MirraBuilderModels/mirrabuiler.routes.js";
 
 const app = express();
 const corsOptions = {
@@ -36,7 +44,22 @@ const connect_mysql = async () => {
 
 connect_mysql();
 
-app.use("/api/v1", VlsLawPracticeRouter, ManagementRouter, VlsLawAcademyRouter , PixelEyeRouter , RamananFinancialRouter );
+app.use(
+  "/api/v1",
+  VlsLawPracticeRouter,
+  ManagementRouter,
+  VlsLawAcademyRouter,
+  PixelEyeRouter,
+  RamananFinancialRouter,
+  KrinstituteRouter,
+  WellinitRouter,
+  NaitrikaRouter,
+  NetralyaRouter,
+  MahimmyfoodsRouter,
+  InvictusRouter,
+  InvictusMetaRouter,
+  MirraBuilderRouter
+);
 
 app.listen(
   ServerEnvironmentConfig?.server?.line == "production"
@@ -49,13 +72,6 @@ app.listen(
           ? ServerEnvironmentConfig?.server?.live
           : ServerEnvironmentConfig?.server?.local
       }`
-    );
-    console.log(
-      `Swagger docs available at http://localhost:${
-        ServerEnvironmentConfig?.server?.line == "production"
-          ? ServerEnvironmentConfig?.server?.live
-          : ServerEnvironmentConfig?.server?.local
-      }/api-docs`
     );
   }
 );

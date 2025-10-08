@@ -38,7 +38,6 @@ export const mirraBuildersTable = (Sequelize, sequelize) => {
     },
 
     
-
     utm_source: {
       type: Sequelize.STRING,
       allowNull: true,

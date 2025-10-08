@@ -1,33 +1,36 @@
 import db from "../../database/index.js";
 import { tableName } from "../../database/tables/tableName.js";
 
-export const createKrinstituteRegisterService = async (
+export const createWellinitRegisterService = async (
   name,
   mobile,
   email,
-  course,
+  provider,
+  message,
   registered_date,
   ip_address,
   utm_source
 ) => {
-  const Query = `INSERT INTO ${tableName?.KRINSTITUTE} 
+  const Query = `INSERT INTO ${tableName?.WELLINIT} 
   (  
   name,
-  email,
   mobile,
-  course,
+  email,
+  provider,
+  message,
   registered_date,
   ip_address,
   utm_source
   ) 
-  VALUES (?,?,?,?,?,?,?)`;
+  VALUES (?,?,?,?,?,?,?,?)`;
 
   try {
     const values = [
       name,
-      email,
       mobile,
-      course,
+      email,
+      provider,
+      message,
       registered_date,
       ip_address,
       utm_source,
@@ -40,8 +43,8 @@ export const createKrinstituteRegisterService = async (
   }
 };
 
-export const getAllKrinstituteRegisterService = async () => {
-  const Query = `SELECT * FROM ${tableName?.KRINSTITUTE} ORDER BY registered_date DESC`;
+export const getAllWellinitRegisterService = async () => {
+  const Query = `SELECT * FROM ${tableName?.WELLINIT} ORDER BY registered_date DESC`;
 
   try {
     const [result] = await db.sequelize.query(Query);
@@ -51,8 +54,8 @@ export const getAllKrinstituteRegisterService = async () => {
   }
 };
 
-export const getByIdKrinstituteRegisterService = async (id) => {
-  const Query = `SELECT * FROM ${tableName?.KRINSTITUTE} WHERE id = ?`;
+export const getByIdWellinitRegisterService = async (id) => {
+  const Query = `SELECT * FROM ${tableName?.WELLINIT} WHERE id = ?`;
 
   try {
     const [result] = await db.sequelize.query(Query, { replacements: [id] });
@@ -62,8 +65,8 @@ export const getByIdKrinstituteRegisterService = async (id) => {
   }
 };
 
-export const deleteByIdKrinstituteRegisterService = async (id) => {
-  const Query = `DELETE FROM ${tableName?.KRINSTITUTE} WHERE id = ?`;
+export const deleteByIdWellinitRegisterService = async (id) => {
+  const Query = `DELETE FROM ${tableName?.WELLINIT} WHERE id = ?`;
 
   try {
     const [result] = await db.sequelize.query(Query, { replacements: [id] });

@@ -1,15 +1,17 @@
 import dayjs from "dayjs";
 import { missingFieldsChecker } from "../../utils/missingFieldChecker.js";
 
-import {
-  createKrinstituteRegisterService,
-  deleteByIdKrinstituteRegisterService,
-  getAllKrinstituteRegisterService,
-  getByIdKrinstituteRegisterService,
-} from "./krinstitute.service.js";
 
-export const createKrinstituteRegisterController = async (req, res) => {
-  const { name, mobile, email, course, ip_address, utm_source } = req.body;
+import {
+  createNaitrikaRegisterService,
+  deleteByIdNaitrikaRegisterService,
+  getAllNaitrikaRegisterService,
+  getByIdNaitrikaRegisterService,
+} from "./naitrika.service.js";
+
+export const createNaitrikaRegisterController = async (req, res) => {
+  const { name, mobile, email, service, message, ip_address, utm_source } =
+    req.body;
 
   const requiredFields = {
     mobile,
@@ -27,11 +29,12 @@ export const createKrinstituteRegisterController = async (req, res) => {
   const registered_date = dayjs().format("YYYY-MM-DD hh:mm:ss");
 
   try {
-    await createKrinstituteRegisterService(
+    await createNaitrikaRegisterService(
       name ? name : null,
       mobile ? mobile : null,
       email ? email : null,
-      course ? course : null,
+      service ? service : null,
+      message ? message : null,
       registered_date,
       ip_address ? ip_address : null,
       utm_source ? utm_source : null
@@ -47,9 +50,9 @@ export const createKrinstituteRegisterController = async (req, res) => {
   }
 };
 
-export const getAllKrinstituteRegisterController = async (req, res) => {
+export const getAllNaitrikaRegisterController = async (req, res) => {
   try {
-    const response = await getAllKrinstituteRegisterService();
+    const response = await getAllNaitrikaRegisterService();
 
     const output = response?.map((item) => ({
       ...item,
@@ -67,11 +70,11 @@ export const getAllKrinstituteRegisterController = async (req, res) => {
   }
 };
 
-export const getByIdKrinstituteRegisterController = async (req, res) => {
+export const getByIdNaitrikaRegisterController = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const response = await getByIdKrinstituteRegisterService(id);
+    const response = await getByIdNaitrikaRegisterService(id);
 
     return res.status(200).json({
       message: "Data fetched successfully",
@@ -87,11 +90,11 @@ export const getByIdKrinstituteRegisterController = async (req, res) => {
   }
 };
 
-export const deleteByIdKrinstituteRegisterController = async (req, res) => {
+export const deleteByIdNaitrikaRegisterController = async (req, res) => {
   const { id } = req.params;
 
   try {
-    await deleteByIdKrinstituteRegisterService(id);
+    await deleteByIdNaitrikaRegisterService(id);
 
     return res.status(200).json({
       message: "Data removed successfully",

@@ -1,7 +1,7 @@
 import { tableName } from "../tableName.js";
 
-export const invictusMetaTable = (Sequelize, sequelize) => {
-  return sequelize.define(tableName?.INVICTUSMETAADDS, {
+export const naitrikaTable = (Sequelize, sequelize) => {
+  return sequelize.define(tableName?.NITRIKAEYECARE, {
     name: {
       type: Sequelize.STRING,
       allowNull: true,
@@ -12,39 +12,18 @@ export const invictusMetaTable = (Sequelize, sequelize) => {
       allowNull: true,
     },
 
-    business_name: {
+    email: {
       type: Sequelize.STRING,
       allowNull: true,
     },
 
-    bussiness_belongs: {
+    service: {
       type: Sequelize.STRING,
       allowNull: true,
     },
 
-    monthly_ad_budget: {
-      type: Sequelize.STRING,
-      allowNull: true,
-    },
-
-    primary_goal_metads: {
-      type: Sequelize.STRING,
-      allowNull: true,
-    },
-
-    metaad_run_before: {
-      type: Sequelize.ENUM("yes", "no"),
-      allowNull: false,
-      defaultValue: "no",
-    },
-
-    package_interested: {
-      type: Sequelize.STRING,
-      allowNull: true,
-    },
-
-    planning_to_start: {
-      type: Sequelize.STRING,
+    message: {
+      type: Sequelize.TEXT,
       allowNull: true,
     },
 

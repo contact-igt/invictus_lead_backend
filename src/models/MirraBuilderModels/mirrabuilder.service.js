@@ -1,33 +1,36 @@
 import db from "../../database/index.js";
 import { tableName } from "../../database/tables/tableName.js";
 
-export const createKrinstituteRegisterService = async (
+export const createMirrabuildersRegisterService = async (
   name,
   mobile,
-  email,
-  course,
+  interest_green_building,
+  plot_build,
+  budget,
   registered_date,
   ip_address,
   utm_source
 ) => {
-  const Query = `INSERT INTO ${tableName?.KRINSTITUTE} 
+  const Query = `INSERT INTO ${tableName?.MIRRABUILDERS} 
   (  
-  name,
-  email,
-  mobile,
-  course,
-  registered_date,
-  ip_address,
-  utm_source
+    name,
+    mobile,
+    interest_green_building,
+    plot_build,
+    budget,
+    registered_date,
+    ip_address,
+    utm_source,
   ) 
-  VALUES (?,?,?,?,?,?,?)`;
+  VALUES (?,?,?,?,?,?,?,?)`;
 
   try {
     const values = [
       name,
-      email,
       mobile,
-      course,
+      interest_green_building,
+      plot_build,
+      budget,
       registered_date,
       ip_address,
       utm_source,
@@ -40,8 +43,8 @@ export const createKrinstituteRegisterService = async (
   }
 };
 
-export const getAllKrinstituteRegisterService = async () => {
-  const Query = `SELECT * FROM ${tableName?.KRINSTITUTE} ORDER BY registered_date DESC`;
+export const getAllMirrabuildersRegisterService = async () => {
+  const Query = `SELECT * FROM ${tableName?.MIRRABUILDERS} ORDER BY registered_date DESC`;
 
   try {
     const [result] = await db.sequelize.query(Query);
@@ -51,8 +54,8 @@ export const getAllKrinstituteRegisterService = async () => {
   }
 };
 
-export const getByIdKrinstituteRegisterService = async (id) => {
-  const Query = `SELECT * FROM ${tableName?.KRINSTITUTE} WHERE id = ?`;
+export const getByIdMirrabuildersRegisterService = async (id) => {
+  const Query = `SELECT * FROM ${tableName?.MIRRABUILDERS} WHERE id = ?`;
 
   try {
     const [result] = await db.sequelize.query(Query, { replacements: [id] });
@@ -62,8 +65,8 @@ export const getByIdKrinstituteRegisterService = async (id) => {
   }
 };
 
-export const deleteByIdKrinstituteRegisterService = async (id) => {
-  const Query = `DELETE FROM ${tableName?.KRINSTITUTE} WHERE id = ?`;
+export const deleteByIdMirrabuildersRegisterService = async (id) => {
+  const Query = `DELETE FROM ${tableName?.MIRRABUILDERS} WHERE id = ?`;
 
   try {
     const [result] = await db.sequelize.query(Query, { replacements: [id] });

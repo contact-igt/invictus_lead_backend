@@ -1,7 +1,7 @@
 import { tableName } from "../tableName.js";
 
-export const invictusMetaTable = (Sequelize, sequelize) => {
-  return sequelize.define(tableName?.INVICTUSMETAADDS, {
+export const netralyaTable = (Sequelize, sequelize) => {
+  return sequelize.define(tableName?.NETRALAYA, {
     name: {
       type: Sequelize.STRING,
       allowNull: true,
@@ -12,47 +12,6 @@ export const invictusMetaTable = (Sequelize, sequelize) => {
       allowNull: true,
     },
 
-    business_name: {
-      type: Sequelize.STRING,
-      allowNull: true,
-    },
-
-    bussiness_belongs: {
-      type: Sequelize.STRING,
-      allowNull: true,
-    },
-
-    monthly_ad_budget: {
-      type: Sequelize.STRING,
-      allowNull: true,
-    },
-
-    primary_goal_metads: {
-      type: Sequelize.STRING,
-      allowNull: true,
-    },
-
-    metaad_run_before: {
-      type: Sequelize.ENUM("yes", "no"),
-      allowNull: false,
-      defaultValue: "no",
-    },
-
-    package_interested: {
-      type: Sequelize.STRING,
-      allowNull: true,
-    },
-
-    planning_to_start: {
-      type: Sequelize.STRING,
-      allowNull: true,
-    },
-
-    registered_date: {
-      type: Sequelize.DATE,
-      allowNull: false,
-    },
-
     ip_address: {
       type: Sequelize.STRING,
       allowNull: true,
@@ -61,6 +20,21 @@ export const invictusMetaTable = (Sequelize, sequelize) => {
     utm_source: {
       type: Sequelize.STRING,
       allowNull: true,
+    },
+
+    page_name: {
+      type: Sequelize.STRING,
+      allowNull: false,
+    },
+
+    enquiry_count: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+    },
+
+    registered_date: {
+      type: Sequelize.DATE,
+      allowNull: false,
     },
 
     createdAt: {
