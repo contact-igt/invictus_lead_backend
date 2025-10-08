@@ -22,6 +22,16 @@ export const vlslawpracticeTable = (Sequelize, sequelize) => {
       allowNull: true,
     },
 
+    registered_date: {
+      type: Sequelize.DATE,
+      allowNull: false,
+    },
+
+    programm_date: {
+      type: Sequelize.DATE,
+      allowNull: false,
+    },
+
     razorpay_order_id: {
       type: Sequelize.STRING,
       allowNull: true,
@@ -67,6 +77,3 @@ export const vlslawpracticeTable = (Sequelize, sequelize) => {
     },
   });
 };
-
-
-

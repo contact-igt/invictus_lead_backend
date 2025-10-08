@@ -22,7 +22,7 @@ export const invictusMetaTable = (Sequelize, sequelize) => {
       allowNull: true,
     },
 
-    ad_budget: {
+    monthly_ad_budget: {
       type: Sequelize.STRING,
       allowNull: true,
     },
@@ -37,7 +37,7 @@ export const invictusMetaTable = (Sequelize, sequelize) => {
       allowNull: true,
     },
 
-    package: {
+    package_interested: {
       type: Sequelize.ENUM("starter", "growth", "premium", "not sure yet"),
       allowNull: true,
     },

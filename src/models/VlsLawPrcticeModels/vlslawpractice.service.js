@@ -6,6 +6,8 @@ export const createRegisterService = async (
   email,
   mobile,
   amount,
+  programm_date,
+  registered_date,
   razorpay_order_id,
   razorpay_payment_id,
   razorpay_signature,
@@ -14,8 +16,19 @@ export const createRegisterService = async (
   page_name
 ) => {
   const Query = `INSERT INTO ${tableName?.VLSLAWPRACTISE} 
-  (name , email , mobile , amount , razorpay_order_id,	razorpay_payment_id,razorpay_signature,	payment_status,	captured , page_name) 
-  VALUES (?,?,?,?,?,?,?,?,?,?)`;
+  (name, 
+  email, 
+  mobile,
+  amount, 
+  programm_date,
+  registered_date,
+  razorpay_order_id,	
+  razorpay_payment_id,
+  razorpay_signature,	
+  payment_status,	
+  captured, 
+  page_name) 
+  VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`;
 
   try {
     const values = [
@@ -23,6 +36,8 @@ export const createRegisterService = async (
       email,
       mobile,
       amount,
+      programm_date,
+      registered_date,
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,

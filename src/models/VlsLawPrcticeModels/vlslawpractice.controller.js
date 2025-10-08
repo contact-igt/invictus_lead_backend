@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 import { missingFieldsChecker } from "../../utils/missingFieldChecker.js";
 import {
   createRegisterService,
@@ -12,12 +13,13 @@ export const createRegisterController = async (req, res) => {
     email,
     mobile,
     amount,
+    programm_date,
     razorpay_order_id,
     razorpay_payment_id,
     razorpay_signature,
     payment_status,
     captured,
-    page_name
+    page_name,
   } = req.body;
 
   const requiredFields = {
@@ -36,12 +38,16 @@ export const createRegisterController = async (req, res) => {
     });
   }
 
+  const registered_date = dayjs().format("YYYY-MM-DD hh:mm:ss");
+
   try {
     await createRegisterService(
       name ? name : null,
       email,
       mobile,
       amount,
+      programm_date,
+      registered_date,
       razorpay_order_id ? razorpay_order_id : null,
       razorpay_payment_id ? razorpay_payment_id : null,
       razorpay_signature ? razorpay_signature : null,
@@ -64,9 +70,14 @@ export const getAllRegisterController = async (req, res) => {
   try {
     const response = await getAllRegisterService();
 
+    const output = await response.map((item) => ({
+      ...item,
+      time: dayjs(item?.registered_date).format("hh:mm A"),
+    }));
+
     return res.status(200).json({
       message: "Data fetched successfully",
-      data: response,
+      data: output,
     });
   } catch (err) {
     return res.status(500).json({
