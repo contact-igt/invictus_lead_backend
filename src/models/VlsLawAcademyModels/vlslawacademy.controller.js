@@ -50,14 +50,14 @@ export const getAllRegisterController = async (req, res) => {
   try {
     const response = await getAllRegisterService();
 
-    const output = response?.map((item) => ({
-      ...item,
-      time: dayjs(item?.registered_date).format("hh:mm A"),
-    }));
+    // const output = response?.map((item) => ({
+    //   ...item,
+    //   time: dayjs(item?.registered_date).format("hh:mm A"),
+    // }));
 
     return res.status(200).json({
       message: "Data fetched successfully",
-      data: output,
+      data: response,
     });
   } catch (err) {
     return res.status(500).json({
@@ -74,10 +74,7 @@ export const getByIdRegisterController = async (req, res) => {
 
     return res.status(200).json({
       message: "Data fetched successfully",
-      data: {
-        ...response,
-        time: dayjs(response?.registered_date).format("hh:mm A"),
-      },
+      data: response,
     });
   } catch (err) {
     return res.status(500).json({
