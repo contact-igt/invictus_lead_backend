@@ -64,14 +64,20 @@ app.use(
 app.listen(
   ServerEnvironmentConfig?.server?.line == "production"
     ? ServerEnvironmentConfig?.server?.live
+    : ServerEnvironmentConfig?.server?.line == "development"
+    ? ServerEnvironmentConfig?.server?.development
     : ServerEnvironmentConfig?.server?.local,
   () => {
     console.log(
       `server connected ${
         ServerEnvironmentConfig?.server?.line == "production"
           ? ServerEnvironmentConfig?.server?.live
+          : ServerEnvironmentConfig?.server?.line == "development"
+          ? ServerEnvironmentConfig?.server?.development
           : ServerEnvironmentConfig?.server?.local
       }`
     );
   }
 );
+
+

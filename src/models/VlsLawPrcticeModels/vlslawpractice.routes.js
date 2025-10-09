@@ -10,6 +10,8 @@ import { authenticateManagementToken } from "../../middlewares/auth/authMiddlewa
 const Router = express.Router();
 
 Router.post("/vls-law-practice", createRegisterController);
+
+
 Router.get(
   "/vls-law-practices",
   authenticateManagementToken,
