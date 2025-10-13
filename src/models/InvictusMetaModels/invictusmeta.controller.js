@@ -24,7 +24,6 @@ export const createInvictusmetaRegisterController = async (req, res) => {
 
   const requiredFields = {
     mobile,
-    email,
   };
 
   const missingFields = await missingFieldsChecker(requiredFields);
