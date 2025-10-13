@@ -10,19 +10,19 @@ import {
 
 const Router = express.Router();
 
-Router.post("/netralya", createNetralyaRegisterController);
+Router.post("/netralaya", createNetralyaRegisterController);
 Router.get(
-  "/netralyas",
+  "/netralayas",
   authenticateManagementToken,
   getAllNetralyaRegisterController
 );
 Router.get(
-  "/netralya/:id",
+  "/netralaya/:id",
   authenticateManagementToken,
   getByIdNetralyaRegisterController
 );
 Router.delete(
-  "/netralya/:id",
+  "/netralaya/:id",
   authenticateManagementToken,
   deleteByIdNetralyaRegisterController
 );
