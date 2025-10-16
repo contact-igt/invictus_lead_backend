@@ -7,6 +7,7 @@ import {
   getByIdMahimmyRegisterController,
 } from "./mahimmyfoods.controller.js";
 
+
 const Router = express.Router();
 
 Router.post("/mahimmy-food", createMahimmyRegisterController);
