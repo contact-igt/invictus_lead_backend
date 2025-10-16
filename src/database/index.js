@@ -14,6 +14,7 @@ import { invictusMetaTable } from "./tables/InvictusMetaTable/index.js";
 import { naitrikaTable } from "./tables/NaitrikaTable/index.js";
 import { netralyaTable } from "./tables/NetralayaTable/index.js";
 import { mahimmyfoodsTable } from "./tables/MahimmyfoodsTable/index.js";
+import { vlslawaibeTable } from "./tables/VlsLawAibeTable/index.js";
 
 const dbconfig =
   ServerEnvironmentConfig?.server?.line === "production"
@@ -51,5 +52,6 @@ db.invictusmeta = invictusMetaTable(Sequelize, sequelize);
 db.naitrika = naitrikaTable(Sequelize, sequelize);
 db.netralya = netralyaTable(Sequelize, sequelize);
 db.mahimmyfoods = mahimmyfoodsTable(Sequelize, sequelize);
+db.VlsLawAibe = vlslawaibeTable(Sequelize, sequelize);
 
 export default db;

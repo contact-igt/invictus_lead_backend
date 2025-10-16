@@ -16,6 +16,7 @@ import MahimmyfoodsRouter from "./models/MahimmyfoodsModels/mahimmyfoods.routes.
 import InvictusRouter from "./models/InvictusModels/invictus.routes.js";
 import InvictusMetaRouter from "./models/InvictusMetaModels/invictusmeta.routes.js";
 import MirraBuilderRouter from "./models/MirraBuilderModels/mirrabuiler.routes.js";
+import VlsLawAibeRouter from "./models/VlsLawAibeModels/vlslawaibe.routes.js"
 
 
 const app = express();
@@ -59,7 +60,8 @@ app.use(
   MahimmyfoodsRouter,
   InvictusRouter,
   InvictusMetaRouter,
-  MirraBuilderRouter
+  MirraBuilderRouter,
+  VlsLawAibeRouter
 );
 
 app.listen(
