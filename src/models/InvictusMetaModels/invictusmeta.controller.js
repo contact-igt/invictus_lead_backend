@@ -24,7 +24,6 @@ export const createInvictusmetaRegisterController = async (req, res) => {
 
   const requiredFields = {
     mobile,
-    email,
   };
 
   const missingFields = await missingFieldsChecker(requiredFields);
@@ -67,14 +66,9 @@ export const getAllInvictusmetaRegisterController = async (req, res) => {
   try {
     const response = await getAllInvictusmetaRegisterService();
 
-    const output = response?.map((item) => ({
-      ...item,
-      time: dayjs(item?.registered_date).format("hh:mm A"),
-    }));
-
     return res.status(200).json({
       message: "Data fetched successfully",
-      data: output,
+      data: response,
     });
   } catch (err) {
     return res.status(500).json({
@@ -91,10 +85,7 @@ export const getByIdInvictusmetaRegisterController = async (req, res) => {
 
     return res.status(200).json({
       message: "Data fetched successfully",
-      data: {
-        ...response,
-        time: dayjs(response?.registered_date).format("hh:mm A"),
-      },
+      data: response,
     });
   } catch (err) {
     return res.status(500).json({
