@@ -1,25 +1,34 @@
 import dayjs from "dayjs";
 import { missingFieldsChecker } from "../../utils/missingFieldChecker.js";
 import {
-  createMirrabuildersRegisterService,
-  deleteByIdMirrabuildersRegisterService,
-  getAllMirrabuildersRegisterService,
-  getByIdMirrabuildersRegisterService,
-} from "./mirrabuilder.service.js";
+  createRegisterService,
+  deleteRegisterService,
+  getAllRegisterService,
+  getByIdRegisterService,
+} from "./vlslawaibe.service.js";
 
-export const createMirrabuildersRegisterController = async (req, res) => {
+export const createRegisterController = async (req, res) => {
   const {
     name,
+    email,
     mobile,
-    interest_green_building,
-    plot_build,
-    budget,
+    amount,
+    programm_start_date,
+    programm_end_date,
+    razorpay_order_id,
+    razorpay_payment_id,
+    razorpay_signature,
+    payment_status,
+    captured,
     ip_address,
     utm_source,
   } = req.body;
 
   const requiredFields = {
+    email,
     mobile,
+    amount,
+    payment_status,
   };
 
   const missingFields = await missingFieldsChecker(requiredFields);
@@ -33,13 +42,19 @@ export const createMirrabuildersRegisterController = async (req, res) => {
   const registered_date = dayjs().format("YYYY-MM-DD hh:mm:ss");
 
   try {
-    await createMirrabuildersRegisterService(
+    await createRegisterService(
       name ? name : null,
-      mobile ? mobile : null,
-      interest_green_building ? interest_green_building : null,
-      plot_build ? plot_build : null,
-      budget ? budget : null,
+      email,
+      mobile,
+      amount,
+      programm_start_date,
+      programm_end_date,
       registered_date,
+      razorpay_order_id ? razorpay_order_id : null,
+      razorpay_payment_id ? razorpay_payment_id : null,
+      razorpay_signature ? razorpay_signature : null,
+      payment_status,
+      captured ? captured : true,
       ip_address ? ip_address : null,
       utm_source ? utm_source : null
     );
@@ -54,9 +69,9 @@ export const createMirrabuildersRegisterController = async (req, res) => {
   }
 };
 
-export const getAllMirrabuildersRegisterController = async (req, res) => {
+export const getAllRegisterController = async (req, res) => {
   try {
-    const response = await getAllMirrabuildersRegisterService();
+    const response = await getAllRegisterService();
 
     return res.status(200).json({
       message: "Data fetched successfully",
@@ -69,11 +84,11 @@ export const getAllMirrabuildersRegisterController = async (req, res) => {
   }
 };
 
-export const getByIdMirrabuildersRegisterController = async (req, res) => {
+export const getByIdRegisterController = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const response = await getByIdMirrabuildersRegisterService(id);
+    const response = await getByIdRegisterService(id);
 
     return res.status(200).json({
       message: "Data fetched successfully",
@@ -86,11 +101,11 @@ export const getByIdMirrabuildersRegisterController = async (req, res) => {
   }
 };
 
-export const deleteByIdMirrabuildersRegisterController = async (req, res) => {
+export const deleteRegisterController = async (req, res) => {
   const { id } = req.params;
 
   try {
-    await deleteByIdMirrabuildersRegisterService(id);
+    await deleteRegisterService(id);
 
     return res.status(200).json({
       message: "Data removed successfully",

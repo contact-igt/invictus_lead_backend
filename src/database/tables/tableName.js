@@ -2,6 +2,7 @@ export const tableName = {
   MANAGEMENT: "managements",
   VLSLAWPRACTISE: "vls_law_practices",
   VLSLAWACADEMY: "vls_academys",
+  VLSLAWAIBE: "vls_aibes",
   KRINSTITUTE: "kr_institutes",
   WELLINIT: "wellinits",
   MIRRABUILDERS: "mirra_builders",

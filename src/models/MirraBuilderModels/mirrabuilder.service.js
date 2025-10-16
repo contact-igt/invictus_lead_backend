@@ -20,7 +20,7 @@ export const createMirrabuildersRegisterService = async (
     budget,
     registered_date,
     ip_address,
-    utm_source,
+    utm_source
   ) 
   VALUES (?,?,?,?,?,?,?,?)`;
 
