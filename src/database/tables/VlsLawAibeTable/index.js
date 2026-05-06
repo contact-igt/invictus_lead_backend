@@ -2,6 +2,15 @@ import { tableName } from "../tableName.js";
 
 export const vlslawaibeTable = (Sequelize, sequelize) => {
   return sequelize.define(tableName?.VLSLAWAIBE, {
+    client_id: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      references: {
+        model: tableName.CLIENTS,
+        key: "id",
+      },
+    },
+
     name: {
       type: Sequelize.STRING,
       allowNull: true,
@@ -15,10 +24,13 @@ export const vlslawaibeTable = (Sequelize, sequelize) => {
     email: {
       type: Sequelize.STRING,
       allowNull: true,
+      validate: {
+        isEmail: true,
+      },
     },
 
     amount: {
-      type: Sequelize.STRING,
+      type: Sequelize.DECIMAL(10, 2),
       allowNull: true,
     },
 
@@ -35,21 +47,6 @@ export const vlslawaibeTable = (Sequelize, sequelize) => {
     programm_end_date: {
       type: Sequelize.DATE,
       allowNull: false,
-    },
-
-    razorpay_order_id: {
-      type: Sequelize.STRING,
-      allowNull: true,
-    },
-
-    razorpay_payment_id: {
-      type: Sequelize.STRING,
-      allowNull: true,
-    },
-
-    razorpay_signature: {
-      type: Sequelize.STRING,
-      allowNull: true,
     },
 
     payment_status: {
@@ -75,14 +72,14 @@ export const vlslawaibeTable = (Sequelize, sequelize) => {
     createdAt: {
       type: "TIMESTAMP",
       defaultValue: sequelize.literal("CURRENT_TIMESTAMP"),
-      allowNull: true,
+      allowNull: false,
       field: "created_at",
     },
 
     updatedAt: {
       type: "TIMESTAMP",
       defaultValue: sequelize.literal("CURRENT_TIMESTAMP"),
-      allowNull: true,
+      allowNull: false,
       field: "updated_at",
     },
   });

@@ -2,6 +2,15 @@ import { tableName } from "../tableName.js";
 
 export const vlsLawAcademyTable = (Sequelize, sequelize) => {
   return sequelize.define(tableName?.VLSLAWACADEMY, {
+    client_id: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      references: {
+        model: tableName.CLIENTS,
+        key: "id",
+      },
+    },
+
     name: {
       type: Sequelize.STRING,
       allowNull: true,
@@ -13,6 +22,9 @@ export const vlsLawAcademyTable = (Sequelize, sequelize) => {
     email: {
       type: Sequelize.STRING,
       allowNull: true,
+      validate: {
+        isEmail: true,
+      },
     },
     message: {
       type: Sequelize.TEXT,
@@ -37,14 +49,14 @@ export const vlsLawAcademyTable = (Sequelize, sequelize) => {
     createdAt: {
       type: "TIMESTAMP",
       defaultValue: sequelize.literal("CURRENT_TIMESTAMP"),
-      allowNull: true,
+      allowNull: false,
       field: "created_at",
     },
 
     updatedAt: {
       type: "TIMESTAMP",
       defaultValue: sequelize.literal("CURRENT_TIMESTAMP"),
-      allowNull: true,
+      allowNull: false,
       field: "updated_at",
     },
   });

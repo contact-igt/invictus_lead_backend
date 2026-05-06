@@ -2,6 +2,15 @@ import { tableName } from "../tableName.js";
 
 export const managementTable = (Sequelize, sequelize) => {
   return sequelize.define(tableName.MANAGEMENT, {
+    client_id: {
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      references: {
+        model: tableName.CLIENTS,
+        key: "id",
+      },
+    },
+
     title: {
       type: Sequelize.ENUM("Mr", "Ms", "Mrs"),
       allowNull: false,
@@ -27,7 +36,6 @@ export const managementTable = (Sequelize, sequelize) => {
     mobile: {
       type: Sequelize.STRING,
       allowNull: false,
-      unique: true,
     },
 
     profile_picture: {
@@ -41,19 +49,19 @@ export const managementTable = (Sequelize, sequelize) => {
     },
 
     role: {
-      type: Sequelize.ENUM("super-admin", "admin"),
+      type: Sequelize.ENUM("super-admin", "admin", "client"),
       allowNull: false,
     },
 
     createdAt: {
       type: "TIMESTAMP",
-      allowNull: true,
+      allowNull: false,
       defaultValue: sequelize.literal("CURRENT_TIMESTAMP"),
       field: "created_at",
     },
     updatedAt: {
       type: "TIMESTAMP",
-      allowNull: true,
+      allowNull: false,
       defaultValue: sequelize.literal("CURRENT_TIMESTAMP"),
       field: "updated_at",
     },

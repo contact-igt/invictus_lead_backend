@@ -10,11 +10,6 @@ const ServerEnvironmentConfig = {
     development: process.env.INVICTUS_SERVER_START_DEVELOPMENT,
     local: process.env.INVICTUS_SERVER_START_LOCAL,
   },
-  service: process.env.EMAIL_SERVICE,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
 };
 
 export default ServerEnvironmentConfig;

@@ -1,6 +1,17 @@
 import jwt from "jsonwebtoken";
 import ServerEnvironmentConfig from "../../config/server.config.js";
 
+const getClientKey = (user) => {
+  if (user.clientKey) return user.clientKey; // If already provided
+  if (user.client?.client_key) {
+    return user.client.client_key;
+  }
+  if (user.client && user.client.name) {
+    return user.client.name.toLowerCase().replace(/ /g, "_");
+  }
+  return null;
+};
+
 const generateAccessToken = (user) => {
   return jwt.sign(
     {
@@ -8,24 +19,11 @@ const generateAccessToken = (user) => {
       email: user.email,
       username: user.username,
       role: user.role ? user.role : "user",
+      clientId: user.client_id || null,
+      clientKey: getClientKey(user),
     },
     ServerEnvironmentConfig?.jwt_key,
-    { expiresIn: "15m" }
-  );
-};
-
-const generateRememberMeoken = (user) => {
-  return jwt.sign(
-    {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      role: user.role ? user.role : "user",
-    },
-    ServerEnvironmentConfig?.jwt_key,
-    {
-      expiresIn: "30d",
-    }
+    { expiresIn: "24h" },
   );
 };
 
@@ -36,22 +34,14 @@ const generateRefreshToken = (user) => {
       email: user.email,
       username: user.username,
       role: user.role ? user.role : "user",
+      clientId: user.client_id || null,
+      clientKey: getClientKey(user),
     },
     ServerEnvironmentConfig?.jwt_key,
     {
       expiresIn: "7d",
-    }
+    },
   );
-};
-
-const decodeAuthToken = (token) => {
-  const currenttoken = token && token.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  const decoded = jwt.verify(currenttoken, ServerEnvironmentConfig?.jwt_key);
-  return decoded;
 };
 
 // user token auth
@@ -120,46 +110,10 @@ const authenticateManagementToken = async (req, res, next) => {
   }
 };
 
-export const checkToken = (req, res, next) => {
-  const token = req.header("Authorization")?.split(" ")[1];
-
-  if (!token) {
-    return res.status(401).json({ message: "No token provided" });
-  }
-  try {
-    jwt.verify(token, ServerEnvironmentConfig.jwt_key);
-    return res.status(200).json({ message: "Valid token" });
-  } catch (err) {
-    if (err.name === "TokenExpiredError") {
-      return res.status(200).json({ message: "Token expired" });
-    }
-    return res.status(200).json({ message: "Invalid token" });
-  }
-};
-
-export const refreshToken = (req, res) => {
-  const { refreshToken } = req.body;
-
-  if (!refreshToken)
-    return res.status(401).json({ message: "Refresh token required" });
-
-  jwt.verify(refreshToken, ServerEnvironmentConfig?.jwt_key, (err, user) => {
-    if (err) return res.status(403).json({ message: "Invalid refresh token" });
-
-    const newAccessToken = generateAccessToken(user);
-    const newRefreshToken = generateRefreshToken(user);
-    return res
-      .status(200)
-      .json({ accessToken: newAccessToken, refreshToken: newRefreshToken });
-  });
-};
-
 export {
   generateAccessToken,
   generateRefreshToken,
-  generateRememberMeoken,
   authenticateToken,
-  decodeAuthToken,
   authenticateManagementToken,
   authenticateSuperAdminToken,
 };

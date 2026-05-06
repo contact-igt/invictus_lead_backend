@@ -1,86 +1,129 @@
 import express from "express";
-import bodyParser from "body-parser";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import ServerEnvironmentConfig from "./config/server.config.js";
 import db from "./database/index.js";
-import VlsLawPracticeRouter from "./models/VlsLawPrcticeModels/vlslawpractice.routes.js";
-import ManagementRouter from "./models/ManagementModels/management.routes.js";
-import VlsLawAcademyRouter from "./models/VlsLawAcademyModels/vlslawacademy.routes.js";
-import PixelEyeRouter from "./models/PixelEyeModels/pixeleye.routes.js";
-import RamananFinancialRouter from "./models/RamananFinancialModels/ramananfinancial.routes.js";
-import KrinstituteRouter from "./models/KrinstituteModels/krinstitute.routes.js";
-import WellinitRouter from "./models/WellinitModels/wellinit.routes.js";
-import NaitrikaRouter from "./models/NaitrikaModels/naitrika.routes.js";
-import NetralyaRouter from "./models/NetralyaModels/netralaya.routes.js";
-import MahimmyfoodsRouter from "./models/MahimmyfoodsModels/mahimmyfoods.routes.js";
-import InvictusRouter from "./models/InvictusModels/invictus.routes.js";
-import InvictusMetaRouter from "./models/InvictusMetaModels/invictusmeta.routes.js";
-import MirraBuilderRouter from "./models/MirraBuilderModels/mirrabuiler.routes.js";
-import VlsLawAibeRouter from "./models/VlsLawAibeModels/vlslawaibe.routes.js"
-
+import AuthRouter from "./modules/auth/auth.routes.js";
+import UsersRouter from "./modules/users/users.routes.js";
+import ClientRouter from "./modules/client/client.routes.js";
+import DynamicRouter from "./modules/dynamic/dynamic.routes.js";
+import PixelEyeRouter from "./modules/pixelEye/pixelEye.routes.js";
+import PixelEyeWebhookRouter from "./modules/pixelEye/webhook/pixelEyeWebhook.routes.js";
 
 const app = express();
+
+// Set security HTTP headers
+app.use(helmet());
+app.set("trust proxy", 1);
+
+// API clients expect fresh JSON data; avoid conditional cache 304 responses.
+app.disable("etag");
+
+const whitelist = (process.env.CORS_ALLOWED_ORIGINS || "http://localhost:4000")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const corsOptions = {
-  origin: "*",
+  origin: (origin, callback) => {
+    if (!origin || whitelist.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204,
 };
 
 app.use(cors(corsOptions));
-app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.urlencoded({ extended: false }));
-app.use(bodyParser.json());
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.json({
-    message: "Hello API Working Fine",
-  });
+// Rate limiting
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // limit each IP to 10 login requests per windowMs
+  message:
+    "Too many login attempts from this IP, please try again after 15 minutes",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply the rate limiters
+app.use("/api/v1/auth/login", loginLimiter);
+app.use("/api/v1/", (req, res, next) => {
+  if (req.path.startsWith("/pixeleye/webhook")) return next();
+  return apiLimiter(req, res, next);
+});
+
+app.use("/api/v1", (req, res, next) => {
+  res.setHeader(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate",
+  );
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
 });
 
 const connect_mysql = async () => {
-  await db.sequelize.sync();
-  console.log("db connect");
+  try {
+    await db.sequelize.sync();
+    console.log("Database synchronized for Multi-Tenant architecture");
+  } catch (error) {
+    console.error("Failed to synchronize database:", error);
+    process.exit(1);
+  }
 };
 
 connect_mysql();
 
-app.use(
-  "/api/v1",
-  VlsLawPracticeRouter,
-  ManagementRouter,
-  VlsLawAcademyRouter,
-  PixelEyeRouter,
-  RamananFinancialRouter,
-  KrinstituteRouter,
-  WellinitRouter,
-  NaitrikaRouter,
-  NetralyaRouter,
-  MahimmyfoodsRouter,
-  InvictusRouter,
-  InvictusMetaRouter,
-  MirraBuilderRouter,
-  VlsLawAibeRouter
-);
+// Routes
+app.use("/api/v1/auth", AuthRouter);
+app.use("/api/v1/users", UsersRouter);
+app.use("/api/v1/dynamic", DynamicRouter);
+app.use("/api/v1/clients", ClientRouter);
+app.use("/api/v1/pixeleye", PixelEyeWebhookRouter);
+app.use("/api/v1/pixeleye", PixelEyeRouter);
 
-app.listen(
-  ServerEnvironmentConfig?.server?.line == "production"
-    ? ServerEnvironmentConfig?.server?.live
-    : ServerEnvironmentConfig?.server?.line == "development"
-    ? ServerEnvironmentConfig?.server?.development
-    : ServerEnvironmentConfig?.server?.local,
-  () => {
-    console.log(
-      `server connected ${
-        ServerEnvironmentConfig?.server?.line == "production"
-          ? ServerEnvironmentConfig?.server?.live
-          : ServerEnvironmentConfig?.server?.line == "development"
-          ? ServerEnvironmentConfig?.server?.development
-          : ServerEnvironmentConfig?.server?.local
-      }`
-    );
-  }
-);
+// Base route
+app.get("/", (req, res) => {
+  res.json({ message: "Invictus SaaS API v1.0 - Multi-Tenant" });
+});
 
+// 404 Handler
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
 
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(err.status || 500).json({
+    message: err.message || "Internal Server Error",
+    error: process.env.NODE_ENV === "development" ? err.stack : {},
+  });
+});
+
+const { line, live, development, local } =
+  ServerEnvironmentConfig?.server ?? {};
+
+const rawPort =
+  line === "production" ? live : line === "development" ? development : local;
+
+const PORT = parseInt(rawPort, 10) || 8000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT} [${line ?? "local"} mode]`);
+});

@@ -1,16 +1,8 @@
 export const tableName = {
+  CLIENTS: "clients",
   MANAGEMENT: "managements",
   VLSLAWPRACTISE: "vls_law_practices",
   VLSLAWACADEMY: "vls_academys",
   VLSLAWAIBE: "vls_aibes",
-  KRINSTITUTE: "kr_institutes",
-  WELLINIT: "wellinits",
-  MIRRABUILDERS: "mirra_builders",
-  MAHIMMYFOODS: "mahimmy_foods",
-  INVICTUS: "invictus",
-  INVICTUSMETAADDS: "invictus_meta_adds",
-  RAMANANFINANCIAL: "rv_financial_visions",
-  PIXELEYE: "pixel_eyes",
-  NITRIKAEYECARE: "nitrika_eye_cares",
-  NETRALAYA: "antardrashti_netralayas",
+  PIXELEYE: "pixel_eye",
 };
