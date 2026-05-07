@@ -1,7 +1,7 @@
 {
   "name": "invictus-backend",
   "version": "1.0.0",
-  "main": "app.js",
+  "main": "src/app.js",
   "type": "module",
   "scripts": {
     "start:dev": "nodemon src/app.js",

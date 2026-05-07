@@ -91,7 +91,7 @@ export const PixelEyeTable = (Sequelize, sequelize) => {
     },
 
     follow_up_date: {
-      type: Sequelize.DATE,
+      type: Sequelize.DATEONLY,
       allowNull: true,
     },
 

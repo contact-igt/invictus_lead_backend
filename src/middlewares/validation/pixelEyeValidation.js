@@ -7,6 +7,7 @@ const STATUS_VALUES = [
   "Switched Off",
   "Missed Call",
   "DND",
+  "Dnp 2",
   "Not Speaking",
   "Disconnecting",
   "Not in Network",

@@ -9,6 +9,7 @@ const STATUS_VALUES = [
   "Missed Call",
   "On Another Call",
   "DND",
+  "Dnp 2",
   "Not Speaking",
   "Disconnecting",
   "Not in Network",

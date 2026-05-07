@@ -17,7 +17,7 @@ export const vlsLawPracticeSchema = Joi.object({
     .valid("decoding-of-practice", "decoding-of-law-practice")
     .required(),
   payment_status: Joi.string()
-    .valid("paid", "failed", "attempted", "cancelled")
+    .valid("paid", "failed", "attempted", "cancelled", "authorized")
     .required(),
   captured: Joi.boolean().default(true),
   razorpay_order_id: Joi.string().optional().allow(null, ""),

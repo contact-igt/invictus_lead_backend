@@ -23,6 +23,7 @@ const sequelize = new Sequelize(
     host: dbconfig?.host,
     dialect: "mysql",
     timezone: "+05:30",
+    logging: false,
   },
 );
 

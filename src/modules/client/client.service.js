@@ -28,7 +28,7 @@ const normalizeClientPayload = (data, { isUpdate = false } = {}) => {
 };
 
 export const listClients = async () => {
-  return await db.Client.findAll({ order: [["created_at", "DESC"]] });
+  return await db.Client.findAll({ order: [["createdAt", "DESC"]] });
 };
 
 export const getClient = async (id) => {

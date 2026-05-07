@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"d:\\\\INVICTUS BACKEND\\\\invictus\\\\invictus-backend\" -Recurse -Force)",
+      "Bash(Select-Object FullName)",
+      "Bash(ConvertTo-Csv -NoTypeInformation)",
+      "Bash(Out-String)"
+    ]
+  }
+}

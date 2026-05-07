@@ -32,7 +32,7 @@ const normalizePhone = (phone) =>
 export const listPixelEyeLeads = async (tenantContext) => {
   const safeModel = tenantSafe(db.PixelEye, tenantContext);
   return await safeModel.findAll({
-    order: [["created_at", "DESC"]],
+    order: [["createdAt", "DESC"]],
   });
 };
 
