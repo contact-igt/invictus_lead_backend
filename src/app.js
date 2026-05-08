@@ -20,19 +20,13 @@ app.set("trust proxy", 1);
 // API clients expect fresh JSON data; avoid conditional cache 304 responses.
 app.disable("etag");
 
-const whitelist = (process.env.CORS_ALLOWED_ORIGINS || "http://localhost:4000")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+// const whitelist = (process.env.CORS_ALLOWED_ORIGINS || "http://localhost:4000")
+//   .split(",")
+//   .map((origin) => origin.trim())
+//   .filter(Boolean);
 
 const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || whitelist.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
+  origin: true,
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   credentials: true,
   preflightContinue: false,
