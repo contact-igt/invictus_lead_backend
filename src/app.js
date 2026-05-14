@@ -10,6 +10,7 @@ import ClientRouter from "./modules/client/client.routes.js";
 import DynamicRouter from "./modules/dynamic/dynamic.routes.js";
 import PixelEyeRouter from "./modules/pixelEye/pixelEye.routes.js";
 import PixelEyeWebhookRouter from "./modules/pixelEye/webhook/pixelEyeWebhook.routes.js";
+import { startPixelEyeScheduler } from "./modules/pixelEye/pixelEyeScheduler.js";
 
 const app = express();
 
@@ -75,6 +76,7 @@ const connect_mysql = async () => {
   try {
     await db.sequelize.sync();
     console.log("Database synchronized for Multi-Tenant architecture");
+    startPixelEyeScheduler();
   } catch (error) {
     console.error("Failed to synchronize database:", error);
     process.exit(1);

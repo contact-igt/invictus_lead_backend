@@ -5,4 +5,5 @@ export const tableName = {
   VLSLAWACADEMY: "vls_academys",
   VLSLAWAIBE: "vls_aibes",
   PIXELEYE: "pixel_eye",
+  PIXELEYE_LEAD_STATE: "pixel_eye_lead_states",
 };

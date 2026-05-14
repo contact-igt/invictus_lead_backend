@@ -1,6 +1,7 @@
 import db from "../../database/index.js";
 import { tenantSafe } from "../../utils/tenantContext.js";
 import { Op, col, fn, where } from "sequelize";
+import { processLeadStatus } from "./pixelEyeNotification.service.js";
 
 const buildLeadFilters = ({ dateFrom, dateTo, agent } = {}) => {
   const filters = {};
@@ -59,8 +60,12 @@ export const getPixelEyeLead = async (id, tenantContext) => {
 };
 
 export const createPixelEyeLead = async (data, clientId) => {
-  // Creation usually happens with an explicit clientId resolved from the controller
-  return await db.PixelEye.create({ ...data, client_id: clientId });
+  const lead = await db.PixelEye.create({ ...data, client_id: clientId });
+  // Fire-and-forget: schedule callback based on initial status.
+  processLeadStatus(lead, clientId, "create").catch((err) =>
+    console.error(`[PixelEye] processLeadStatus(create) failed for call_id=${lead?.call_id}:`, err?.message),
+  );
+  return lead;
 };
 
 export const findPixelEyeLeadByPhone = async (clientId, phoneNumber) => {
@@ -149,7 +154,20 @@ export const updatePixelEyeLead = async (id, data, tenantContext) => {
     delete updateData.client_id;
   }
 
-  return await lead.update(updateData);
+  const statusBefore = lead.status;
+  const updatedLead  = await lead.update(updateData);
+
+  // Trigger notification logic only when the status field changed.
+  if (
+    Object.prototype.hasOwnProperty.call(updateData, "status") &&
+    updateData.status !== statusBefore
+  ) {
+    processLeadStatus(updatedLead, updatedLead.client_id, "update").catch((err) =>
+      console.error(`[PixelEye] processLeadStatus(update) failed for call_id=${updatedLead?.call_id}:`, err?.message),
+    );
+  }
+
+  return updatedLead;
 };
 
 export const deletePixelEyeLead = async (id, tenantContext) => {
