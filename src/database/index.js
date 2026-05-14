@@ -7,6 +7,7 @@ import { managementTable } from "./tables/ManagementTable/index.js";
 import { vlsLawAcademyTable } from "./tables/VlsLawAcademyTable/index.js";
 import { vlslawaibeTable } from "./tables/VlsLawAibeTable/index.js";
 import { PixelEyeTable } from "./tables/PixelEyeTable/index.js";
+import { PixelEyeLeadStateTable } from "./tables/PixelEyeLeadStateTable/index.js";
 
 const dbconfig =
   ServerEnvironmentConfig?.server?.line === "production"
@@ -37,7 +38,8 @@ db.VlsLawPractice = vlslawpracticeTable(Sequelize, sequelize);
 db.Management = managementTable(Sequelize, sequelize);
 db.VlsLawAcademy = vlsLawAcademyTable(Sequelize, sequelize);
 db.VlsLawAibe = vlslawaibeTable(Sequelize, sequelize);
-db.PixelEye = PixelEyeTable(Sequelize, sequelize);
+db.PixelEye          = PixelEyeTable(Sequelize, sequelize);
+db.PixelEyeLeadState = PixelEyeLeadStateTable(Sequelize, sequelize);
 
 const addClientId = (model) => {
   model.belongsTo(db.Client, { foreignKey: "client_id", as: "client" });
@@ -49,5 +51,6 @@ addClientId(db.VlsLawPractice);
 addClientId(db.VlsLawAcademy);
 addClientId(db.VlsLawAibe);
 addClientId(db.PixelEye);
+addClientId(db.PixelEyeLeadState);
 
 export default db;

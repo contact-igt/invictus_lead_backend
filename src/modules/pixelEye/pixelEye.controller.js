@@ -7,6 +7,10 @@ import {
   updatePixelEyeLead,
   deletePixelEyeLead,
 } from "./pixelEye.service.js";
+import {
+  listNotificationStates,
+  getNotificationSummary,
+} from "./pixelEyeNotification.service.js";
 import db from "../../database/index.js";
 import { Op } from "sequelize";
 import PDFDocument from "pdfkit";
@@ -342,5 +346,44 @@ export const deleteLead = async (req, res) => {
   } catch (err) {
     const status = resolvePixelEyeErrorStatus(err.message);
     return res.status(status).json({ message: err.message });
+  }
+};
+
+const resolveNotificationClientId = async (req) => {
+  if (req.tenant.id) return req.tenant.id;
+  return resolveClientIdFromKey(req.query._client_key || req.query.client_key);
+};
+
+export const getNotifications = async (req, res) => {
+  try {
+    const clientId = await resolveNotificationClientId(req);
+    if (!clientId) {
+      return res.status(400).json({ message: "Could not determine client context." });
+    }
+
+    const filters = {
+      state:         String(req.query.state         || "").trim() || undefined,
+      schedule_type: String(req.query.schedule_type || "").trim() || undefined,
+      limit:         req.query.limit,
+    };
+
+    const states = await listNotificationStates(clientId, filters);
+    return res.status(200).json({ data: states });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+export const getNotificationsSummary = async (req, res) => {
+  try {
+    const clientId = await resolveNotificationClientId(req);
+    if (!clientId) {
+      return res.status(400).json({ message: "Could not determine client context." });
+    }
+
+    const summary = await getNotificationSummary(clientId);
+    return res.status(200).json({ data: summary });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
   }
 };

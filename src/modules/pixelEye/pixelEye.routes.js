@@ -6,6 +6,8 @@ import {
   createLead,
   updateLead,
   deleteLead,
+  getNotifications,
+  getNotificationsSummary,
 } from "./pixelEye.controller.js";
 import { authenticateToken } from "../../middlewares/auth/authMiddlewares.js";
 import { attachTenantContext } from "../../middlewares/auth/tenantMiddleware.js";
@@ -21,6 +23,8 @@ router.use(attachTenantContext);
 
 router.get("/", getLeads);
 router.get("/export", exportLeads);
+router.get("/notifications", getNotifications);
+router.get("/notifications/summary", getNotificationsSummary);
 router.get("/:id", getLeadById);
 router.post("/", validatePixelEyeCreate, createLead);
 router.patch("/:id", validatePixelEyeUpdate, updateLead);

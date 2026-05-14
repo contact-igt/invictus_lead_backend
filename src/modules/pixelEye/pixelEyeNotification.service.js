@@ -1,0 +1,533 @@
+/**
+ * Pixel Eye Notification Service
+ *
+ * Translates the Google Apps Script hospital call tracking system into
+ * the Node.js / MySQL stack. State that the script stored in
+ * PropertiesService is stored here in pixel_eye_lead_states.
+ *
+ * Status categories and callback windows match the reference script exactly:
+ *   THIRTY_MIN     → notify agent 30 minutes after status set
+ *   DNP2           → notify agent 24 hours after status set
+ *   TWENTY_FOUR_HR → notify agent 24 hours after status set
+ *   TERMINATION    → cancel all pending callbacks permanently
+ *   NO_ACTION      → success states, nothing scheduled
+ */
+
+import { Op } from "sequelize";
+import db from "../../database/index.js";
+
+const TIMEZONE_LABEL = "IST";
+
+// How long past the scheduled_at time we will keep retrying before giving up.
+// Prevents an infinite retry loop if the webhook is permanently unavailable.
+const NOTIFICATION_RETRY_WINDOW_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+// ---------------------------------------------------------------------------
+// STATUS CATEGORY MAPPING
+// Mirrors getStatusCategory_() from the reference script,
+// mapped to our exact STATUS_ENUM_VALUES.
+// ---------------------------------------------------------------------------
+
+const THIRTY_MIN_STATUSES = new Set([
+  "Busy",
+  "Not Answering",
+  "Switched Off",
+  "Missed Call",
+  "On Another Call",
+  "DND",
+  "Not Speaking",
+  "Disconnecting",
+  "Not in Network",
+  "Incoming Call Not Available",
+]);
+
+const DNP2_STATUSES = new Set([
+  "Dnp 2",
+]);
+
+const TWENTY_FOUR_HR_STATUSES = new Set([
+  "Enquiry",
+  "Hot Follow-up",
+  "Follow-up Required",
+  "Will Call Later",
+  "Rescheduling",
+  "Doctor Time",
+  "Follow-up Post Appointment",
+  "Want to Speak With Doctor",
+  "Appointment Cancelled",
+  "Address Requested",
+  "Searching for Specific Hospital",
+  "Others",
+]);
+
+const TERMINATION_STATUSES = new Set([
+  "Wrong Number",
+  "Wrongly Dialed",
+  "Fraud Call",
+  "Not Interested",
+  "Not Willing to Come Now",
+  "Going to Other Hospital",
+  "Not in Hyderabad",
+  "Long Distance",
+  "Number Not in Service",
+  "Walk-in",
+  "Closed",
+]);
+
+// Appointment Fixed and Visited → lead is won, no further callbacks needed.
+const NO_ACTION_STATUSES = new Set([
+  "Appointment Fixed",
+  "Visited",
+]);
+
+export const getStatusCategory = (status) => {
+  const s = String(status || "").trim();
+  if (TERMINATION_STATUSES.has(s))    return "TERMINATION";
+  if (DNP2_STATUSES.has(s))           return "DNP2";
+  if (THIRTY_MIN_STATUSES.has(s))     return "THIRTY_MIN";
+  if (TWENTY_FOUR_HR_STATUSES.has(s)) return "TWENTY_FOUR_HR";
+  if (NO_ACTION_STATUSES.has(s))      return "NO_ACTION";
+  return "UNKNOWN";
+};
+
+// ---------------------------------------------------------------------------
+// STATE HELPERS  (mirrors getState_ / saveState_ / createEmptyState_)
+// ---------------------------------------------------------------------------
+
+const getLeadState = async (callId, clientId) => {
+  return await db.PixelEyeLeadState.findOne({
+    where: { call_id: callId, client_id: clientId },
+  });
+};
+
+// FIX (Bug 1): Use the `created` boolean returned by findOrCreate instead of
+// the private `row._options.isNewRecord` internal Sequelize property.
+const upsertLeadState = async (callId, clientId, fields) => {
+  const [row, created] = await db.PixelEyeLeadState.findOrCreate({
+    where: { call_id: callId, client_id: clientId },
+    defaults: {
+      call_id:   callId,
+      client_id: clientId,
+      state:     "new",
+      day1_mode: "auto",
+      notification_sent:          false,
+      thirty_min_cycle_completed: false,
+      permanently_closed:         false,
+      ...fields,
+    },
+  });
+
+  if (!created) {
+    await row.update(fields);
+  }
+
+  return row;
+};
+
+// ---------------------------------------------------------------------------
+// MIRROR DAY 1  (mirrors mirrorDay1IfAllowed_)
+// Auto-sets day_1 = status until the first 30-min callback fires.
+// ---------------------------------------------------------------------------
+
+const mirrorDay1 = async (lead, state) => {
+  const mode = state ? state.day1_mode : "auto";
+  if (mode === "manual") return;
+
+  if (lead.day_1 !== lead.status) {
+    await db.PixelEye.update(
+      { day_1: lead.status },
+      { where: { id: lead.id } },
+    );
+  }
+};
+
+// ---------------------------------------------------------------------------
+// SCHEDULE / CANCEL
+// ---------------------------------------------------------------------------
+
+const scheduleCallback = async (lead, clientId, delayMinutes, type, reason) => {
+  const scheduledAt = new Date(Date.now() + delayMinutes * 60 * 1000);
+
+  await upsertLeadState(lead.call_id, clientId, {
+    customer_name:        lead.customer_name,
+    phone_number:         lead.phone_number,
+    agent_name:           lead.agent_name,
+    last_status:          lead.status,
+    state:                "scheduled",
+    schedule_type:        type,
+    reason:               reason,
+    scheduled_at:         scheduledAt,
+    notification_sent:    false,
+    notification_sent_at: null,
+    permanently_closed:   false,
+    cancel_reason:        null,
+  });
+
+  console.log(
+    `[PixelEye] Scheduled ${type} callback for call_id=${lead.call_id}` +
+    ` at ${scheduledAt.toISOString()} (in ${delayMinutes} min)`,
+  );
+};
+
+const cancelLeadState = async (callId, clientId, reason, lead) => {
+  await upsertLeadState(callId, clientId, {
+    ...(lead ? {
+      customer_name: lead.customer_name,
+      phone_number:  lead.phone_number,
+      agent_name:    lead.agent_name,
+      last_status:   lead.status,
+    } : {}),
+    state:              "cancelled",
+    schedule_type:      null,
+    reason:             null,
+    scheduled_at:       null,
+    notification_sent:  false,
+    permanently_closed: true,
+    cancel_reason:      reason,
+  });
+};
+
+// ---------------------------------------------------------------------------
+// MAIN ENTRY POINT  (mirrors processRowObject_ / processLeadStatus)
+// Called after every create or status update in the pixel_eye table.
+// ---------------------------------------------------------------------------
+
+export const processLeadStatus = async (lead, clientId, source) => {
+  try {
+    const callId   = lead.call_id;
+    const status   = lead.status;
+    const category = getStatusCategory(status);
+
+    const existingState = await getLeadState(callId, clientId);
+
+    // ------------------------------------------------------------------
+    // New lead — no state row exists yet.
+    // FIX (Bug 5): Skip creating a baseline row that would immediately
+    // be overwritten. Go straight to scheduling so only 1 DB write happens.
+    // ------------------------------------------------------------------
+    if (!existingState) {
+      if (category === "TERMINATION" || category === "NO_ACTION") {
+        await cancelLeadState(callId, clientId, `Initial status: ${status}`, lead);
+        return;
+      }
+
+      // Mirror day_1 = status on first creation before scheduling.
+      // FIX (Bug 3): Isolate mirrorDay1 so a DB error here cannot prevent
+      // notification scheduling from running.
+      await mirrorDay1(lead, null).catch((err) =>
+        _logError("processLeadStatus:mirrorDay1:new", err, callId),
+      );
+
+      // For UNKNOWN status, create a baseline record with no schedule.
+      if (category === "UNKNOWN") {
+        await upsertLeadState(callId, clientId, {
+          customer_name: lead.customer_name,
+          phone_number:  lead.phone_number,
+          agent_name:    lead.agent_name,
+          last_status:   status,
+          state:         "baseline",
+          day1_mode:     "auto",
+        });
+        return;
+      }
+
+      // For schedulable statuses, go directly to scheduling (1 DB write).
+      await _scheduleForCategory(lead, clientId, category, status, null);
+      return;
+    }
+
+    // ------------------------------------------------------------------
+    // Permanently closed lead — ignore all further updates.
+    // Mirrors: if (state.permanentlyClosed === true) return;
+    // ------------------------------------------------------------------
+    if (existingState.permanently_closed) return;
+
+    // ------------------------------------------------------------------
+    // Status has not changed — just mirror day_1 if needed.
+    // ------------------------------------------------------------------
+    const statusChanged =
+      String(existingState.last_status || "").trim() !== String(status || "").trim();
+
+    if (!statusChanged) {
+      await mirrorDay1(lead, existingState).catch((err) =>
+        _logError("processLeadStatus:mirrorDay1:nochange", err, callId),
+      );
+      return;
+    }
+
+    // ------------------------------------------------------------------
+    // Status changed to a terminal state.
+    // FIX (Bug 4): cancelLeadState already writes all fields including
+    // last_status and customer details, so no separate existingState.update()
+    // call is needed before it — that was an extra wasted DB write.
+    // ------------------------------------------------------------------
+    if (category === "TERMINATION" || category === "NO_ACTION") {
+      await cancelLeadState(callId, clientId, `Status changed to: ${status}`, lead);
+      return;
+    }
+
+    // ------------------------------------------------------------------
+    // Status changed to a schedulable state — update mirror fields first.
+    // ------------------------------------------------------------------
+    await existingState.update({
+      last_status:   status,
+      customer_name: lead.customer_name,
+      phone_number:  lead.phone_number,
+      agent_name:    lead.agent_name,
+    });
+
+    // FIX (Bug 3): Isolate mirrorDay1 so a DB error cannot prevent scheduling.
+    await mirrorDay1(lead, existingState).catch((err) =>
+      _logError("processLeadStatus:mirrorDay1:changed", err, callId),
+    );
+
+    await _scheduleForCategory(lead, clientId, category, status, existingState);
+
+  } catch (err) {
+    _logError("processLeadStatus", err, lead?.call_id);
+    // Re-throw so the caller's .catch() can also see the error if needed.
+    throw err;
+  }
+};
+
+// Internal — decides delay and type then calls scheduleCallback.
+const _scheduleForCategory = async (lead, clientId, category, status, existingState) => {
+  if (category === "THIRTY_MIN") {
+    // Mirrors handleThirtyMinuteStatus_:
+    // If the first 30-min cycle already completed, do not reschedule 30-min.
+    if (existingState?.thirty_min_cycle_completed) return;
+
+    // Avoid duplicate scheduling when the same 30-min window is already pending.
+    if (
+      existingState?.state === "scheduled" &&
+      existingState?.schedule_type === "THIRTY_MIN" &&
+      !existingState?.notification_sent
+    ) return;
+
+    await scheduleCallback(lead, clientId, 30, "THIRTY_MIN", "30-min callback");
+    return;
+  }
+
+  if (category === "DNP2") {
+    await scheduleCallback(lead, clientId, 24 * 60, "DNP2", "DNP2 — 24-hr callback");
+    return;
+  }
+
+  if (category === "TWENTY_FOUR_HR") {
+    await scheduleCallback(lead, clientId, 24 * 60, "TWENTY_FOUR_HR", `24-hr follow-up (${status})`);
+    return;
+  }
+};
+
+// ---------------------------------------------------------------------------
+// SEND DUE NOTIFICATIONS  (mirrors sendDueNotifications_)
+// Called every minute by the cron scheduler.
+// ---------------------------------------------------------------------------
+
+export const sendDueNotifications = async () => {
+  try {
+    const now = new Date();
+
+    const dueStates = await db.PixelEyeLeadState.findAll({
+      where: {
+        state:             "scheduled",
+        notification_sent: false,
+        scheduled_at:      { [Op.lte]: now },
+      },
+    });
+
+    if (dueStates.length > 0) {
+      console.log(
+        `[PixelEye Scheduler] ${dueStates.length} notification(s) due at ${now.toISOString()}`,
+      );
+    }
+
+    for (const state of dueStates) {
+      try {
+        await _processDueState(state, now);
+      } catch (err) {
+        _logError("sendDueNotifications:item", err, state.call_id);
+      }
+    }
+  } catch (err) {
+    _logError("sendDueNotifications:outer", err, null);
+  }
+};
+
+const _processDueState = async (state, now) => {
+  // ------------------------------------------------------------------
+  // BUG FIX: Prevent infinite retry loop.
+  // If the notification has been overdue for more than 2 hours (webhook
+  // persistently failing or misconfigured), mark it as cancelled so the
+  // scheduler stops retrying and the row doesn't pile up indefinitely.
+  // ------------------------------------------------------------------
+  const overdueMs = now.getTime() - new Date(state.scheduled_at).getTime();
+  if (overdueMs > NOTIFICATION_RETRY_WINDOW_MS) {
+    await state.update({
+      state:        "cancelled",
+      cancel_reason: `Notification retry window exceeded — overdue by ${Math.round(overdueMs / 60000)} min`,
+    });
+    console.warn(
+      `[PixelEye] Cancelled notification for call_id=${state.call_id}` +
+      ` — overdue by ${Math.round(overdueMs / 60000)} min (retry window exceeded).`,
+    );
+    return;
+  }
+
+  // Re-fetch the latest lead to get current status — agent may have updated it.
+  const latestLead = await db.PixelEye.findOne({
+    where: { call_id: state.call_id, client_id: state.client_id },
+  });
+
+  if (!latestLead) {
+    await state.update({
+      state:              "cancelled",
+      cancel_reason:      "Lead not found in pixel_eye table",
+      permanently_closed: true,
+    });
+    return;
+  }
+
+  const latestCategory = getStatusCategory(latestLead.status);
+
+  // If the agent has since moved the lead to a terminal status, cancel.
+  if (latestCategory === "TERMINATION" || latestCategory === "NO_ACTION") {
+    await state.update({
+      state:              "cancelled",
+      cancel_reason:      `Status changed to terminal before notification: ${latestLead.status}`,
+      permanently_closed: true,
+    });
+    return;
+  }
+
+  const message = buildNotificationMessage(latestLead, state);
+  await sendGoogleChatMessage(message);
+
+  const isThirtyMin = state.schedule_type === "THIRTY_MIN";
+
+  await state.update({
+    notification_sent:    true,
+    notification_sent_at: new Date(),
+    state:                "completed",
+    // After first 30-min fires, day_1 goes manual — agent controls it now.
+    ...(isThirtyMin ? {
+      thirty_min_cycle_completed: true,
+      day1_mode:                  "manual",
+    } : {}),
+  });
+
+  console.log(
+    `[PixelEye] Notification sent for call_id=${state.call_id}` +
+    ` schedule_type=${state.schedule_type} agent=${latestLead.agent_name || "—"}`,
+  );
+};
+
+// ---------------------------------------------------------------------------
+// GOOGLE CHAT MESSAGE  (mirrors buildGoogleChatMessage_ + sendGoogleChatMessage_)
+// ---------------------------------------------------------------------------
+
+export const buildNotificationMessage = (lead, state) => {
+  const agentName    = lead.agent_name    || state.agent_name    || "Unassigned Agent";
+  const customerName = lead.customer_name || state.customer_name || "Not Available";
+  const phone        = lead.phone_number  || state.phone_number  || "Not Available";
+  const scheduledAt  = state.scheduled_at
+    ? _formatDateTime(new Date(state.scheduled_at))
+    : "—";
+
+  return [
+    "🚨 *CALL NOW – Agent Action Required*",
+    "",
+    `👤 *Agent Name:* ${agentName}`,
+    `🆔 *Call ID:* ${lead.call_id}`,
+    `🏥 *Customer Name:* ${customerName}`,
+    `📞 *Phone Number:* ${phone}`,
+    `📌 *Current Status:* ${lead.status}`,
+    `📌 *Reason:* ${state.reason || state.schedule_type}`,
+    `⏱ *Scheduled Time:* ${scheduledAt} ${TIMEZONE_LABEL}`,
+    "",
+    "👉 This is an internal task for the assigned agent only.",
+    "Do not send any patient-facing message from this notification.",
+  ].join("\n");
+};
+
+// FIX (Bug 2): Read GOOGLE_CHAT_WEBHOOK_URL at call time, not at module load
+// time. With ESM, module bodies run during import resolution — before dotenv
+// loads in app.js. Reading at the top-level would always capture an empty string.
+export const sendGoogleChatMessage = async (text) => {
+  const webhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL || "";
+
+  if (!webhookUrl) {
+    throw new Error("GOOGLE_CHAT_WEBHOOK_URL is not configured in environment.");
+  }
+
+  const response = await fetch(webhookUrl, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ text }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `Google Chat webhook failed. Status: ${response.status}. Body: ${body}`,
+    );
+  }
+};
+
+// ---------------------------------------------------------------------------
+// NOTIFICATION STATE QUERIES  (for Notification Tracker UI)
+// ---------------------------------------------------------------------------
+
+export const listNotificationStates = async (clientId, filters = {}) => {
+  const where = { client_id: clientId };
+
+  if (filters.state) where.state = filters.state;
+  if (filters.schedule_type) where.schedule_type = filters.schedule_type;
+
+  return await db.PixelEyeLeadState.findAll({
+    where,
+    order: [["updatedAt", "DESC"]],
+    limit: filters.limit ? parseInt(filters.limit, 10) : 200,
+  });
+};
+
+export const getNotificationSummary = async (clientId) => {
+  const [total, scheduled, completed, cancelled] = await Promise.all([
+    db.PixelEyeLeadState.count({ where: { client_id: clientId } }),
+    db.PixelEyeLeadState.count({
+      where: { client_id: clientId, state: "scheduled", notification_sent: false },
+    }),
+    db.PixelEyeLeadState.count({ where: { client_id: clientId, state: "completed" } }),
+    db.PixelEyeLeadState.count({ where: { client_id: clientId, state: "cancelled" } }),
+  ]);
+
+  return { total, scheduled, completed, cancelled };
+};
+
+// ---------------------------------------------------------------------------
+// UTILITY
+// ---------------------------------------------------------------------------
+
+const _formatDateTime = (dateObj) => {
+  return dateObj.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day:      "2-digit",
+    month:    "short",
+    year:     "numeric",
+    hour:     "2-digit",
+    minute:   "2-digit",
+    hour12:   true,
+  });
+};
+
+const _logError = (fn, err, callId) => {
+  console.error(
+    JSON.stringify({
+      fn,
+      call_id: callId || null,
+      error:   err?.message,
+      stack:   err?.stack,
+      time:    new Date().toISOString(),
+    }),
+  );
+};

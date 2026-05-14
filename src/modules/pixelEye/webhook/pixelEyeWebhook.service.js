@@ -4,6 +4,7 @@ import {
   extractClientModuleKey,
   normalizeClientKey,
 } from "../../../utils/clientKey.js";
+import { processLeadStatus } from "../pixelEyeNotification.service.js";
 
 const RUNO_SERVICE_NAME = "Runo";
 const DEFAULT_WEBHOOK_CLIENT_KEY = "pixeleye";
@@ -106,6 +107,10 @@ export const processPixelEyeWebhook = async (payload) => {
         { transaction },
       );
       await transaction.commit();
+      // Notify after commit so the DB state is consistent.
+      processLeadStatus(updatedLead, clientId, "webhook-update").catch((err) =>
+        console.error(`[PixelEye] processLeadStatus(webhook-update) failed for call_id=${updatedLead?.call_id}:`, err?.message),
+      );
       return {
         action: "updated",
         lead: updatedLead,
@@ -121,6 +126,10 @@ export const processPixelEyeWebhook = async (payload) => {
     );
 
     await transaction.commit();
+    // Notify after commit so the DB state is consistent.
+    processLeadStatus(createdLead, clientId, "webhook-create").catch((err) =>
+      console.error(`[PixelEye] processLeadStatus(webhook-create) failed for call_id=${createdLead?.call_id}:`, err?.message),
+    );
     return {
       action: "created",
       lead: createdLead,
