@@ -6,6 +6,7 @@ import { vlslawpracticeTable } from "./tables/VlsLawPracticeTable/index.js";
 import { managementTable } from "./tables/ManagementTable/index.js";
 import { vlsLawAcademyTable } from "./tables/VlsLawAcademyTable/index.js";
 import { vlslawaibeTable } from "./tables/VlsLawAibeTable/index.js";
+import { vlsPropertyLawTable } from "./tables/VlsPropertyLawTable/index.js";
 import { PixelEyeTable } from "./tables/PixelEyeTable/index.js";
 import { PixelEyeLeadStateTable } from "./tables/PixelEyeLeadStateTable/index.js";
 
@@ -40,6 +41,8 @@ db.VlsLawAcademy = vlsLawAcademyTable(Sequelize, sequelize);
 db.VlsLawAibe = vlslawaibeTable(Sequelize, sequelize);
 db.PixelEye          = PixelEyeTable(Sequelize, sequelize);
 db.PixelEyeLeadState = PixelEyeLeadStateTable(Sequelize, sequelize);
+db.VlsPropertyLaw = vlsPropertyLawTable(Sequelize, sequelize);
+db.PixelEye = PixelEyeTable(Sequelize, sequelize);
 
 const addClientId = (model) => {
   model.belongsTo(db.Client, { foreignKey: "client_id", as: "client" });
@@ -50,6 +53,7 @@ addClientId(db.Management);
 addClientId(db.VlsLawPractice);
 addClientId(db.VlsLawAcademy);
 addClientId(db.VlsLawAibe);
+addClientId(db.VlsPropertyLaw);
 addClientId(db.PixelEye);
 addClientId(db.PixelEyeLeadState);
 

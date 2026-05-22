@@ -11,6 +11,7 @@ import DynamicRouter from "./modules/dynamic/dynamic.routes.js";
 import PixelEyeRouter from "./modules/pixelEye/pixelEye.routes.js";
 import PixelEyeWebhookRouter from "./modules/pixelEye/webhook/pixelEyeWebhook.routes.js";
 import { startPixelEyeScheduler } from "./modules/pixelEye/pixelEyeScheduler.js";
+import PropertyLawRouter from "./modules/vls/propertyLaw/propertyLaw.routes.js";
 
 const app = express();
 
@@ -92,6 +93,7 @@ app.use("/api/v1/dynamic", DynamicRouter);
 app.use("/api/v1/clients", ClientRouter);
 app.use("/api/v1/pixeleye", PixelEyeWebhookRouter);
 app.use("/api/v1/pixeleye", PixelEyeRouter);
+app.use("/api/v1/property-law", PropertyLawRouter);
 
 // Base route
 app.get("/", (req, res) => {

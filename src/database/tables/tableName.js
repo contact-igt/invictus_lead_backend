@@ -4,6 +4,7 @@ export const tableName = {
   VLSLAWPRACTISE: "vls_law_practices",
   VLSLAWACADEMY: "vls_academys",
   VLSLAWAIBE: "vls_aibes",
+  VLSLAWPROPERTY: "vls_property_laws",
   PIXELEYE: "pixel_eye",
   PIXELEYE_LEAD_STATE: "pixel_eye_lead_states",
 };

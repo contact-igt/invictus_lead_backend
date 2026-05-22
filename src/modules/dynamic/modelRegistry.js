@@ -4,6 +4,7 @@ const MODEL_REGISTRY = {
   vlslaw_practice: db.VlsLawPractice,
   vlslaw_academy: db.VlsLawAcademy,
   vlslaw_aibe: db.VlsLawAibe,
+  vlslaw_property: db.VlsPropertyLaw,
 };
 
 export const getDynamicModel = (modelKey) => {
