@@ -51,7 +51,7 @@ export const vlslawaibeTable = (Sequelize, sequelize) => {
 
     payment_status: {
       type: Sequelize.ENUM("paid", "failed", "attempted", "cancelled"),
-      allowNull: false,
+      allowNull: true,
     },
 
     captured: {

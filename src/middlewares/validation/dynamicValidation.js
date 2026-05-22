@@ -37,7 +37,8 @@ export const vlsLawAibeSchema = Joi.object({
   programm_end_date: Joi.date().iso().required(),
   payment_status: Joi.string()
     .valid("paid", "failed", "attempted", "cancelled")
-    .required(),
+    .optional()
+    .allow(null, ""),
   captured: Joi.boolean().default(true),
   razorpay_order_id: Joi.string().optional().allow(null, ""),
   razorpay_payment_id: Joi.string().optional().allow(null, ""),
