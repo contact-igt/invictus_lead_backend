@@ -41,8 +41,11 @@ const THIRTY_MIN_STATUSES = new Set([
   "Incoming Call Not Available",
 ]);
 
-const DNP2_STATUSES = new Set([
+const DNP_STATUSES = new Set([
+  "Dnp 1",
   "Dnp 2",
+  "Dnp 3",
+  "Dnp 4",
 ]);
 
 const TWENTY_FOUR_HR_STATUSES = new Set([
@@ -80,13 +83,21 @@ const NO_ACTION_STATUSES = new Set([
   "Visited",
 ]);
 
+const makeLowercaseSet = (s) => new Set([...s].map(val => val.toLowerCase().trim()));
+
+const THIRTY_MIN_STATUSES_LOWER     = makeLowercaseSet(THIRTY_MIN_STATUSES);
+const DNP_STATUSES_LOWER            = makeLowercaseSet(DNP_STATUSES);
+const TWENTY_FOUR_HR_STATUSES_LOWER = makeLowercaseSet(TWENTY_FOUR_HR_STATUSES);
+const TERMINATION_STATUSES_LOWER   = makeLowercaseSet(TERMINATION_STATUSES);
+const NO_ACTION_STATUSES_LOWER      = makeLowercaseSet(NO_ACTION_STATUSES);
+
 export const getStatusCategory = (status) => {
-  const s = String(status || "").trim();
-  if (TERMINATION_STATUSES.has(s))    return "TERMINATION";
-  if (DNP2_STATUSES.has(s))           return "DNP2";
-  if (THIRTY_MIN_STATUSES.has(s))     return "THIRTY_MIN";
-  if (TWENTY_FOUR_HR_STATUSES.has(s)) return "TWENTY_FOUR_HR";
-  if (NO_ACTION_STATUSES.has(s))      return "NO_ACTION";
+  const s = String(status || "").trim().toLowerCase();
+  if (TERMINATION_STATUSES_LOWER.has(s))    return "TERMINATION";
+  if (DNP_STATUSES_LOWER.has(s))            return "DNP2";
+  if (THIRTY_MIN_STATUSES_LOWER.has(s))     return "THIRTY_MIN";
+  if (TWENTY_FOUR_HR_STATUSES_LOWER.has(s)) return "TWENTY_FOUR_HR";
+  if (NO_ACTION_STATUSES_LOWER.has(s))      return "NO_ACTION";
   return "UNKNOWN";
 };
 
@@ -109,7 +120,8 @@ const upsertLeadState = async (callId, clientId, fields) => {
       call_id:   callId,
       client_id: clientId,
       state:     "new",
-      day1_mode: "auto",
+      day1_mode: "manual",
+      current_day: 0,
       notification_sent:          false,
       thirty_min_cycle_completed: false,
       permanently_closed:         false,
@@ -127,18 +139,12 @@ const upsertLeadState = async (callId, clientId, fields) => {
 // ---------------------------------------------------------------------------
 // MIRROR DAY 1  (mirrors mirrorDay1IfAllowed_)
 // Auto-sets day_1 = status until the first 30-min callback fires.
+// Disabled per user request: day 1 status is purely manual.
 // ---------------------------------------------------------------------------
 
 const mirrorDay1 = async (lead, state) => {
-  const mode = state ? state.day1_mode : "auto";
-  if (mode === "manual") return;
-
-  if (lead.day_1 !== lead.status) {
-    await db.PixelEye.update(
-      { day_1: lead.status },
-      { where: { id: lead.id } },
-    );
-  }
+  // Disabled per user requirements. Day 1 is set manually by agents.
+  return;
 };
 
 // ---------------------------------------------------------------------------
@@ -222,8 +228,17 @@ export const processDayStatus = async (lead, clientId, dayNumber, dayValue) => {
       return;
     }
 
-    // ── Permanently closed lead — ignore ──
-    if (existingState.permanently_closed) return;
+    // ── Permanently closed lead — reopen if a schedulable status is set ──
+    if (existingState.permanently_closed) {
+      if (category !== "TERMINATION" && category !== "NO_ACTION" && category !== "UNKNOWN") {
+        await existingState.update({
+          permanently_closed: false,
+          cancel_reason: null,
+        });
+      } else {
+        return;
+      }
+    }
 
     // ── Only process if this day is >= current_day (no going backwards) ──
     if (dayNumber < existingState.current_day) return;
@@ -322,10 +337,18 @@ export const processLeadStatus = async (lead, clientId, source) => {
     }
 
     // ------------------------------------------------------------------
-    // Permanently closed lead — ignore all further updates.
-    // Mirrors: if (state.permanentlyClosed === true) return;
+    // Permanently closed lead — reopen if a schedulable status is set.
     // ------------------------------------------------------------------
-    if (existingState.permanently_closed) return;
+    if (existingState.permanently_closed) {
+      if (category !== "TERMINATION" && category !== "NO_ACTION" && category !== "UNKNOWN") {
+        await existingState.update({
+          permanently_closed: false,
+          cancel_reason: null,
+        });
+      } else {
+        return;
+      }
+    }
 
     // ------------------------------------------------------------------
     // Status has not changed — just mirror day_1 if needed.
@@ -394,7 +417,7 @@ const _scheduleForCategory = async (lead, clientId, category, status, existingSt
   }
 
   if (category === "DNP2") {
-    await scheduleCallback(lead, clientId, 24 * 60, "DNP2", "DNP2 — 24-hr callback");
+    await scheduleCallback(lead, clientId, 24 * 60, "DNP2", `${status} — 24-hr callback`);
     return;
   }
 
