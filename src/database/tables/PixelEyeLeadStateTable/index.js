@@ -58,6 +58,14 @@ export const PixelEyeLeadStateTable = (Sequelize, sequelize) => {
       permanently_closed: { type: Sequelize.BOOLEAN, defaultValue: false },
       cancel_reason:      { type: Sequelize.STRING,  allowNull: true },
 
+      // Tracks which day the notification pipeline is on.
+      // 0 = initial main status, 1 = day_1, 2 = day_2, ... 5 = day_5
+      current_day: {
+        type: Sequelize.INTEGER,
+        defaultValue: 0,
+        allowNull: false,
+      },
+
       createdAt: {
         type: "TIMESTAMP",
         defaultValue: sequelize.literal("CURRENT_TIMESTAMP"),

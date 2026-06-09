@@ -187,6 +187,91 @@ const cancelLeadState = async (callId, clientId, reason, lead) => {
   });
 };
 
+/**
+ * Called when an agent manually sets day_1, day_2, day_3, day_4, or day_5.
+ * Evaluates the day value's status category and schedules a notification
+ * using the existing scheduling functionality.
+ *
+ * @param {object} lead       - The full lead record after update
+ * @param {number} clientId   - The client ID
+ * @param {number} dayNumber  - Which day was updated (1-5)
+ * @param {string} dayValue   - The new status value set on that day field
+ */
+export const processDayStatus = async (lead, clientId, dayNumber, dayValue) => {
+  try {
+    const callId   = lead.call_id;
+    const category = getStatusCategory(dayValue);
+
+    const existingState = await getLeadState(callId, clientId);
+
+    // ── No state row yet (unlikely for day updates, but safe) ──
+    if (!existingState) {
+      if (category === "TERMINATION" || category === "NO_ACTION") {
+        await cancelLeadState(callId, clientId, `Day ${dayNumber}: ${dayValue}`, lead);
+        return;
+      }
+      if (category === "UNKNOWN") {
+        await upsertLeadState(callId, clientId, {
+          customer_name: lead.customer_name, phone_number: lead.phone_number,
+          agent_name: lead.agent_name, last_status: dayValue,
+          state: "baseline", current_day: dayNumber,
+        });
+        return;
+      }
+      await _scheduleForDayCategory(lead, clientId, category, dayValue, dayNumber, null);
+      return;
+    }
+
+    // ── Permanently closed lead — ignore ──
+    if (existingState.permanently_closed) return;
+
+    // ── Only process if this day is >= current_day (no going backwards) ──
+    if (dayNumber < existingState.current_day) return;
+
+    // ── Terminal / Success status on this day → cancel everything ──
+    if (category === "TERMINATION" || category === "NO_ACTION") {
+      await cancelLeadState(callId, clientId, `Day ${dayNumber} status: ${dayValue}`, lead);
+      return;
+    }
+
+    // ── Update state and schedule ──
+    await existingState.update({
+      last_status: dayValue, current_day: dayNumber,
+      customer_name: lead.customer_name, phone_number: lead.phone_number,
+      agent_name: lead.agent_name,
+    });
+
+    await _scheduleForDayCategory(lead, clientId, category, dayValue, dayNumber, existingState);
+
+  } catch (err) {
+    _logError("processDayStatus", err, lead?.call_id);
+    throw err;
+  }
+};
+
+const _scheduleForDayCategory = async (lead, clientId, category, status, dayNumber, existingState) => {
+  const dayLabel = `Day ${dayNumber}`;
+
+  if (category === "THIRTY_MIN") {
+    if (
+      existingState?.state === "scheduled" &&
+      existingState?.schedule_type === "THIRTY_MIN" &&
+      existingState?.current_day === dayNumber &&
+      !existingState?.notification_sent
+    ) return; // Avoid duplicate
+    await scheduleCallback(lead, clientId, 30, "THIRTY_MIN", `${dayLabel}: 30-min callback`);
+    return;
+  }
+  if (category === "DNP2") {
+    await scheduleCallback(lead, clientId, 24 * 60, "DNP2", `${dayLabel}: DNP2 — 24-hr callback`);
+    return;
+  }
+  if (category === "TWENTY_FOUR_HR") {
+    await scheduleCallback(lead, clientId, 24 * 60, "TWENTY_FOUR_HR", `${dayLabel}: 24-hr follow-up (${status})`);
+    return;
+  }
+};
+
 // ---------------------------------------------------------------------------
 // MAIN ENTRY POINT  (mirrors processRowObject_ / processLeadStatus)
 // Called after every create or status update in the pixel_eye table.
@@ -409,11 +494,8 @@ const _processDueState = async (state, now) => {
     notification_sent:    true,
     notification_sent_at: new Date(),
     state:                "completed",
-    // After first 30-min fires, day_1 goes manual — agent controls it now.
-    ...(isThirtyMin ? {
-      thirty_min_cycle_completed: true,
-      day1_mode:                  "manual",
-    } : {}),
+    // Advance to next day so the system watches the next day field
+    current_day: Math.min((state.current_day || 0) + 1, 5),
   });
 
   console.log(
@@ -442,6 +524,7 @@ export const buildNotificationMessage = (lead, state) => {
     `🏥 *Customer Name:* ${customerName}`,
     `📞 *Phone Number:* ${phone}`,
     `📌 *Current Status:* ${lead.status}`,
+    `📅 *Day:* ${state.current_day > 0 ? `Day ${state.current_day}` : "Initial"}`,
     `📌 *Reason:* ${state.reason || state.schedule_type}`,
     `⏱ *Scheduled Time:* ${scheduledAt} ${TIMEZONE_LABEL}`,
     "",
