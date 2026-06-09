@@ -1,7 +1,7 @@
 import db from "../../database/index.js";
 import { tenantSafe } from "../../utils/tenantContext.js";
 import { Op, col, fn, where } from "sequelize";
-import { processLeadStatus } from "./pixelEyeNotification.service.js";
+import { processLeadStatus, processDayStatus } from "./pixelEyeNotification.service.js";
 
 const buildLeadFilters = ({ dateFrom, dateTo, agent } = {}) => {
   const filters = {};
@@ -165,6 +165,22 @@ export const updatePixelEyeLead = async (id, data, tenantContext) => {
     processLeadStatus(updatedLead, updatedLead.client_id, "update").catch((err) =>
       console.error(`[PixelEye] processLeadStatus(update) failed for call_id=${updatedLead?.call_id}:`, err?.message),
     );
+  }
+
+  // Trigger notification logic when a day field is manually updated.
+  const DAY_FIELDS = ["day_1", "day_2", "day_3", "day_4", "day_5"];
+  for (const dayField of DAY_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(updateData, dayField) && updateData[dayField]) {
+      const dayNumber = parseInt(dayField.split("_")[1], 10);
+      processDayStatus(updatedLead, updatedLead.client_id, dayNumber, updateData[dayField])
+        .catch((err) =>
+          console.error(
+            `[PixelEye] processDayStatus(${dayField}) failed for call_id=${updatedLead?.call_id}:`,
+            err?.message,
+          ),
+        );
+      break; // Only one day field should change per API request
+    }
   }
 
   return updatedLead;
