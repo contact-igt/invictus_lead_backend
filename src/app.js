@@ -13,6 +13,9 @@ import PixelEyeWebhookRouter from "./modules/pixelEye/webhook/pixelEyeWebhook.ro
 import { startPixelEyeScheduler } from "./modules/pixelEye/pixelEyeScheduler.js";
 import PropertyLawRouter from "./modules/vls/propertyLaw/propertyLaw.routes.js";
 import VlsAibeRouter from "./modules/vls/vlsAibe/vlsAibe.routes.js";
+import { ensurePixelEyeLeadStateCurrentDayColumn } from "./database/migrations/ensurePixelEyeLeadStateCurrentDay.js";
+import { ensurePixelEyeLeadStateManualScheduleType } from "./database/migrations/ensurePixelEyeLeadStateScheduleTypeManual.js";
+import { ensurePixelEyeDnpStatusEnums } from "./database/migrations/ensurePixelEyeDnpStatusEnums.js";
 
 const app = express();
 
@@ -77,6 +80,9 @@ app.use("/api/v1", (req, res, next) => {
 const connect_mysql = async () => {
   try {
     await db.sequelize.sync();
+    await ensurePixelEyeLeadStateCurrentDayColumn();
+    await ensurePixelEyeLeadStateManualScheduleType();
+    await ensurePixelEyeDnpStatusEnums();
     console.log("Database synchronized for Multi-Tenant architecture");
     startPixelEyeScheduler();
   } catch (error) {
@@ -84,8 +90,6 @@ const connect_mysql = async () => {
     process.exit(1);
   }
 };
-
-connect_mysql();
 
 // Routes
 app.use("/api/v1/auth", AuthRouter);
@@ -123,6 +127,8 @@ const rawPort =
   line === "production" ? live : line === "development" ? development : local;
 
 const PORT = parseInt(rawPort, 10) || 8000;
+
+await connect_mysql();
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT} [${line ?? "local"} mode]`);

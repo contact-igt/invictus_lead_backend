@@ -6,6 +6,9 @@ import {
   findPixelEyeLeadByPhone,
   updatePixelEyeLead,
   deletePixelEyeLead,
+  markPixelEyeFollowUpHandled,
+  reschedulePixelEyeFollowUp,
+  cancelPixelEyeFollowUp,
 } from "./pixelEye.service.js";
 import {
   listNotificationStates,
@@ -202,17 +205,31 @@ const resolvePixelEyeErrorStatus = (message = "") => {
   if (
     normalized.includes("invalid day field") ||
     normalized.includes("both day and value") ||
-    normalized.includes("validation")
+    normalized.includes("validation") ||
+    normalized.includes("follow_up_date") ||
+    normalized.includes("manual follow-up") ||
+    normalized.includes("cannot update") ||
+    normalized.includes("cannot be rescheduled") ||
+    normalized.includes("permanently closed")
   ) {
     return 400;
   }
+
+  if (normalized.includes("no active follow-up reminder found")) return 404;
 
   return 500;
 };
 
 export const getLeads = async (req, res) => {
   try {
-    const leads = await listPixelEyeLeads(req.tenant);
+    const requestedClientKey = req.query._client_key || req.query.client_key;
+    const clientId = req.tenant.isSuperAdmin && requestedClientKey
+      ? await resolveClientIdFromKey(requestedClientKey)
+      : null;
+    if (req.tenant.isSuperAdmin && requestedClientKey && !clientId) {
+      return res.status(400).json({ message: "Could not determine client context." });
+    }
+    const leads = await listPixelEyeLeads(req.tenant, clientId);
     return res.status(200).json({ data: leads });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -231,7 +248,14 @@ export const exportLeads = async (req, res) => {
     }
 
     const filters = normalizeExportFilters(req.query);
-    const leads = await listPixelEyeLeadsForExport(req.tenant, filters);
+    const requestedClientKey = req.query._client_key || req.query.client_key;
+    const clientId = req.tenant.isSuperAdmin && requestedClientKey
+      ? await resolveClientIdFromKey(requestedClientKey)
+      : null;
+    if (req.tenant.isSuperAdmin && requestedClientKey && !clientId) {
+      return res.status(400).json({ message: "Could not determine client context." });
+    }
+    const leads = await listPixelEyeLeadsForExport(req.tenant, filters, clientId);
     const fileName = buildExportFileName(format);
 
     if (format === "csv") {
@@ -280,16 +304,17 @@ export const createLead = async (req, res) => {
     );
 
     if (existingLead) {
-      // If same phone number comes again, only status should be updated.
-      if (existingLead.status !== data.status) {
-        await existingLead.update({ status: data.status });
-      }
+      const updatedLead = await updatePixelEyeLead(
+        existingLead.id,
+        data,
+        req.tenant,
+      );
 
       return res.status(200).json({
         message: "Duplicate phone number found. Existing lead updated.",
         isDuplicate: true,
         duplicateLeadId: existingLead.id,
-        data: existingLead,
+        data: updatedLead,
       });
     }
 
@@ -300,7 +325,8 @@ export const createLead = async (req, res) => {
       data: lead,
     });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    const status = resolvePixelEyeErrorStatus(err.message);
+    return res.status(status).json({ message: err.message });
   }
 };
 
@@ -343,6 +369,63 @@ export const deleteLead = async (req, res) => {
   try {
     await deletePixelEyeLead(req.params.id, req.tenant);
     return res.status(200).json({ message: "Lead deleted successfully" });
+  } catch (err) {
+    const status = resolvePixelEyeErrorStatus(err.message);
+    return res.status(status).json({ message: err.message });
+  }
+};
+
+export const markLeadFollowUpHandled = async (req, res) => {
+  try {
+    const { reason } = req.body || {};
+    const result = await markPixelEyeFollowUpHandled(
+      req.params.id,
+      req.tenant,
+      reason,
+    );
+
+    return res.status(200).json({
+      message: "Follow-up marked as handled",
+      data: result,
+    });
+  } catch (err) {
+    const status = resolvePixelEyeErrorStatus(err.message);
+    return res.status(status).json({ message: err.message });
+  }
+};
+
+export const rescheduleLeadFollowUp = async (req, res) => {
+  try {
+    const result = await reschedulePixelEyeFollowUp(
+      req.params.id,
+      req.tenant,
+      req.body || {},
+    );
+
+    return res.status(200).json({
+      message: "Follow-up rescheduled successfully",
+      data: result,
+    });
+  } catch (err) {
+    const status = resolvePixelEyeErrorStatus(err.message);
+    return res.status(status).json({ message: err.message });
+  }
+};
+
+export const cancelLeadFollowUp = async (req, res) => {
+  try {
+    const result = await cancelPixelEyeFollowUp(
+      req.params.id,
+      req.tenant,
+      req.body || {},
+    );
+
+    return res.status(200).json({
+      message: result.hadReminder
+        ? "Follow-up cancelled successfully"
+        : "No active follow-up reminder found",
+      data: result,
+    });
   } catch (err) {
     const status = resolvePixelEyeErrorStatus(err.message);
     return res.status(status).json({ message: err.message });

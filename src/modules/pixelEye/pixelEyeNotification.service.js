@@ -9,6 +9,7 @@
  *   THIRTY_MIN     → notify agent 30 minutes after status set
  *   DNP2           → notify agent 24 hours after status set
  *   TWENTY_FOUR_HR → notify agent 24 hours after status set
+ *   MANUAL         → notify agent at the manually selected follow-up time
  *   TERMINATION    → cancel all pending callbacks permanently
  *   NO_ACTION      → success states, nothing scheduled
  */
@@ -17,6 +18,7 @@ import { Op } from "sequelize";
 import db from "../../database/index.js";
 
 const TIMEZONE_LABEL = "IST";
+const GOOGLE_CHAT_WEBHOOK_TIMEOUT_MS = 15_000;
 
 // How long past the scheduled_at time we will keep retrying before giving up.
 // Prevents an infinite retry loop if the webhook is permanently unavailable.
@@ -62,6 +64,15 @@ const TWENTY_FOUR_HR_STATUSES = new Set([
   "Searching for Specific Hospital",
   "Others",
 ]);
+
+const ALLOWED_SCHEDULE_TYPES = new Set([
+  "THIRTY_MIN",
+  "DNP2",
+  "TWENTY_FOUR_HR",
+  "MANUAL",
+]);
+
+const DUE_NOTIFICATION_BATCH_LIMIT = 50;
 
 const TERMINATION_STATUSES = new Set([
   "Wrong Number",
@@ -109,6 +120,45 @@ const getLeadState = async (callId, clientId) => {
   return await db.PixelEyeLeadState.findOne({
     where: { call_id: callId, client_id: clientId },
   });
+};
+
+export const isTerminalLeadStatus = (status) => {
+  const category = getStatusCategory(status);
+  return category === "TERMINATION" || category === "NO_ACTION";
+};
+
+export const resolveManualFollowUpScheduledAt = (followUpDate) => {
+  const text = String(followUpDate || "").trim();
+
+  if (!text) {
+    return null;
+  }
+
+  let scheduledAt;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    scheduledAt = new Date(`${text}T09:00:00+05:30`);
+  } else if (/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}/.test(text)) {
+    scheduledAt = new Date(text.replace(" ", "T"));
+  } else {
+    scheduledAt = new Date(text);
+  }
+
+  if (Number.isNaN(scheduledAt.getTime())) {
+    throw new Error("Invalid follow_up_date");
+  }
+
+  return scheduledAt;
+};
+
+const normalizeScheduledAt = (scheduledAt) => {
+  const nextScheduledAt =
+    scheduledAt instanceof Date ? new Date(scheduledAt.getTime()) : new Date(scheduledAt);
+
+  if (Number.isNaN(nextScheduledAt.getTime())) {
+    throw new Error("Invalid scheduledAt value for manual follow-up reminder");
+  }
+
+  return nextScheduledAt;
 };
 
 // FIX (Bug 1): Use the `created` boolean returned by findOrCreate instead of
@@ -173,6 +223,86 @@ const scheduleCallback = async (lead, clientId, delayMinutes, type, reason) => {
     `[PixelEye] Scheduled ${type} callback for call_id=${lead.call_id}` +
     ` at ${scheduledAt.toISOString()} (in ${delayMinutes} min)`,
   );
+};
+
+export const scheduleManualFollowUpReminder = async (lead, scheduledAt, options = {}) => {
+  const clientId = Number(options.clientId ?? lead?.client_id);
+  const callId = String(options.callId ?? lead?.call_id ?? "").trim();
+  const scheduledDate = normalizeScheduledAt(scheduledAt);
+  const reason = String(
+    options.reason || "Manual Follow-up Reminder",
+  ).trim() || "Manual Follow-up Reminder";
+
+  if (!clientId) {
+    throw new Error("Missing client context for manual follow-up reminder");
+  }
+
+  if (!callId) {
+    throw new Error("Missing call_id for manual follow-up reminder");
+  }
+
+  const existingState = await getLeadState(callId, clientId);
+  const payload = {
+    customer_name:        lead?.customer_name ?? existingState?.customer_name ?? null,
+    phone_number:         lead?.phone_number ?? existingState?.phone_number ?? null,
+    agent_name:           lead?.agent_name ?? existingState?.agent_name ?? null,
+    last_status:          lead?.status ?? existingState?.last_status ?? null,
+    state:                "scheduled",
+    schedule_type:        "MANUAL",
+    reason,
+    scheduled_at:         scheduledDate,
+    notification_sent:    false,
+    notification_sent_at: null,
+    permanently_closed:   false,
+    cancel_reason:        null,
+    current_day:          null,
+  };
+
+  let state;
+  if (!existingState) {
+    state = await db.PixelEyeLeadState.create({
+      client_id: clientId,
+      call_id: callId,
+      ...payload,
+    });
+  } else {
+    state = await existingState.update(payload);
+  }
+
+  console.log(
+    `[PixelEye] Scheduled MANUAL follow-up reminder for call_id=${callId}` +
+    ` at ${scheduledDate.toISOString()}`,
+  );
+
+  return state;
+};
+
+export const markFollowUpReminderHandled = async (lead, options = {}) => {
+  const clientId = Number(options.clientId ?? lead?.client_id);
+  const callId = String(options.callId ?? lead?.call_id ?? "").trim();
+
+  if (!clientId) {
+    throw new Error("Missing client context for follow-up handling");
+  }
+
+  if (!callId) {
+    throw new Error("Missing call_id for follow-up handling");
+  }
+
+  const existingState = await getLeadState(callId, clientId);
+  if (!existingState || existingState.state !== "scheduled") {
+    throw new Error("No active follow-up reminder found");
+  }
+
+  const handledState = await existingState.update({
+    state: "completed",
+  });
+
+  console.log(
+    `[PixelEye] Marked follow-up reminder handled for call_id=${callId}`,
+  );
+
+  return handledState;
 };
 
 const cancelLeadState = async (callId, clientId, reason, lead) => {
@@ -353,6 +483,11 @@ export const processLeadStatus = async (lead, clientId, source) => {
     // ------------------------------------------------------------------
     // Status has not changed — just mirror day_1 if needed.
     // ------------------------------------------------------------------
+    if (category === "TERMINATION" || category === "NO_ACTION") {
+      await cancelLeadState(callId, clientId, `Status changed to: ${status}`, lead);
+      return;
+    }
+
     const statusChanged =
       String(existingState.last_status || "").trim() !== String(status || "").trim();
 
@@ -433,6 +568,7 @@ const _scheduleForCategory = async (lead, clientId, category, status, existingSt
 // ---------------------------------------------------------------------------
 
 export const sendDueNotifications = async () => {
+  const startedAt = Date.now();
   try {
     const now = new Date();
 
@@ -440,14 +576,29 @@ export const sendDueNotifications = async () => {
       where: {
         state:             "scheduled",
         notification_sent: false,
+        permanently_closed: { [Op.not]: true },
         scheduled_at:      { [Op.lte]: now },
+        schedule_type:     { [Op.in]: Array.from(ALLOWED_SCHEDULE_TYPES) },
       },
+      order: [
+        ["scheduled_at", "ASC"],
+        ["createdAt", "ASC"],
+      ],
+      limit: DUE_NOTIFICATION_BATCH_LIMIT,
     });
 
     if (dueStates.length > 0) {
       console.log(
-        `[PixelEye Scheduler] ${dueStates.length} notification(s) due at ${now.toISOString()}`,
+        `[PixelEye Scheduler] ${dueStates.length} notification(s) due at ${now.toISOString()}` +
+        ` (limit=${DUE_NOTIFICATION_BATCH_LIMIT})`,
       );
+
+      if (dueStates.length === DUE_NOTIFICATION_BATCH_LIMIT) {
+        console.warn(
+          `[PixelEye Scheduler] Due reminder batch reached limit=${DUE_NOTIFICATION_BATCH_LIMIT}.` +
+          ` Remaining reminders will be processed on the next tick.`,
+        );
+      }
     }
 
     for (const state of dueStates) {
@@ -457,12 +608,26 @@ export const sendDueNotifications = async () => {
         _logError("sendDueNotifications:item", err, state.call_id);
       }
     }
+
+    const durationMs = Date.now() - startedAt;
+    console.log(
+      `[PixelEye Scheduler] sendDueNotifications completed in ${durationMs}ms` +
+      ` processed=${dueStates.length}`,
+    );
   } catch (err) {
     _logError("sendDueNotifications:outer", err, null);
   }
 };
 
 const _processDueState = async (state, now) => {
+  if (state.permanently_closed) {
+    await state.update({
+      state: "cancelled",
+      cancel_reason: state.cancel_reason || "Follow-up permanently closed",
+    });
+    return;
+  }
+
   // ------------------------------------------------------------------
   // BUG FIX: Prevent infinite retry loop.
   // If the notification has been overdue for more than 2 hours (webhook
@@ -548,7 +713,7 @@ export const buildNotificationMessage = (lead, state) => {
     `📞 *Phone Number:* ${phone}`,
     `📌 *Current Status:* ${lead.status}`,
     `📅 *Day:* ${state.current_day > 0 ? `Day ${state.current_day}` : "Initial"}`,
-    `📌 *Reason:* ${state.reason || state.schedule_type}`,
+    `📌 *Reason:* ${state.reason || getScheduleTypeLabel(state.schedule_type)}`,
     `⏱ *Scheduled Time:* ${scheduledAt} ${TIMEZONE_LABEL}`,
     "",
     "👉 This is an internal task for the assigned agent only.",
@@ -566,17 +731,47 @@ export const sendGoogleChatMessage = async (text) => {
     throw new Error("GOOGLE_CHAT_WEBHOOK_URL is not configured in environment.");
   }
 
-  const response = await fetch(webhookUrl, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ text }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), GOOGLE_CHAT_WEBHOOK_TIMEOUT_MS);
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `Google Chat webhook failed. Status: ${response.status}. Body: ${body}`,
-    );
+  try {
+    const response = await fetch(webhookUrl, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ text }),
+      signal:  controller.signal,
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(
+        `Google Chat webhook failed. Status: ${response.status}. Body: ${body}`,
+      );
+    }
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(
+        `Google Chat webhook timed out after ${GOOGLE_CHAT_WEBHOOK_TIMEOUT_MS}ms`,
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const getScheduleTypeLabel = (scheduleType) => {
+  switch (String(scheduleType || "").trim()) {
+    case "THIRTY_MIN":
+      return "30-Min Callback";
+    case "DNP2":
+      return "DNP2 — 24-Hour Callback";
+    case "TWENTY_FOUR_HR":
+      return "24-Hour Follow-up";
+    case "MANUAL":
+      return "Manual Follow-up Reminder";
+    default:
+      return String(scheduleType || "—");
   }
 };
 

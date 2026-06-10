@@ -4,7 +4,12 @@ import {
   extractClientModuleKey,
   normalizeClientKey,
 } from "../../../utils/clientKey.js";
-import { processLeadStatus } from "../pixelEyeNotification.service.js";
+import {
+  processLeadStatus,
+  scheduleManualFollowUpReminder,
+  isTerminalLeadStatus,
+  resolveManualFollowUpScheduledAt,
+} from "../pixelEyeNotification.service.js";
 
 const RUNO_SERVICE_NAME = "Runo";
 const DEFAULT_WEBHOOK_CLIENT_KEY = "pixeleye";
@@ -73,6 +78,53 @@ const buildPixelEyeLeadData = (payload) => {
   };
 };
 
+const logWebhookFollowUpSkip = (callId, reason) => {
+  console.log(
+    `[PixelEye] Skipped webhook manual follow-up scheduling for call_id=${callId || "—"}: ${reason}`,
+  );
+};
+
+const scheduleWebhookManualFollowUpIfEligible = async (lead, followUpDate) => {
+  if (!String(followUpDate || "").trim()) {
+    return false;
+  }
+
+  if (!lead?.client_id || !lead?.call_id) {
+    logWebhookFollowUpSkip(lead?.call_id, "missing client_id or call_id");
+    return false;
+  }
+
+  if (isTerminalLeadStatus(lead?.status)) {
+    logWebhookFollowUpSkip(lead?.call_id, `terminal status=${lead?.status}`);
+    return false;
+  }
+
+  let scheduledAt;
+  try {
+    scheduledAt = resolveManualFollowUpScheduledAt(followUpDate);
+  } catch (err) {
+    logWebhookFollowUpSkip(lead?.call_id, err.message);
+    return false;
+  }
+
+  if (scheduledAt.getTime() <= Date.now()) {
+    logWebhookFollowUpSkip(lead?.call_id, "follow_up_date must be in the future");
+    return false;
+  }
+
+  await scheduleManualFollowUpReminder(lead, scheduledAt, {
+    clientId: lead.client_id,
+    callId: lead.call_id,
+    reason: "Manual Follow-up Reminder",
+  });
+
+  console.log(
+    `[PixelEye] Webhook manual follow-up scheduled for call_id=${lead.call_id} at ${scheduledAt.toISOString()}`,
+  );
+
+  return true;
+};
+
 export const processPixelEyeWebhook = async (payload) => {
   if (!payload?.call_id) {
     throw createWebhookError("Missing required field: call_id", 400);
@@ -103,10 +155,21 @@ export const processPixelEyeWebhook = async (payload) => {
 
     if (existingLead) {
       const updatedLead = await existingLead.update(
-        { status: leadData.status },
+        {
+          status: leadData.status,
+          follow_up_date: leadData.follow_up_date,
+        },
         { transaction },
       );
       await transaction.commit();
+
+      if (await scheduleWebhookManualFollowUpIfEligible(updatedLead, leadData.follow_up_date)) {
+        return {
+          action: "updated",
+          lead: updatedLead,
+        };
+      }
+
       // Notify after commit so the DB state is consistent.
       processLeadStatus(updatedLead, clientId, "webhook-update").catch((err) =>
         console.error(`[PixelEye] processLeadStatus(webhook-update) failed for call_id=${updatedLead?.call_id}:`, err?.message),
@@ -126,6 +189,14 @@ export const processPixelEyeWebhook = async (payload) => {
     );
 
     await transaction.commit();
+
+    if (await scheduleWebhookManualFollowUpIfEligible(createdLead, leadData.follow_up_date)) {
+      return {
+        action: "created",
+        lead: createdLead,
+      };
+    }
+
     // Notify after commit so the DB state is consistent.
     processLeadStatus(createdLead, clientId, "webhook-create").catch((err) =>
       console.error(`[PixelEye] processLeadStatus(webhook-create) failed for call_id=${createdLead?.call_id}:`, err?.message),

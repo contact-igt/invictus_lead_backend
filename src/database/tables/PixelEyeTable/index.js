@@ -1,13 +1,16 @@
 import { tableName } from "../tableName.js";
 
-const STATUS_ENUM_VALUES = [
+export const STATUS_ENUM_VALUES = [
   "Busy",
   "Not Answering",
   "Switched Off",
   "Missed Call",
   "On Another Call",
   "DND",
+  "Dnp 1",
   "Dnp 2",
+  "Dnp 3",
+  "Dnp 4",
   "Not Speaking",
   "Disconnecting",
   "Not in Network",
