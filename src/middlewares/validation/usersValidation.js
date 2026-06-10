@@ -10,7 +10,7 @@ const userSchema = {
   password: Joi.string().min(8).required(),
   role: Joi.string().valid("super-admin", "admin", "client").required(),
   client_key: Joi.string().trim().optional(),
-};
+}; 
 
 export const createUserSchema = Joi.object(userSchema);
 

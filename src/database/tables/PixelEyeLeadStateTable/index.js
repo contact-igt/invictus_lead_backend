@@ -32,7 +32,7 @@ export const PixelEyeLeadStateTable = (Sequelize, sequelize) => {
 
       // Which callback window was scheduled.
       schedule_type: {
-        type: Sequelize.ENUM("THIRTY_MIN", "DNP2", "TWENTY_FOUR_HR"),
+        type: Sequelize.ENUM("THIRTY_MIN", "DNP2", "TWENTY_FOUR_HR", "MANUAL"),
         allowNull: true,
       },
 
@@ -57,6 +57,14 @@ export const PixelEyeLeadStateTable = (Sequelize, sequelize) => {
 
       permanently_closed: { type: Sequelize.BOOLEAN, defaultValue: false },
       cancel_reason:      { type: Sequelize.STRING,  allowNull: true },
+
+      // Tracks which day the notification pipeline is on.
+      // null = not yet assigned, 1 = day_1, 2 = day_2, ... 5 = day_5
+      current_day: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+      },
 
       createdAt: {
         type: "TIMESTAMP",
