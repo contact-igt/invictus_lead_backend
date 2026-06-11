@@ -9,6 +9,14 @@ import {
   isTerminalLeadStatus,
   resolveManualFollowUpScheduledAt,
 } from "./pixelEyeNotification.service.js";
+import {
+  createFollowUpHistoryEntry,
+  getFollowUpChangeSummaryForLead,
+  getFollowUpChangeSummaryMapForLeads,
+} from "./pixelEyeFollowUpHistory.service.js";
+import {
+  createOrUpdatePendingFollowUpCompliance,
+} from "./pixelEyeFollowUpCallCompliance.service.js";
 
 const buildLeadFilters = ({ dateFrom, dateTo, agent } = {}) => {
   const filters = {};
@@ -37,7 +45,10 @@ const normalizePhone = (phone) =>
     .trim()
     .replace(/\D/g, "");
 
-const attachReminderState = (lead, reminderState) => ({
+const buildClientCallKey = (clientId, callId) =>
+  `${clientId}:${String(callId || "").trim()}`;
+
+const attachReminderState = (lead, reminderState, historySummary = {}) => ({
   ...lead.toJSON(),
   followup_state: reminderState?.state ?? null,
   reminder_schedule_type: reminderState?.schedule_type ?? null,
@@ -47,6 +58,8 @@ const attachReminderState = (lead, reminderState) => ({
   reminder_reason: reminderState?.reason ?? null,
   reminder_permanently_closed: reminderState?.permanently_closed ?? null,
   reminder_cancel_reason: reminderState?.cancel_reason ?? null,
+  follow_up_change_count: Number(historySummary?.count || 0),
+  latest_follow_up_change_at: historySummary?.latest_follow_up_change_at ?? null,
 });
 
 const hasOwnValue = (obj, key) =>
@@ -155,7 +168,34 @@ const scheduleManualFollowUpIfEligible = async (lead, followUpDate, options = {}
   return true;
 };
 
-export const reschedulePixelEyeFollowUp = async (id, tenantContext, data = {}) => {
+const persistPendingFollowUpCompliance = async ({
+  lead,
+  followUpDate,
+  source,
+  reason,
+}) => {
+  const compliance = await createOrUpdatePendingFollowUpCompliance({
+    client_id: lead?.client_id,
+    lead_id: lead?.id,
+    call_id: lead?.call_id,
+    phone_number: lead?.phone_number,
+    customer_name: lead?.customer_name,
+    agent_name: lead?.agent_name,
+    follow_up_date: followUpDate,
+    source,
+    reason,
+  });
+
+  if (!compliance) {
+    console.error(
+      `[PixelEye] Failed to create/update pending compliance for call_id=${lead?.call_id || "â€”"}`,
+    );
+  }
+
+  return compliance;
+};
+
+export const reschedulePixelEyeFollowUp = async (id, tenantContext, data = {}, actor = {}) => {
   const safeModel = tenantSafe(db.PixelEye, tenantContext);
   const lead = await safeModel.findOne({ where: { id } });
 
@@ -176,13 +216,14 @@ export const reschedulePixelEyeFollowUp = async (id, tenantContext, data = {}) =
     throw new Error("Lead is permanently closed and cannot be rescheduled");
   }
 
+  const oldFollowUpDate = lead.follow_up_date;
   const followUpDate = String(data.follow_up_date || "").trim();
   if (!followUpDate) {
     throw new Error("follow_up_date is required");
   }
 
   const scheduledAt = getManualFollowUpScheduledAt(followUpDate);
-  const reason = String(data.reason || "Rescheduled follow-up").trim() || "Rescheduled follow-up";
+  const reason = String(data.reason || "Follow-up rescheduled").trim() || "Follow-up rescheduled";
 
   const updatedLead = await lead.update({
     follow_up_date: scheduledAt.toISOString(),
@@ -192,6 +233,28 @@ export const reschedulePixelEyeFollowUp = async (id, tenantContext, data = {}) =
     clientId: updatedLead.client_id,
     callId: updatedLead.call_id,
     reason,
+  });
+
+  await persistPendingFollowUpCompliance({
+    lead: updatedLead,
+    followUpDate: updatedLead.follow_up_date ?? scheduledAt.toISOString(),
+    source: actor?.source || "FRONTEND",
+    reason: "Pending follow-up call check",
+  });
+
+  await createFollowUpHistoryEntry({
+    client_id: updatedLead.client_id,
+    lead_id: updatedLead.id,
+    call_id: updatedLead.call_id,
+    phone_number: updatedLead.phone_number,
+    customer_name: updatedLead.customer_name,
+    old_follow_up_date: oldFollowUpDate,
+    new_follow_up_date: updatedLead.follow_up_date ?? scheduledAt.toISOString(),
+    change_type: "RESCHEDULED",
+    source: "FRONTEND",
+    reason,
+    changed_by_user_id: actor?.changed_by_user_id ?? null,
+    changed_by_name: actor?.changed_by_name ?? null,
   });
 
   console.log(
@@ -324,16 +387,19 @@ export const listPixelEyeLeads = async (tenantContext, clientId) => {
 
   const reminderStateMap = new Map();
   for (const state of reminderStates) {
-    const key = `${state.client_id}:${state.call_id}`;
+    const key = buildClientCallKey(state.client_id, state.call_id);
     if (!reminderStateMap.has(key)) {
       reminderStateMap.set(key, state);
     }
   }
 
+  const historySummaryMap = await getFollowUpChangeSummaryMapForLeads(leads);
+
   return leads.map((lead) =>
     attachReminderState(
       lead,
-      reminderStateMap.get(`${lead.client_id}:${lead.call_id}`),
+      reminderStateMap.get(buildClientCallKey(lead.client_id, lead.call_id)),
+      getFollowUpChangeSummaryForLead(historySummaryMap, lead),
     ),
   );
 };
@@ -365,7 +431,7 @@ export const getPixelEyeLead = async (id, tenantContext) => {
   return await safeModel.findOne({ where: { id } });
 };
 
-export const createPixelEyeLead = async (data, clientId) => {
+export const createPixelEyeLead = async (data, clientId, actor = {}) => {
   if (hasOwnValue(data, "follow_up_date") && !isBlank(data.follow_up_date)) {
     getManualFollowUpScheduledAt(data.follow_up_date);
   }
@@ -373,7 +439,35 @@ export const createPixelEyeLead = async (data, clientId) => {
   const lead = await db.PixelEye.create({ ...data, client_id: clientId });
 
   if (hasOwnValue(data, "follow_up_date") && !isBlank(data.follow_up_date)) {
-    await scheduleManualFollowUpIfEligible(lead, data.follow_up_date, data);
+    const manualReminderScheduled = await scheduleManualFollowUpIfEligible(
+      lead,
+      data.follow_up_date,
+      data,
+    );
+
+    if (manualReminderScheduled) {
+      await persistPendingFollowUpCompliance({
+        lead,
+        followUpDate: data.follow_up_date,
+        source: "SYSTEM",
+        reason: "Pending follow-up call check",
+      });
+
+      await createFollowUpHistoryEntry({
+        client_id: lead.client_id,
+        lead_id: lead.id,
+        call_id: lead.call_id,
+        phone_number: lead.phone_number,
+        customer_name: lead.customer_name,
+        old_follow_up_date: null,
+        new_follow_up_date: lead.follow_up_date ?? data.follow_up_date,
+        change_type: "CREATED",
+        reason: "Follow-up date created",
+        changed_by_user_id: actor?.changed_by_user_id ?? null,
+        changed_by_name: actor?.changed_by_name ?? null,
+        source: actor?.source || "FRONTEND",
+      });
+    }
 
     if (!isTerminalLeadStatus(lead.status)) {
       return lead;
@@ -441,17 +535,47 @@ export const findPixelEyeLeadByPhone = async (clientId, phoneNumber) => {
   return lead;
 };
 
-export const updatePixelEyeLead = async (id, data, tenantContext) => {
+export const updatePixelEyeLead = async (id, data, tenantContext, actor = {}) => {
   const safeModel = tenantSafe(db.PixelEye, tenantContext);
   const lead = await safeModel.findOne({ where: { id } });
 
   if (!lead) throw new Error("Lead not found or unauthorized");
+
+  const previousFollowUpDate = lead.follow_up_date;
+  const hasFollowUpDateUpdate = hasOwnValue(data, "follow_up_date");
+  const shouldTrackFollowUpHistory = Boolean(actor?.trackFollowUpHistory);
+  const followUpDateValue = hasFollowUpDateUpdate ? data.follow_up_date : undefined;
+  const followUpDateWasCleared = hasFollowUpDateUpdate && isBlank(followUpDateValue);
+  const historyReason = followUpDateWasCleared
+    ? String(data.reason || "Follow-up date cleared").trim() || "Follow-up date cleared"
+    : String(data.reason || "Follow-up date updated").trim() || "Follow-up date updated";
+  const historyPayload = hasFollowUpDateUpdate && shouldTrackFollowUpHistory
+    ? {
+        client_id: lead.client_id,
+        lead_id: lead.id,
+        call_id: lead.call_id,
+        phone_number: lead.phone_number,
+        customer_name: lead.customer_name,
+        old_follow_up_date: previousFollowUpDate,
+        new_follow_up_date: followUpDateWasCleared
+          ? null
+          : followUpDateValue,
+        change_type: followUpDateWasCleared ? "CLEARED" : "UPDATED",
+        source: "FRONTEND",
+        reason: historyReason,
+        changed_by_user_id: actor?.changed_by_user_id ?? null,
+        changed_by_name: actor?.changed_by_name ?? null,
+      }
+    : null;
 
   if (hasOwnValue(data, "follow_up_date") && !isBlank(data.follow_up_date)) {
     getManualFollowUpScheduledAt(data.follow_up_date);
   }
 
   let updateData = { ...data };
+  if (hasOwnValue(updateData, "reason")) {
+    delete updateData.reason;
+  }
   const hasDay = Object.prototype.hasOwnProperty.call(data, "day");
   const hasValue = Object.prototype.hasOwnProperty.call(data, "value");
 
@@ -485,6 +609,21 @@ export const updatePixelEyeLead = async (id, data, tenantContext) => {
   const statusBefore = lead.status;
   const updatedLead  = await lead.update(updateData);
 
+  const logFollowUpHistory = async () => {
+    if (!historyPayload) {
+      return null;
+    }
+
+    return await createFollowUpHistoryEntry({
+      ...historyPayload,
+      new_follow_up_date: updatedLead.follow_up_date ?? historyPayload.new_follow_up_date,
+    });
+  };
+
+  if (historyPayload && (followUpDateWasCleared || isTerminalLeadStatus(updatedLead.status))) {
+    await logFollowUpHistory();
+  }
+
   if (isTerminalLeadStatus(updatedLead.status)) {
     processLeadStatus(updatedLead, updatedLead.client_id, "update-terminal").catch((err) =>
       console.error(`[PixelEye] processLeadStatus(update-terminal) failed for call_id=${updatedLead?.call_id}:`, err?.message),
@@ -495,7 +634,22 @@ export const updatePixelEyeLead = async (id, data, tenantContext) => {
   const followUpDateProvided =
     hasOwnValue(updateData, "follow_up_date") && !isBlank(updateData.follow_up_date);
   if (followUpDateProvided) {
-    await scheduleManualFollowUpIfEligible(updatedLead, updateData.follow_up_date, updateData);
+    const manualReminderScheduled = await scheduleManualFollowUpIfEligible(
+      updatedLead,
+      updateData.follow_up_date,
+      updateData,
+    );
+
+    if (manualReminderScheduled) {
+      await persistPendingFollowUpCompliance({
+        lead: updatedLead,
+        followUpDate: updateData.follow_up_date,
+        source: actor?.source || "SYSTEM",
+        reason: "Pending follow-up call check",
+      });
+    }
+
+    await logFollowUpHistory();
 
     if (!isTerminalLeadStatus(updatedLead.status)) {
       return updatedLead;

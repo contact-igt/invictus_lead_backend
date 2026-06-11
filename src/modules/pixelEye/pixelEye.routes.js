@@ -11,6 +11,10 @@ import {
   cancelLeadFollowUp,
   getNotifications,
   getNotificationsSummary,
+  getLeadFollowUpHistory,
+  getFollowUpCallCompliance,
+  getMissedFollowUpCalls,
+  getFollowUpCallComplianceSummary,
 } from "./pixelEye.controller.js";
 import { authenticateToken } from "../../middlewares/auth/authMiddlewares.js";
 import { attachTenantContext } from "../../middlewares/auth/tenantMiddleware.js";
@@ -28,6 +32,10 @@ router.get("/", getLeads);
 router.get("/export", exportLeads);
 router.get("/notifications", getNotifications);
 router.get("/notifications/summary", getNotificationsSummary);
+router.get("/follow-ups/call-compliance", getFollowUpCallCompliance);
+router.get("/follow-ups/missed-calls", getMissedFollowUpCalls);
+router.get("/follow-ups/call-compliance-summary", getFollowUpCallComplianceSummary);
+router.get("/:id/follow-up/history", getLeadFollowUpHistory);
 router.patch("/:id/follow-up/handled", markLeadFollowUpHandled);
 router.patch("/:id/follow-up/reschedule", rescheduleLeadFollowUp);
 router.patch("/:id/follow-up/cancel", cancelLeadFollowUp);

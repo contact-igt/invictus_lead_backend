@@ -11,11 +11,15 @@ import DynamicRouter from "./modules/dynamic/dynamic.routes.js";
 import PixelEyeRouter from "./modules/pixelEye/pixelEye.routes.js";
 import PixelEyeWebhookRouter from "./modules/pixelEye/webhook/pixelEyeWebhook.routes.js";
 import { startPixelEyeScheduler } from "./modules/pixelEye/pixelEyeScheduler.js";
+import { startPixelEyeFollowUpComplianceScheduler } from "./modules/pixelEye/pixelEyeFollowUpComplianceScheduler.js";
 import PropertyLawRouter from "./modules/vls/propertyLaw/propertyLaw.routes.js";
 import VlsAibeRouter from "./modules/vls/vlsAibe/vlsAibe.routes.js";
 import { ensurePixelEyeLeadStateCurrentDayColumn } from "./database/migrations/ensurePixelEyeLeadStateCurrentDay.js";
 import { ensurePixelEyeLeadStateManualScheduleType } from "./database/migrations/ensurePixelEyeLeadStateScheduleTypeManual.js";
 import { ensurePixelEyeDnpStatusEnums } from "./database/migrations/ensurePixelEyeDnpStatusEnums.js";
+import { ensurePixelEyeFollowUpHistoryTable } from "./database/migrations/ensurePixelEyeFollowUpHistoryTable.js";
+import { ensurePixelEyeCallLogTable } from "./database/migrations/ensurePixelEyeCallLogTable.js";
+import { ensurePixelEyeFollowUpCallComplianceTable } from "./database/migrations/ensurePixelEyeFollowUpCallComplianceTable.js";
 
 const app = express();
 
@@ -83,8 +87,12 @@ const connect_mysql = async () => {
     await ensurePixelEyeLeadStateCurrentDayColumn();
     await ensurePixelEyeLeadStateManualScheduleType();
     await ensurePixelEyeDnpStatusEnums();
+    await ensurePixelEyeFollowUpHistoryTable();
+    await ensurePixelEyeCallLogTable();
+    await ensurePixelEyeFollowUpCallComplianceTable();
     console.log("Database synchronized for Multi-Tenant architecture");
     startPixelEyeScheduler();
+    startPixelEyeFollowUpComplianceScheduler();
   } catch (error) {
     console.error("Failed to synchronize database:", error);
     process.exit(1);
