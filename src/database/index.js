@@ -9,6 +9,9 @@ import { vlslawaibeTable } from "./tables/VlsLawAibeTable/index.js";
 import { vlsPropertyLawTable } from "./tables/VlsPropertyLawTable/index.js";
 import { PixelEyeTable } from "./tables/PixelEyeTable/index.js";
 import { PixelEyeLeadStateTable } from "./tables/PixelEyeLeadStateTable/index.js";
+import { PixelEyeFollowUpHistoryTable } from "./tables/PixelEyeFollowUpHistoryTable/index.js";
+import { PixelEyeCallLogTable } from "./tables/PixelEyeCallLogTable/index.js";
+import { PixelEyeFollowUpCallComplianceTable } from "./tables/PixelEyeFollowUpCallComplianceTable/index.js";
 
 const dbconfig =
   ServerEnvironmentConfig?.server?.line === "production"
@@ -41,6 +44,9 @@ db.VlsLawAcademy = vlsLawAcademyTable(Sequelize, sequelize);
 db.VlsLawAibe = vlslawaibeTable(Sequelize, sequelize);
 db.PixelEye          = PixelEyeTable(Sequelize, sequelize);
 db.PixelEyeLeadState = PixelEyeLeadStateTable(Sequelize, sequelize);
+db.PixelEyeFollowUpHistory = PixelEyeFollowUpHistoryTable(Sequelize, sequelize);
+db.PixelEyeCallLog = PixelEyeCallLogTable(Sequelize, sequelize);
+db.PixelEyeFollowUpCallCompliance = PixelEyeFollowUpCallComplianceTable(Sequelize, sequelize);
 db.VlsPropertyLaw = vlsPropertyLawTable(Sequelize, sequelize);
 db.PixelEye = PixelEyeTable(Sequelize, sequelize);
 

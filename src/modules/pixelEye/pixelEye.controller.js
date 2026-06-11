@@ -10,10 +10,18 @@ import {
   reschedulePixelEyeFollowUp,
   cancelPixelEyeFollowUp,
 } from "./pixelEye.service.js";
+import { getFollowUpHistoryForLead } from "./pixelEyeFollowUpHistory.service.js";
 import {
   listNotificationStates,
   getNotificationSummary,
+  isTerminalLeadStatus,
 } from "./pixelEyeNotification.service.js";
+import { createFollowUpHistoryEntry } from "./pixelEyeFollowUpHistory.service.js";
+import {
+  listFollowUpCallCompliance,
+  listMissedFollowUpCalls,
+  getFollowUpCallComplianceSummary as getFollowUpCallComplianceSummaryService,
+} from "./pixelEyeFollowUpCallCompliance.service.js";
 import db from "../../database/index.js";
 import { Op } from "sequelize";
 import PDFDocument from "pdfkit";
@@ -220,6 +228,27 @@ const resolvePixelEyeErrorStatus = (message = "") => {
   return 500;
 };
 
+const hasOwnValue = (obj, key) =>
+  Object.prototype.hasOwnProperty.call(obj || {}, key);
+
+const isBlank = (value) =>
+  value === null || value === undefined || String(value).trim() === "";
+
+const normalizeComplianceFilters = (query = {}) => ({
+  compliance_status: String(query.compliance_status || "").trim() || undefined,
+  from: String(query.from || "").trim() || undefined,
+  to: String(query.to || "").trim() || undefined,
+  agent_name: String(query.agent_name || "").trim() || undefined,
+  limit: query.limit,
+});
+
+const getHistoryActor = (user) => ({
+  trackFollowUpHistory: true,
+  changed_by_user_id: user?.id ?? null,
+  changed_by_name: user?.username || user?.email || null,
+  source: "FRONTEND",
+});
+
 export const getLeads = async (req, res) => {
   try {
     const requestedClientKey = req.query._client_key || req.query.client_key;
@@ -287,6 +316,45 @@ export const getLeadById = async (req, res) => {
   }
 };
 
+export const getLeadFollowUpHistory = async (req, res) => {
+  try {
+    const lead = await getPixelEyeLead(req.params.id, req.tenant);
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    const historyRows = await getFollowUpHistoryForLead({
+      client_id: lead.client_id,
+      lead_id: lead.id,
+      call_id: lead.call_id,
+    });
+
+    const history = historyRows.map((row) => ({
+      old_follow_up_date: row.old_follow_up_date ?? null,
+      new_follow_up_date: row.new_follow_up_date ?? null,
+      change_type: row.change_type,
+      reason: row.reason ?? null,
+      changed_by_name: row.changed_by_name ?? null,
+      source: row.source,
+      created_at: row.createdAt ?? row.created_at,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        lead_id: lead.id,
+        call_id: lead.call_id,
+        customer_name: lead.customer_name,
+        phone_number: lead.phone_number,
+        change_count: history.length,
+        history,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 export const createLead = async (req, res) => {
   try {
     const clientId = await resolveClientId(req.body, req.tenant);
@@ -310,6 +378,25 @@ export const createLead = async (req, res) => {
         req.tenant,
       );
 
+      if (
+        hasOwnValue(data, "follow_up_date") &&
+        !isBlank(data.follow_up_date) &&
+        !isTerminalLeadStatus(updatedLead.status)
+      ) {
+        await createFollowUpHistoryEntry({
+          client_id: updatedLead.client_id,
+          lead_id: updatedLead.id,
+          call_id: updatedLead.call_id,
+          phone_number: updatedLead.phone_number,
+          customer_name: updatedLead.customer_name,
+          old_follow_up_date: existingLead.follow_up_date,
+          new_follow_up_date: updatedLead.follow_up_date ?? data.follow_up_date,
+          change_type: "UPDATED",
+          reason: "Follow-up date updated during duplicate lead update",
+          ...getHistoryActor(req.user),
+        });
+      }
+
       return res.status(200).json({
         message: "Duplicate phone number found. Existing lead updated.",
         isDuplicate: true,
@@ -318,7 +405,7 @@ export const createLead = async (req, res) => {
       });
     }
 
-    const lead = await createPixelEyeLead(data, clientId);
+    const lead = await createPixelEyeLead(data, clientId, getHistoryActor(req.user));
     return res.status(201).json({
       message: "Lead created successfully",
       isDuplicate: false,
@@ -355,7 +442,12 @@ export const updateLead = async (req, res) => {
       }
     }
 
-    const lead = await updatePixelEyeLead(req.params.id, req.body, req.tenant);
+    const lead = await updatePixelEyeLead(
+      req.params.id,
+      req.body,
+      req.tenant,
+      getHistoryActor(req.user),
+    );
     return res
       .status(200)
       .json({ message: "Lead updated successfully", data: lead });
@@ -400,6 +492,7 @@ export const rescheduleLeadFollowUp = async (req, res) => {
       req.params.id,
       req.tenant,
       req.body || {},
+      getHistoryActor(req.user),
     );
 
     return res.status(200).json({
@@ -465,6 +558,80 @@ export const getNotificationsSummary = async (req, res) => {
     }
 
     const summary = await getNotificationSummary(clientId);
+    return res.status(200).json({ data: summary });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+const resolveComplianceTenant = (req) => req.tenant;
+
+const resolveComplianceClientId = async (req) => {
+  const requestedClientKey = req.query._client_key || req.query.client_key;
+  if (req.tenant.isSuperAdmin && requestedClientKey) {
+    return await resolveClientIdFromKey(requestedClientKey);
+  }
+
+  return req.tenant.id || null;
+};
+
+export const getFollowUpCallCompliance = async (req, res) => {
+  try {
+    const clientId = await resolveComplianceClientId(req);
+    if (req.tenant.isSuperAdmin && (req.query._client_key || req.query.client_key) && !clientId) {
+      return res.status(400).json({ message: "Could not determine client context." });
+    }
+
+    const rows = await listFollowUpCallCompliance({
+      tenant: resolveComplianceTenant(req),
+      filters: {
+        ...normalizeComplianceFilters(req.query),
+        client_id: clientId || undefined,
+      },
+    });
+
+    return res.status(200).json({ data: rows });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+export const getMissedFollowUpCalls = async (req, res) => {
+  try {
+    const clientId = await resolveComplianceClientId(req);
+    if (req.tenant.isSuperAdmin && (req.query._client_key || req.query.client_key) && !clientId) {
+      return res.status(400).json({ message: "Could not determine client context." });
+    }
+
+    const rows = await listMissedFollowUpCalls({
+      tenant: resolveComplianceTenant(req),
+      filters: {
+        ...normalizeComplianceFilters(req.query),
+        client_id: clientId || undefined,
+      },
+    });
+
+    return res.status(200).json({ data: rows });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+export const getFollowUpCallComplianceSummary = async (req, res) => {
+  try {
+    const clientId = await resolveComplianceClientId(req);
+    if (req.tenant.isSuperAdmin && (req.query._client_key || req.query.client_key) && !clientId) {
+      return res.status(400).json({ message: "Could not determine client context." });
+    }
+
+    const summary = await getFollowUpCallComplianceSummaryService({
+      tenant: resolveComplianceTenant(req),
+      filters: {
+        ...normalizeComplianceFilters(req.query),
+        client_id: clientId || undefined,
+      },
+    });
+
     return res.status(200).json({ data: summary });
   } catch (err) {
     return res.status(500).json({ message: err.message });

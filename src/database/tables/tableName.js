@@ -7,4 +7,7 @@ export const tableName = {
   VLSLAWPROPERTY: "vls_property_laws",
   PIXELEYE: "pixel_eye",
   PIXELEYE_LEAD_STATE: "pixel_eye_lead_states",
+  PIXELEYE_FOLLOW_UP_HISTORY: "pixel_eye_follow_up_history",
+  PIXELEYE_CALL_LOGS: "pixel_eye_call_logs",
+  PIXELEYE_FOLLOW_UP_CALL_COMPLIANCE: "pixel_eye_follow_up_call_compliance",
 };
