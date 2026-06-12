@@ -43,12 +43,7 @@ const THIRTY_MIN_STATUSES = new Set([
   "Incoming Call Not Available",
 ]);
 
-const DNP_STATUSES = new Set([
-  "Dnp 1",
-  "Dnp 2",
-  "Dnp 3",
-  "Dnp 4",
-]);
+const DNP_STATUSES = new Set(["Dnp 1", "Dnp 2", "Dnp 3", "Dnp 4"]);
 
 const TWENTY_FOUR_HR_STATUSES = new Set([
   "Enquiry",
@@ -89,26 +84,26 @@ const TERMINATION_STATUSES = new Set([
 ]);
 
 // Appointment Fixed and Visited → lead is won, no further callbacks needed.
-const NO_ACTION_STATUSES = new Set([
-  "Appointment Fixed",
-  "Visited",
-]);
+const NO_ACTION_STATUSES = new Set(["Appointment Fixed", "Visited"]);
 
-const makeLowercaseSet = (s) => new Set([...s].map(val => val.toLowerCase().trim()));
+const makeLowercaseSet = (s) =>
+  new Set([...s].map((val) => val.toLowerCase().trim()));
 
-const THIRTY_MIN_STATUSES_LOWER     = makeLowercaseSet(THIRTY_MIN_STATUSES);
-const DNP_STATUSES_LOWER            = makeLowercaseSet(DNP_STATUSES);
+const THIRTY_MIN_STATUSES_LOWER = makeLowercaseSet(THIRTY_MIN_STATUSES);
+const DNP_STATUSES_LOWER = makeLowercaseSet(DNP_STATUSES);
 const TWENTY_FOUR_HR_STATUSES_LOWER = makeLowercaseSet(TWENTY_FOUR_HR_STATUSES);
-const TERMINATION_STATUSES_LOWER   = makeLowercaseSet(TERMINATION_STATUSES);
-const NO_ACTION_STATUSES_LOWER      = makeLowercaseSet(NO_ACTION_STATUSES);
+const TERMINATION_STATUSES_LOWER = makeLowercaseSet(TERMINATION_STATUSES);
+const NO_ACTION_STATUSES_LOWER = makeLowercaseSet(NO_ACTION_STATUSES);
 
 export const getStatusCategory = (status) => {
-  const s = String(status || "").trim().toLowerCase();
-  if (TERMINATION_STATUSES_LOWER.has(s))    return "TERMINATION";
-  if (DNP_STATUSES_LOWER.has(s))            return "DNP2";
-  if (THIRTY_MIN_STATUSES_LOWER.has(s))     return "THIRTY_MIN";
+  const s = String(status || "")
+    .trim()
+    .toLowerCase();
+  if (TERMINATION_STATUSES_LOWER.has(s)) return "TERMINATION";
+  if (DNP_STATUSES_LOWER.has(s)) return "DNP2";
+  if (THIRTY_MIN_STATUSES_LOWER.has(s)) return "THIRTY_MIN";
   if (TWENTY_FOUR_HR_STATUSES_LOWER.has(s)) return "TWENTY_FOUR_HR";
-  if (NO_ACTION_STATUSES_LOWER.has(s))      return "NO_ACTION";
+  if (NO_ACTION_STATUSES_LOWER.has(s)) return "NO_ACTION";
   return "UNKNOWN";
 };
 
@@ -152,7 +147,9 @@ export const resolveManualFollowUpScheduledAt = (followUpDate) => {
 
 const normalizeScheduledAt = (scheduledAt) => {
   const nextScheduledAt =
-    scheduledAt instanceof Date ? new Date(scheduledAt.getTime()) : new Date(scheduledAt);
+    scheduledAt instanceof Date
+      ? new Date(scheduledAt.getTime())
+      : new Date(scheduledAt);
 
   if (Number.isNaN(nextScheduledAt.getTime())) {
     throw new Error("Invalid scheduledAt value for manual follow-up reminder");
@@ -167,14 +164,14 @@ const upsertLeadState = async (callId, clientId, fields) => {
   const [row, created] = await db.PixelEyeLeadState.findOrCreate({
     where: { call_id: callId, client_id: clientId },
     defaults: {
-      call_id:   callId,
+      call_id: callId,
       client_id: clientId,
-      state:     "new",
+      state: "new",
       day1_mode: "manual",
       current_day: 0,
-      notification_sent:          false,
+      notification_sent: false,
       thirty_min_cycle_completed: false,
-      permanently_closed:         false,
+      permanently_closed: false,
       ...fields,
     },
   });
@@ -205,33 +202,37 @@ const scheduleCallback = async (lead, clientId, delayMinutes, type, reason) => {
   const scheduledAt = new Date(Date.now() + delayMinutes * 60 * 1000);
 
   await upsertLeadState(lead.call_id, clientId, {
-    customer_name:        lead.customer_name,
-    phone_number:         lead.phone_number,
-    agent_name:           lead.agent_name,
-    last_status:          lead.status,
-    state:                "scheduled",
-    schedule_type:        type,
-    reason:               reason,
-    scheduled_at:         scheduledAt,
-    notification_sent:    false,
+    customer_name: lead.customer_name,
+    phone_number: lead.phone_number,
+    agent_name: lead.agent_name,
+    last_status: lead.status,
+    state: "scheduled",
+    schedule_type: type,
+    reason: reason,
+    scheduled_at: scheduledAt,
+    notification_sent: false,
     notification_sent_at: null,
-    permanently_closed:   false,
-    cancel_reason:        null,
+    permanently_closed: false,
+    cancel_reason: null,
   });
 
   console.log(
     `[PixelEye] Scheduled ${type} callback for call_id=${lead.call_id}` +
-    ` at ${scheduledAt.toISOString()} (in ${delayMinutes} min)`,
+      ` at ${scheduledAt.toISOString()} (in ${delayMinutes} min)`,
   );
 };
 
-export const scheduleManualFollowUpReminder = async (lead, scheduledAt, options = {}) => {
+export const scheduleManualFollowUpReminder = async (
+  lead,
+  scheduledAt,
+  options = {},
+) => {
   const clientId = Number(options.clientId ?? lead?.client_id);
   const callId = String(options.callId ?? lead?.call_id ?? "").trim();
   const scheduledDate = normalizeScheduledAt(scheduledAt);
-  const reason = String(
-    options.reason || "Manual Follow-up Reminder",
-  ).trim() || "Manual Follow-up Reminder";
+  const reason =
+    String(options.reason || "Manual Follow-up Reminder").trim() ||
+    "Manual Follow-up Reminder";
 
   if (!clientId) {
     throw new Error("Missing client context for manual follow-up reminder");
@@ -243,19 +244,19 @@ export const scheduleManualFollowUpReminder = async (lead, scheduledAt, options 
 
   const existingState = await getLeadState(callId, clientId);
   const payload = {
-    customer_name:        lead?.customer_name ?? existingState?.customer_name ?? null,
-    phone_number:         lead?.phone_number ?? existingState?.phone_number ?? null,
-    agent_name:           lead?.agent_name ?? existingState?.agent_name ?? null,
-    last_status:          lead?.status ?? existingState?.last_status ?? null,
-    state:                "scheduled",
-    schedule_type:        "MANUAL",
+    customer_name: lead?.customer_name ?? existingState?.customer_name ?? null,
+    phone_number: lead?.phone_number ?? existingState?.phone_number ?? null,
+    agent_name: lead?.agent_name ?? existingState?.agent_name ?? null,
+    last_status: lead?.status ?? existingState?.last_status ?? null,
+    state: "scheduled",
+    schedule_type: "MANUAL",
     reason,
-    scheduled_at:         scheduledDate,
-    notification_sent:    false,
+    scheduled_at: scheduledDate,
+    notification_sent: false,
     notification_sent_at: null,
-    permanently_closed:   false,
-    cancel_reason:        null,
-    current_day:          null,
+    permanently_closed: false,
+    cancel_reason: null,
+    current_day: null,
   };
 
   let state;
@@ -271,7 +272,7 @@ export const scheduleManualFollowUpReminder = async (lead, scheduledAt, options 
 
   console.log(
     `[PixelEye] Scheduled MANUAL follow-up reminder for call_id=${callId}` +
-    ` at ${scheduledDate.toISOString()}`,
+      ` at ${scheduledDate.toISOString()}`,
   );
 
   return state;
@@ -307,21 +308,33 @@ export const markFollowUpReminderHandled = async (lead, options = {}) => {
 
 const cancelLeadState = async (callId, clientId, reason, lead) => {
   await upsertLeadState(callId, clientId, {
-    ...(lead ? {
-      customer_name: lead.customer_name,
-      phone_number:  lead.phone_number,
-      agent_name:    lead.agent_name,
-      last_status:   lead.status,
-    } : {}),
-    state:              "cancelled",
-    schedule_type:      null,
-    reason:             null,
-    scheduled_at:       null,
-    notification_sent:  false,
+    ...(lead
+      ? {
+          customer_name: lead.customer_name,
+          phone_number: lead.phone_number,
+          agent_name: lead.agent_name,
+          last_status: lead.status,
+        }
+      : {}),
+    state: "cancelled",
+    schedule_type: null,
+    reason: null,
+    scheduled_at: null,
+    notification_sent: false,
     permanently_closed: true,
-    cancel_reason:      reason,
+    cancel_reason: reason,
   });
 };
+
+const shouldPreserveActiveManualReminder = (existingState) =>
+  Boolean(
+    existingState &&
+      String(existingState.schedule_type || "").trim() === "MANUAL" &&
+      String(existingState.state || "").trim() === "scheduled" &&
+      !existingState.notification_sent &&
+      !existingState.permanently_closed &&
+      existingState.scheduled_at,
+  );
 
 /**
  * Called when an agent manually sets day_1, day_2, day_3, day_4, or day_5.
@@ -335,7 +348,7 @@ const cancelLeadState = async (callId, clientId, reason, lead) => {
  */
 export const processDayStatus = async (lead, clientId, dayNumber, dayValue) => {
   try {
-    const callId   = lead.call_id;
+    const callId = lead.call_id;
     const category = getStatusCategory(dayValue);
 
     const existingState = await getLeadState(callId, clientId);
@@ -343,24 +356,43 @@ export const processDayStatus = async (lead, clientId, dayNumber, dayValue) => {
     // ── No state row yet (unlikely for day updates, but safe) ──
     if (!existingState) {
       if (category === "TERMINATION" || category === "NO_ACTION") {
-        await cancelLeadState(callId, clientId, `Day ${dayNumber}: ${dayValue}`, lead);
+        await cancelLeadState(
+          callId,
+          clientId,
+          `Day ${dayNumber}: ${dayValue}`,
+          lead,
+        );
         return;
       }
       if (category === "UNKNOWN") {
         await upsertLeadState(callId, clientId, {
-          customer_name: lead.customer_name, phone_number: lead.phone_number,
-          agent_name: lead.agent_name, last_status: dayValue,
-          state: "baseline", current_day: dayNumber,
+          customer_name: lead.customer_name,
+          phone_number: lead.phone_number,
+          agent_name: lead.agent_name,
+          last_status: dayValue,
+          state: "baseline",
+          current_day: dayNumber,
         });
         return;
       }
-      await _scheduleForDayCategory(lead, clientId, category, dayValue, dayNumber, null);
+      await _scheduleForDayCategory(
+        lead,
+        clientId,
+        category,
+        dayValue,
+        dayNumber,
+        null,
+      );
       return;
     }
 
     // ── Permanently closed lead — reopen if a schedulable status is set ──
     if (existingState.permanently_closed) {
-      if (category !== "TERMINATION" && category !== "NO_ACTION" && category !== "UNKNOWN") {
+      if (
+        category !== "TERMINATION" &&
+        category !== "NO_ACTION" &&
+        category !== "UNKNOWN"
+      ) {
         await existingState.update({
           permanently_closed: false,
           cancel_reason: null,
@@ -375,26 +407,53 @@ export const processDayStatus = async (lead, clientId, dayNumber, dayValue) => {
 
     // ── Terminal / Success status on this day → cancel everything ──
     if (category === "TERMINATION" || category === "NO_ACTION") {
-      await cancelLeadState(callId, clientId, `Day ${dayNumber} status: ${dayValue}`, lead);
+      await cancelLeadState(
+        callId,
+        clientId,
+        `Day ${dayNumber} status: ${dayValue}`,
+        lead,
+      );
       return;
     }
 
     // ── Update state and schedule ──
     await existingState.update({
-      last_status: dayValue, current_day: dayNumber,
-      customer_name: lead.customer_name, phone_number: lead.phone_number,
+      last_status: dayValue,
+      current_day: dayNumber,
+      customer_name: lead.customer_name,
+      phone_number: lead.phone_number,
       agent_name: lead.agent_name,
     });
 
-    await _scheduleForDayCategory(lead, clientId, category, dayValue, dayNumber, existingState);
+    if (shouldPreserveActiveManualReminder(existingState)) {
+      console.log(
+        `[PixelEye] Preserved active MANUAL reminder for call_id=${callId} during Day ${dayNumber} change to ${dayValue}`,
+      );
+      return;
+    }
 
+    await _scheduleForDayCategory(
+      lead,
+      clientId,
+      category,
+      dayValue,
+      dayNumber,
+      existingState,
+    );
   } catch (err) {
     _logError("processDayStatus", err, lead?.call_id);
     throw err;
   }
 };
 
-const _scheduleForDayCategory = async (lead, clientId, category, status, dayNumber, existingState) => {
+const _scheduleForDayCategory = async (
+  lead,
+  clientId,
+  category,
+  status,
+  dayNumber,
+  existingState,
+) => {
   const dayLabel = `Day ${dayNumber}`;
 
   if (category === "THIRTY_MIN") {
@@ -403,16 +462,35 @@ const _scheduleForDayCategory = async (lead, clientId, category, status, dayNumb
       existingState?.schedule_type === "THIRTY_MIN" &&
       existingState?.current_day === dayNumber &&
       !existingState?.notification_sent
-    ) return; // Avoid duplicate
-    await scheduleCallback(lead, clientId, 30, "THIRTY_MIN", `${dayLabel}: 30-min callback`);
+    )
+      return; // Avoid duplicate
+    await scheduleCallback(
+      lead,
+      clientId,
+      30,
+      "THIRTY_MIN",
+      `${dayLabel}: 30-min callback`,
+    );
     return;
   }
   if (category === "DNP2") {
-    await scheduleCallback(lead, clientId, 24 * 60, "DNP2", `${dayLabel}: DNP2 — 24-hr callback`);
+    await scheduleCallback(
+      lead,
+      clientId,
+      24 * 60,
+      "DNP2",
+      `${dayLabel}: DNP2 — 24-hr callback`,
+    );
     return;
   }
   if (category === "TWENTY_FOUR_HR") {
-    await scheduleCallback(lead, clientId, 24 * 60, "TWENTY_FOUR_HR", `${dayLabel}: 24-hr follow-up (${status})`);
+    await scheduleCallback(
+      lead,
+      clientId,
+      24 * 60,
+      "TWENTY_FOUR_HR",
+      `${dayLabel}: 24-hr follow-up (${status})`,
+    );
     return;
   }
 };
@@ -424,8 +502,8 @@ const _scheduleForDayCategory = async (lead, clientId, category, status, dayNumb
 
 export const processLeadStatus = async (lead, clientId, source) => {
   try {
-    const callId   = lead.call_id;
-    const status   = lead.status;
+    const callId = lead.call_id;
+    const status = lead.status;
     const category = getStatusCategory(status);
 
     const existingState = await getLeadState(callId, clientId);
@@ -437,7 +515,12 @@ export const processLeadStatus = async (lead, clientId, source) => {
     // ------------------------------------------------------------------
     if (!existingState) {
       if (category === "TERMINATION" || category === "NO_ACTION") {
-        await cancelLeadState(callId, clientId, `Initial status: ${status}`, lead);
+        await cancelLeadState(
+          callId,
+          clientId,
+          `Initial status: ${status}`,
+          lead,
+        );
         return;
       }
 
@@ -452,11 +535,11 @@ export const processLeadStatus = async (lead, clientId, source) => {
       if (category === "UNKNOWN") {
         await upsertLeadState(callId, clientId, {
           customer_name: lead.customer_name,
-          phone_number:  lead.phone_number,
-          agent_name:    lead.agent_name,
-          last_status:   status,
-          state:         "baseline",
-          day1_mode:     "auto",
+          phone_number: lead.phone_number,
+          agent_name: lead.agent_name,
+          last_status: status,
+          state: "baseline",
+          day1_mode: "auto",
         });
         return;
       }
@@ -470,7 +553,11 @@ export const processLeadStatus = async (lead, clientId, source) => {
     // Permanently closed lead — reopen if a schedulable status is set.
     // ------------------------------------------------------------------
     if (existingState.permanently_closed) {
-      if (category !== "TERMINATION" && category !== "NO_ACTION" && category !== "UNKNOWN") {
+      if (
+        category !== "TERMINATION" &&
+        category !== "NO_ACTION" &&
+        category !== "UNKNOWN"
+      ) {
         await existingState.update({
           permanently_closed: false,
           cancel_reason: null,
@@ -484,12 +571,18 @@ export const processLeadStatus = async (lead, clientId, source) => {
     // Status has not changed — just mirror day_1 if needed.
     // ------------------------------------------------------------------
     if (category === "TERMINATION" || category === "NO_ACTION") {
-      await cancelLeadState(callId, clientId, `Status changed to: ${status}`, lead);
+      await cancelLeadState(
+        callId,
+        clientId,
+        `Status changed to: ${status}`,
+        lead,
+      );
       return;
     }
 
     const statusChanged =
-      String(existingState.last_status || "").trim() !== String(status || "").trim();
+      String(existingState.last_status || "").trim() !==
+      String(status || "").trim();
 
     if (!statusChanged) {
       await mirrorDay1(lead, existingState).catch((err) =>
@@ -505,7 +598,12 @@ export const processLeadStatus = async (lead, clientId, source) => {
     // call is needed before it — that was an extra wasted DB write.
     // ------------------------------------------------------------------
     if (category === "TERMINATION" || category === "NO_ACTION") {
-      await cancelLeadState(callId, clientId, `Status changed to: ${status}`, lead);
+      await cancelLeadState(
+        callId,
+        clientId,
+        `Status changed to: ${status}`,
+        lead,
+      );
       return;
     }
 
@@ -513,10 +611,10 @@ export const processLeadStatus = async (lead, clientId, source) => {
     // Status changed to a schedulable state — update mirror fields first.
     // ------------------------------------------------------------------
     await existingState.update({
-      last_status:   status,
+      last_status: status,
       customer_name: lead.customer_name,
-      phone_number:  lead.phone_number,
-      agent_name:    lead.agent_name,
+      phone_number: lead.phone_number,
+      agent_name: lead.agent_name,
     });
 
     // FIX (Bug 3): Isolate mirrorDay1 so a DB error cannot prevent scheduling.
@@ -524,8 +622,14 @@ export const processLeadStatus = async (lead, clientId, source) => {
       _logError("processLeadStatus:mirrorDay1:changed", err, callId),
     );
 
-    await _scheduleForCategory(lead, clientId, category, status, existingState);
+    if (shouldPreserveActiveManualReminder(existingState)) {
+      console.log(
+        `[PixelEye] Preserved active MANUAL reminder for call_id=${callId} during status change to ${status}`,
+      );
+      return;
+    }
 
+    await _scheduleForCategory(lead, clientId, category, status, existingState);
   } catch (err) {
     _logError("processLeadStatus", err, lead?.call_id);
     // Re-throw so the caller's .catch() can also see the error if needed.
@@ -534,7 +638,13 @@ export const processLeadStatus = async (lead, clientId, source) => {
 };
 
 // Internal — decides delay and type then calls scheduleCallback.
-const _scheduleForCategory = async (lead, clientId, category, status, existingState) => {
+const _scheduleForCategory = async (
+  lead,
+  clientId,
+  category,
+  status,
+  existingState,
+) => {
   if (category === "THIRTY_MIN") {
     // Mirrors handleThirtyMinuteStatus_:
     // If the first 30-min cycle already completed, do not reschedule 30-min.
@@ -545,19 +655,32 @@ const _scheduleForCategory = async (lead, clientId, category, status, existingSt
       existingState?.state === "scheduled" &&
       existingState?.schedule_type === "THIRTY_MIN" &&
       !existingState?.notification_sent
-    ) return;
+    )
+      return;
 
     await scheduleCallback(lead, clientId, 30, "THIRTY_MIN", "30-min callback");
     return;
   }
 
   if (category === "DNP2") {
-    await scheduleCallback(lead, clientId, 24 * 60, "DNP2", `${status} — 24-hr callback`);
+    await scheduleCallback(
+      lead,
+      clientId,
+      24 * 60,
+      "DNP2",
+      `${status} — 24-hr callback`,
+    );
     return;
   }
 
   if (category === "TWENTY_FOUR_HR") {
-    await scheduleCallback(lead, clientId, 24 * 60, "TWENTY_FOUR_HR", `24-hr follow-up (${status})`);
+    await scheduleCallback(
+      lead,
+      clientId,
+      24 * 60,
+      "TWENTY_FOUR_HR",
+      `24-hr follow-up (${status})`,
+    );
     return;
   }
 };
@@ -574,11 +697,11 @@ export const sendDueNotifications = async () => {
 
     const dueStates = await db.PixelEyeLeadState.findAll({
       where: {
-        state:             "scheduled",
+        state: "scheduled",
         notification_sent: false,
         permanently_closed: { [Op.not]: true },
-        scheduled_at:      { [Op.lte]: now },
-        schedule_type:     { [Op.in]: Array.from(ALLOWED_SCHEDULE_TYPES) },
+        scheduled_at: { [Op.lte]: now },
+        schedule_type: { [Op.in]: Array.from(ALLOWED_SCHEDULE_TYPES) },
       },
       order: [
         ["scheduled_at", "ASC"],
@@ -590,13 +713,13 @@ export const sendDueNotifications = async () => {
     if (dueStates.length > 0) {
       console.log(
         `[PixelEye Scheduler] ${dueStates.length} notification(s) due at ${now.toISOString()}` +
-        ` (limit=${DUE_NOTIFICATION_BATCH_LIMIT})`,
+          ` (limit=${DUE_NOTIFICATION_BATCH_LIMIT})`,
       );
 
       if (dueStates.length === DUE_NOTIFICATION_BATCH_LIMIT) {
         console.warn(
           `[PixelEye Scheduler] Due reminder batch reached limit=${DUE_NOTIFICATION_BATCH_LIMIT}.` +
-          ` Remaining reminders will be processed on the next tick.`,
+            ` Remaining reminders will be processed on the next tick.`,
         );
       }
     }
@@ -612,7 +735,7 @@ export const sendDueNotifications = async () => {
     const durationMs = Date.now() - startedAt;
     console.log(
       `[PixelEye Scheduler] sendDueNotifications completed in ${durationMs}ms` +
-      ` processed=${dueStates.length}`,
+        ` processed=${dueStates.length}`,
     );
   } catch (err) {
     _logError("sendDueNotifications:outer", err, null);
@@ -637,12 +760,12 @@ const _processDueState = async (state, now) => {
   const overdueMs = now.getTime() - new Date(state.scheduled_at).getTime();
   if (overdueMs > NOTIFICATION_RETRY_WINDOW_MS) {
     await state.update({
-      state:        "cancelled",
+      state: "cancelled",
       cancel_reason: `Notification retry window exceeded — overdue by ${Math.round(overdueMs / 60000)} min`,
     });
     console.warn(
       `[PixelEye] Cancelled notification for call_id=${state.call_id}` +
-      ` — overdue by ${Math.round(overdueMs / 60000)} min (retry window exceeded).`,
+        ` — overdue by ${Math.round(overdueMs / 60000)} min (retry window exceeded).`,
     );
     return;
   }
@@ -654,8 +777,8 @@ const _processDueState = async (state, now) => {
 
   if (!latestLead) {
     await state.update({
-      state:              "cancelled",
-      cancel_reason:      "Lead not found in pixel_eye table",
+      state: "cancelled",
+      cancel_reason: "Lead not found in pixel_eye table",
       permanently_closed: true,
     });
     return;
@@ -666,8 +789,8 @@ const _processDueState = async (state, now) => {
   // If the agent has since moved the lead to a terminal status, cancel.
   if (latestCategory === "TERMINATION" || latestCategory === "NO_ACTION") {
     await state.update({
-      state:              "cancelled",
-      cancel_reason:      `Status changed to terminal before notification: ${latestLead.status}`,
+      state: "cancelled",
+      cancel_reason: `Status changed to terminal before notification: ${latestLead.status}`,
       permanently_closed: true,
     });
     return;
@@ -679,16 +802,16 @@ const _processDueState = async (state, now) => {
   const isThirtyMin = state.schedule_type === "THIRTY_MIN";
 
   await state.update({
-    notification_sent:    true,
+    notification_sent: true,
     notification_sent_at: new Date(),
-    state:                "completed",
+    state: "completed",
     // Advance to next day so the system watches the next day field
     current_day: Math.min((state.current_day || 0) + 1, 5),
   });
 
   console.log(
     `[PixelEye] Notification sent for call_id=${state.call_id}` +
-    ` schedule_type=${state.schedule_type} agent=${latestLead.agent_name || "—"}`,
+      ` schedule_type=${state.schedule_type} agent=${latestLead.agent_name || "—"}`,
   );
 };
 
@@ -697,10 +820,11 @@ const _processDueState = async (state, now) => {
 // ---------------------------------------------------------------------------
 
 export const buildNotificationMessage = (lead, state) => {
-  const agentName    = lead.agent_name    || state.agent_name    || "Unassigned Agent";
-  const customerName = lead.customer_name || state.customer_name || "Not Available";
-  const phone        = lead.phone_number  || state.phone_number  || "Not Available";
-  const scheduledAt  = state.scheduled_at
+  const agentName = lead.agent_name || state.agent_name || "Unassigned Agent";
+  const customerName =
+    lead.customer_name || state.customer_name || "Not Available";
+  const phone = lead.phone_number || state.phone_number || "Not Available";
+  const scheduledAt = state.scheduled_at
     ? _formatDateTime(new Date(state.scheduled_at))
     : "—";
 
@@ -728,18 +852,23 @@ export const sendGoogleChatMessage = async (text) => {
   const webhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL || "";
 
   if (!webhookUrl) {
-    throw new Error("GOOGLE_CHAT_WEBHOOK_URL is not configured in environment.");
+    throw new Error(
+      "GOOGLE_CHAT_WEBHOOK_URL is not configured in environment.",
+    );
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), GOOGLE_CHAT_WEBHOOK_TIMEOUT_MS);
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    GOOGLE_CHAT_WEBHOOK_TIMEOUT_MS,
+  );
 
   try {
     const response = await fetch(webhookUrl, {
-      method:  "POST",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ text }),
-      signal:  controller.signal,
+      body: JSON.stringify({ text }),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -796,10 +925,18 @@ export const getNotificationSummary = async (clientId) => {
   const [total, scheduled, completed, cancelled] = await Promise.all([
     db.PixelEyeLeadState.count({ where: { client_id: clientId } }),
     db.PixelEyeLeadState.count({
-      where: { client_id: clientId, state: "scheduled", notification_sent: false },
+      where: {
+        client_id: clientId,
+        state: "scheduled",
+        notification_sent: false,
+      },
     }),
-    db.PixelEyeLeadState.count({ where: { client_id: clientId, state: "completed" } }),
-    db.PixelEyeLeadState.count({ where: { client_id: clientId, state: "cancelled" } }),
+    db.PixelEyeLeadState.count({
+      where: { client_id: clientId, state: "completed" },
+    }),
+    db.PixelEyeLeadState.count({
+      where: { client_id: clientId, state: "cancelled" },
+    }),
   ]);
 
   return { total, scheduled, completed, cancelled };
@@ -812,12 +949,12 @@ export const getNotificationSummary = async (clientId) => {
 const _formatDateTime = (dateObj) => {
   return dateObj.toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata",
-    day:      "2-digit",
-    month:    "short",
-    year:     "numeric",
-    hour:     "2-digit",
-    minute:   "2-digit",
-    hour12:   true,
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
   });
 };
 
@@ -826,9 +963,9 @@ const _logError = (fn, err, callId) => {
     JSON.stringify({
       fn,
       call_id: callId || null,
-      error:   err?.message,
-      stack:   err?.stack,
-      time:    new Date().toISOString(),
+      error: err?.message,
+      stack: err?.stack,
+      time: new Date().toISOString(),
     }),
   );
 };
