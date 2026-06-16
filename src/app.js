@@ -13,6 +13,7 @@ import PixelEyeWebhookRouter from "./modules/pixelEye/webhook/pixelEyeWebhook.ro
 import { startPixelEyeScheduler } from "./modules/pixelEye/pixelEyeScheduler.js";
 import { startPixelEyeFollowUpComplianceScheduler } from "./modules/pixelEye/pixelEyeFollowUpComplianceScheduler.js";
 import PropertyLawRouter from "./modules/vls/propertyLaw/propertyLaw.routes.js";
+import FamilyLawRouter from "./modules/vls/familyLaw/familyLaw.routes.js";
 import VlsAibeRouter from "./modules/vls/vlsAibe/vlsAibe.routes.js";
 import { ensurePixelEyeLeadStateCurrentDayColumn } from "./database/migrations/ensurePixelEyeLeadStateCurrentDay.js";
 import { ensurePixelEyeLeadStateManualScheduleType } from "./database/migrations/ensurePixelEyeLeadStateScheduleTypeManual.js";
@@ -107,6 +108,7 @@ app.use("/api/v1/clients", ClientRouter);
 app.use("/api/v1/pixeleye", PixelEyeWebhookRouter);
 app.use("/api/v1/pixeleye", PixelEyeRouter);
 app.use("/api/v1/property-law", PropertyLawRouter);
+app.use("/api/v1/family-law", FamilyLawRouter);
 app.use("/api/v1/vls-aibe", VlsAibeRouter);
 
 // Base route
