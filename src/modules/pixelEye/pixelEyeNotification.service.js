@@ -50,7 +50,6 @@ const TWENTY_FOUR_HR_STATUSES = new Set([
   "Hot Follow-up",
   "Follow-up Required",
   "Will Call Later",
-  "Rescheduling",
   "Doctor Time",
   "Follow-up Post Appointment",
   "Want to Speak With Doctor",
@@ -60,10 +59,17 @@ const TWENTY_FOUR_HR_STATUSES = new Set([
   "Others",
 ]);
 
+const FORTY_EIGHT_HR_STATUSES = new Set([
+  "Will Call & Take Appointment Later",
+]);
+
+const NO_REMINDER_STATUSES = new Set(["Medicine"]);
+
 const ALLOWED_SCHEDULE_TYPES = new Set([
   "THIRTY_MIN",
   "DNP2",
   "TWENTY_FOUR_HR",
+  "FORTY_EIGHT_HR",
   "MANUAL",
 ]);
 
@@ -92,6 +98,8 @@ const makeLowercaseSet = (s) =>
 const THIRTY_MIN_STATUSES_LOWER = makeLowercaseSet(THIRTY_MIN_STATUSES);
 const DNP_STATUSES_LOWER = makeLowercaseSet(DNP_STATUSES);
 const TWENTY_FOUR_HR_STATUSES_LOWER = makeLowercaseSet(TWENTY_FOUR_HR_STATUSES);
+const FORTY_EIGHT_HR_STATUSES_LOWER = makeLowercaseSet(FORTY_EIGHT_HR_STATUSES);
+const NO_REMINDER_STATUSES_LOWER = makeLowercaseSet(NO_REMINDER_STATUSES);
 const TERMINATION_STATUSES_LOWER = makeLowercaseSet(TERMINATION_STATUSES);
 const NO_ACTION_STATUSES_LOWER = makeLowercaseSet(NO_ACTION_STATUSES);
 
@@ -103,6 +111,8 @@ export const getStatusCategory = (status) => {
   if (DNP_STATUSES_LOWER.has(s)) return "DNP2";
   if (THIRTY_MIN_STATUSES_LOWER.has(s)) return "THIRTY_MIN";
   if (TWENTY_FOUR_HR_STATUSES_LOWER.has(s)) return "TWENTY_FOUR_HR";
+  if (FORTY_EIGHT_HR_STATUSES_LOWER.has(s)) return "FORTY_EIGHT_HR";
+  if (NO_REMINDER_STATUSES_LOWER.has(s)) return "NO_REMINDER";
   if (NO_ACTION_STATUSES_LOWER.has(s)) return "NO_ACTION";
   return "UNKNOWN";
 };
@@ -326,6 +336,23 @@ const cancelLeadState = async (callId, clientId, reason, lead) => {
   });
 };
 
+const resetLeadStateToBaseline = async (lead, clientId, lastStatus) => {
+  await upsertLeadState(lead.call_id, clientId, {
+    customer_name: lead.customer_name,
+    phone_number: lead.phone_number,
+    agent_name: lead.agent_name,
+    last_status: lastStatus,
+    state: "baseline",
+    schedule_type: null,
+    reason: null,
+    scheduled_at: null,
+    notification_sent: false,
+    notification_sent_at: null,
+    permanently_closed: false,
+    cancel_reason: null,
+  });
+};
+
 const shouldPreserveActiveManualReminder = (existingState) =>
   Boolean(
     existingState &&
@@ -364,7 +391,7 @@ export const processDayStatus = async (lead, clientId, dayNumber, dayValue) => {
         );
         return;
       }
-      if (category === "UNKNOWN") {
+      if (category === "UNKNOWN" || category === "NO_REMINDER") {
         await upsertLeadState(callId, clientId, {
           customer_name: lead.customer_name,
           phone_number: lead.phone_number,
@@ -432,6 +459,11 @@ export const processDayStatus = async (lead, clientId, dayNumber, dayValue) => {
       return;
     }
 
+    if (category === "UNKNOWN" || category === "NO_REMINDER") {
+      await resetLeadStateToBaseline(lead, clientId, dayValue);
+      return;
+    }
+
     await _scheduleForDayCategory(
       lead,
       clientId,
@@ -493,6 +525,16 @@ const _scheduleForDayCategory = async (
     );
     return;
   }
+  if (category === "FORTY_EIGHT_HR") {
+    await scheduleCallback(
+      lead,
+      clientId,
+      48 * 60,
+      "FORTY_EIGHT_HR",
+      `${dayLabel}: 48-hr follow-up (${status})`,
+    );
+    return;
+  }
 };
 
 // ---------------------------------------------------------------------------
@@ -532,7 +574,7 @@ export const processLeadStatus = async (lead, clientId, source) => {
       );
 
       // For UNKNOWN status, create a baseline record with no schedule.
-      if (category === "UNKNOWN") {
+      if (category === "UNKNOWN" || category === "NO_REMINDER") {
         await upsertLeadState(callId, clientId, {
           customer_name: lead.customer_name,
           phone_number: lead.phone_number,
@@ -629,6 +671,11 @@ export const processLeadStatus = async (lead, clientId, source) => {
       return;
     }
 
+    if (category === "UNKNOWN" || category === "NO_REMINDER") {
+      await resetLeadStateToBaseline(lead, clientId, status);
+      return;
+    }
+
     await _scheduleForCategory(lead, clientId, category, status, existingState);
   } catch (err) {
     _logError("processLeadStatus", err, lead?.call_id);
@@ -680,6 +727,16 @@ const _scheduleForCategory = async (
       24 * 60,
       "TWENTY_FOUR_HR",
       `24-hr follow-up (${status})`,
+    );
+    return;
+  }
+  if (category === "FORTY_EIGHT_HR") {
+    await scheduleCallback(
+      lead,
+      clientId,
+      48 * 60,
+      "FORTY_EIGHT_HR",
+      `48-hr follow-up (${status})`,
     );
     return;
   }
@@ -897,6 +954,8 @@ const getScheduleTypeLabel = (scheduleType) => {
       return "DNP2 — 24-Hour Callback";
     case "TWENTY_FOUR_HR":
       return "24-Hour Follow-up";
+    case "FORTY_EIGHT_HR":
+      return "48-Hour Follow-up";
     case "MANUAL":
       return "Manual Follow-up Reminder";
     default:

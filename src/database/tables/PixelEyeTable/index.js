@@ -23,6 +23,8 @@ export const STATUS_ENUM_VALUES = [
   "Hot Follow-up",
   "Follow-up Required",
   "Will Call Later",
+  "Will Call & Take Appointment Later",
+  "Medicine",
   "Rescheduling",
   "Doctor Time",
   "Follow-up Post Appointment",

@@ -16,8 +16,8 @@ import PropertyLawRouter from "./modules/vls/propertyLaw/propertyLaw.routes.js";
 import FamilyLawRouter from "./modules/vls/familyLaw/familyLaw.routes.js";
 import VlsAibeRouter from "./modules/vls/vlsAibe/vlsAibe.routes.js";
 import { ensurePixelEyeLeadStateCurrentDayColumn } from "./database/migrations/ensurePixelEyeLeadStateCurrentDay.js";
-import { ensurePixelEyeLeadStateManualScheduleType } from "./database/migrations/ensurePixelEyeLeadStateScheduleTypeManual.js";
-import { ensurePixelEyeDnpStatusEnums } from "./database/migrations/ensurePixelEyeDnpStatusEnums.js";
+import { ensurePixelEyeLeadStateScheduleTypes } from "./database/migrations/ensurePixelEyeLeadStateScheduleTypeManual.js";
+import { ensurePixelEyeStatusEnums } from "./database/migrations/ensurePixelEyeDnpStatusEnums.js";
 import { ensurePixelEyeFollowUpHistoryTable } from "./database/migrations/ensurePixelEyeFollowUpHistoryTable.js";
 import { ensurePixelEyeCallLogTable } from "./database/migrations/ensurePixelEyeCallLogTable.js";
 import { ensurePixelEyeFollowUpCallComplianceTable } from "./database/migrations/ensurePixelEyeFollowUpCallComplianceTable.js";
@@ -86,8 +86,8 @@ const connect_mysql = async () => {
   try {
     await db.sequelize.sync();
     await ensurePixelEyeLeadStateCurrentDayColumn();
-    await ensurePixelEyeLeadStateManualScheduleType();
-    await ensurePixelEyeDnpStatusEnums();
+    await ensurePixelEyeLeadStateScheduleTypes();
+    await ensurePixelEyeStatusEnums();
     await ensurePixelEyeFollowUpHistoryTable();
     await ensurePixelEyeCallLogTable();
     await ensurePixelEyeFollowUpCallComplianceTable();

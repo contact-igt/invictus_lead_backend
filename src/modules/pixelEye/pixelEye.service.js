@@ -698,7 +698,7 @@ export const updatePixelEyeLead = async (
   }
 
   if (isTerminalLeadStatus(updatedLead.status)) {
-    processLeadStatus(
+    await processLeadStatus(
       updatedLead,
       updatedLead.client_id,
       "update-terminal",
@@ -742,7 +742,7 @@ export const updatePixelEyeLead = async (
     Object.prototype.hasOwnProperty.call(updateData, "status") &&
     updateData.status !== statusBefore
   ) {
-    processLeadStatus(updatedLead, updatedLead.client_id, "update").catch(
+    await processLeadStatus(updatedLead, updatedLead.client_id, "update").catch(
       (err) =>
         console.error(
           `[PixelEye] processLeadStatus(update) failed for call_id=${updatedLead?.call_id}:`,
@@ -758,7 +758,7 @@ export const updatePixelEyeLead = async (
       updateData[dayField]
     ) {
       const dayNumber = parseInt(dayField.split("_")[1], 10);
-      processDayStatus(
+      await processDayStatus(
         updatedLead,
         updatedLead.client_id,
         dayNumber,

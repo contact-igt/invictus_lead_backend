@@ -10,14 +10,12 @@ const PIXEL_EYE_STATUS_COLUMNS = [
   "day_5",
 ];
 
-const REQUIRED_DNP_VALUES = ["Dnp 1", "Dnp 3", "Dnp 4"];
-
-const columnHasRequiredDnpValues = (column) => {
+const columnHasAllStatusValues = (column) => {
   const type = String(column?.type || "");
-  return REQUIRED_DNP_VALUES.every((value) => type.includes(value));
+  return STATUS_ENUM_VALUES.every((value) => type.includes(value));
 };
 
-export const ensurePixelEyeDnpStatusEnums = async () => {
+export const ensurePixelEyeStatusEnums = async () => {
   const queryInterface = db.sequelize.getQueryInterface();
   const pixelEyeTableName = db.PixelEye.getTableName();
   const columns = await queryInterface.describeTable(pixelEyeTableName);
@@ -26,7 +24,7 @@ export const ensurePixelEyeDnpStatusEnums = async () => {
   for (const columnName of PIXEL_EYE_STATUS_COLUMNS) {
     const column = columns[columnName];
 
-    if (!column || columnHasRequiredDnpValues(column)) {
+    if (!column || columnHasAllStatusValues(column)) {
       continue;
     }
 
@@ -40,11 +38,11 @@ export const ensurePixelEyeDnpStatusEnums = async () => {
 
   if (changed) {
     console.log(
-      `[Schema] Ensured DNP status enum values on ${pixelEyeTableName}`,
+      `[Schema] Ensured status enum values on ${pixelEyeTableName}`,
     );
   }
 
   return changed;
 };
 
-export default ensurePixelEyeDnpStatusEnums;
+export default ensurePixelEyeStatusEnums;
