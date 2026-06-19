@@ -32,7 +32,13 @@ export const PixelEyeLeadStateTable = (Sequelize, sequelize) => {
 
       // Which callback window was scheduled.
       schedule_type: {
-        type: Sequelize.ENUM("THIRTY_MIN", "DNP2", "TWENTY_FOUR_HR", "MANUAL"),
+        type: Sequelize.ENUM(
+          "THIRTY_MIN",
+          "DNP2",
+          "TWENTY_FOUR_HR",
+          "FORTY_EIGHT_HR",
+          "MANUAL",
+        ),
         allowNull: true,
       },
 
