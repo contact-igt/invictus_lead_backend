@@ -16,11 +16,16 @@ import PropertyLawRouter from "./modules/vls/propertyLaw/propertyLaw.routes.js";
 import FamilyLawRouter from "./modules/vls/familyLaw/familyLaw.routes.js";
 import VlsAibeRouter from "./modules/vls/vlsAibe/vlsAibe.routes.js";
 import { ensurePixelEyeLeadStateCurrentDayColumn } from "./database/migrations/ensurePixelEyeLeadStateCurrentDay.js";
+import { ensurePixelEyeLeadStateLeadIdColumn } from "./database/migrations/ensurePixelEyeLeadStateLeadId.js";
+import { ensurePixelEyeLeadStateCompletionSourceColumn } from "./database/migrations/ensurePixelEyeLeadStateCompletionSource.js";
 import { ensurePixelEyeLeadStateScheduleTypes } from "./database/migrations/ensurePixelEyeLeadStateScheduleTypeManual.js";
 import { ensurePixelEyeStatusEnums } from "./database/migrations/ensurePixelEyeDnpStatusEnums.js";
 import { ensurePixelEyeFollowUpHistoryTable } from "./database/migrations/ensurePixelEyeFollowUpHistoryTable.js";
 import { ensurePixelEyeCallLogTable } from "./database/migrations/ensurePixelEyeCallLogTable.js";
 import { ensurePixelEyeFollowUpCallComplianceTable } from "./database/migrations/ensurePixelEyeFollowUpCallComplianceTable.js";
+import { ensurePixelEyePhoneNormalization } from "./database/migrations/ensurePixelEyePhoneNormalization.js";
+import ensureAddFollowUpHistoryMetadataColumn from "./database/migrations/ensureAddFollowUpHistoryMetadataColumn.js";
+import { ensurePixelEyeLeadNotesColumn } from "./database/migrations/ensurePixelEyeLeadNotesColumn.js";
 
 const app = express();
 
@@ -49,15 +54,6 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
 // Rate limiting
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // limit each IP to 10 login requests per windowMs
-  message:
-    "Too many login attempts from this IP, please try again after 15 minutes",
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
@@ -65,8 +61,7 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Apply the rate limiters
-app.use("/api/v1/auth/login", loginLimiter);
+// Apply the API rate limiter
 app.use("/api/v1/", (req, res, next) => {
   if (req.path.startsWith("/pixeleye/webhook")) return next();
   return apiLimiter(req, res, next);
@@ -86,11 +81,16 @@ const connect_mysql = async () => {
   try {
     await db.sequelize.sync();
     await ensurePixelEyeLeadStateCurrentDayColumn();
+    await ensurePixelEyeLeadStateLeadIdColumn();
+    await ensurePixelEyeLeadStateCompletionSourceColumn();
     await ensurePixelEyeLeadStateScheduleTypes();
     await ensurePixelEyeStatusEnums();
     await ensurePixelEyeFollowUpHistoryTable();
     await ensurePixelEyeCallLogTable();
     await ensurePixelEyeFollowUpCallComplianceTable();
+    await ensurePixelEyePhoneNormalization();
+    await ensurePixelEyeLeadNotesColumn();
+    await ensureAddFollowUpHistoryMetadataColumn();
     console.log("Database synchronized for Multi-Tenant architecture");
     startPixelEyeScheduler();
     startPixelEyeFollowUpComplianceScheduler();
@@ -124,10 +124,14 @@ app.use((req, res) => {
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(err.status || 500).json({
-    message: err.message || "Internal Server Error",
-    error: process.env.NODE_ENV === "development" ? err.stack : {},
-  });
+
+  const status = Number.isInteger(err.status) ? err.status : 500;
+  const message =
+    status >= 400 && status < 500 && err.message
+      ? err.message
+      : "Internal Server Error";
+
+  res.status(status).json({ message });
 });
 
 const { line, live, development, local } =

@@ -53,6 +53,10 @@ export const buildPixelEyeFollowUpHistoryCreateTableDefinition = (
       type: Sequelize.DATEONLY,
       allowNull: true,
     },
+    metadata: {
+      type: Sequelize.JSON,
+      allowNull: true,
+    },
     change_type: {
       type: Sequelize.ENUM(...PIXEL_EYE_FOLLOW_UP_HISTORY_CHANGE_TYPES),
       allowNull: false,
@@ -118,6 +122,10 @@ const buildModelAttributes = (Sequelize, sequelize) => ({
   },
   new_follow_up_date: {
     type: Sequelize.DATEONLY,
+    allowNull: true,
+  },
+  metadata: {
+    type: Sequelize.JSON,
     allowNull: true,
   },
   change_type: {

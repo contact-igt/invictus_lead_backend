@@ -1,55 +1,106 @@
 import db from "../../database/index.js";
 import { tenantSafe } from "../../utils/tenantContext.js";
 import { Op, col, fn, where } from "sequelize";
+import { normalizePixelEyePhoneNumber } from "./pixelEyePhoneNumber.js";
 import {
   processLeadStatus,
   processDayStatus,
   scheduleManualFollowUpReminder,
-  markFollowUpReminderHandled,
   isTerminalLeadStatus,
   resolveManualFollowUpScheduledAt,
 } from "./pixelEyeNotification.service.js";
+import {
+  getAllowedStatusesForDay,
+  isTerminalPixelEyeStatus,
+  normalizePixelEyeMainStatus,
+  normalizePixelEyeOutcomeStatus,
+} from "./pixelEyeStatusPolicy.js";
 import {
   createFollowUpHistoryEntry,
   getFollowUpHistoryForLead,
   getFollowUpChangeSummaryForLead,
   getFollowUpChangeSummaryMapForLeads,
 } from "./pixelEyeFollowUpHistory.service.js";
-import { createOrUpdatePendingFollowUpCompliance } from "./pixelEyeFollowUpCallCompliance.service.js";
+import {
+  createOrUpdatePendingFollowUpCompliance,
+  cancelPendingFollowUpComplianceForLead,
+  getPendingFollowUpComplianceForLead,
+  markPendingFollowUpComplianceCalledForLead,
+} from "./pixelEyeFollowUpCallCompliance.service.js";
+import { createPixelEyeCallLog } from "./pixelEyeCallLog.service.js";
 
-const buildLeadFilters = ({ dateFrom, dateTo, agent } = {}) => {
+const buildDateRangeFilter = (dateFrom, dateTo) => {
+  if (dateFrom && dateTo) return { [Op.between]: [dateFrom, dateTo] };
+  if (dateFrom) return { [Op.gte]: dateFrom };
+  if (dateTo) return { [Op.lte]: dateTo };
+  return null;
+};
+
+const buildLeadFilters = ({ dateFrom, dateTo, agent, status, search } = {}) => {
   const filters = {};
 
   const normalizedDateFrom = String(dateFrom || "").trim();
   const normalizedDateTo = String(dateTo || "").trim();
   const normalizedAgent = String(agent || "").trim();
+  const normalizedStatus = String(status || "").trim();
+  const normalizedSearch = String(search || "").trim();
 
-  if (normalizedDateFrom && normalizedDateTo) {
-    filters.date = { [Op.between]: [normalizedDateFrom, normalizedDateTo] };
-  } else if (normalizedDateFrom) {
-    filters.date = { [Op.gte]: normalizedDateFrom };
-  } else if (normalizedDateTo) {
-    filters.date = { [Op.lte]: normalizedDateTo };
+  const dateRangeFilter = buildDateRangeFilter(
+    normalizedDateFrom,
+    normalizedDateTo,
+  );
+  if (dateRangeFilter) {
+    filters[Op.and] = [
+      {
+        [Op.or]: [
+          { date: dateRangeFilter },
+          {
+            [Op.and]: [
+              { date: null },
+              where(fn("DATE", col("created_at")), dateRangeFilter),
+            ],
+          },
+        ],
+      },
+    ];
   }
 
   if (normalizedAgent) {
     filters.agent_name = normalizedAgent;
   }
 
+  if (normalizedStatus) {
+    filters.status = normalizedStatus;
+  }
+
+  if (normalizedSearch) {
+    filters[Op.or] = [
+      { customer_name: { [Op.like]: `%${normalizedSearch}%` } },
+      { phone_number: { [Op.like]: `%${normalizedSearch}%` } },
+      { agent_name: { [Op.like]: `%${normalizedSearch}%` } },
+      { source: { [Op.like]: `%${normalizedSearch}%` } },
+      { type_of_enquiry: { [Op.like]: `%${normalizedSearch}%` } },
+      { status: { [Op.like]: `%${normalizedSearch}%` } },
+      { call_id: { [Op.like]: `%${normalizedSearch}%` } },
+    ];
+  }
+
   return filters;
 };
 
-const normalizePhone = (phone) =>
-  String(phone || "")
-    .trim()
-    .replace(/\D/g, "");
+const normalizePhone = (phone) => normalizePixelEyePhoneNumber(phone);
 
-const buildClientCallKey = (clientId, callId) =>
-  `${clientId}:${String(callId || "").trim()}`;
+const normalizeLeadPhone = (phone) => normalizePixelEyePhoneNumber(phone);
+
+const buildClientCallKey = (clientId, callId, leadId = null) =>
+  leadId
+    ? `${clientId}:lead:${String(leadId).trim()}`
+    : `${clientId}:call:${String(callId || "").trim()}`;
 
 const attachReminderState = (lead, reminderState, historySummary = {}) => ({
   ...lead.toJSON(),
   followup_state: reminderState?.state ?? null,
+  followup_completion_source: reminderState?.completion_source ?? null,
   reminder_schedule_type: reminderState?.schedule_type ?? null,
   reminder_scheduled_at: reminderState?.scheduled_at ?? null,
   reminder_notification_sent: reminderState?.notification_sent ?? null,
@@ -62,13 +113,408 @@ const attachReminderState = (lead, reminderState, historySummary = {}) => ({
     historySummary?.latest_follow_up_change_at ?? null,
 });
 
+const DAY_FIELDS = ["day_1", "day_2", "day_3", "day_4", "day_5"];
+const NORMAL_LEAD_ATTENTION_STATE = "SAME_NUMBER_OUTCOME_PENDING";
+const NORMAL_LEAD_ATTENTION_LABEL = "Repeat Caller - Update Outcome";
+
+const hasIncompleteOutcomeDays = (lead) =>
+  DAY_FIELDS.some((field) => isBlank(lead?.[field]));
+
+const getRawPayloadObject = (callLog) => {
+  if (!callLog) return null;
+
+  const raw = callLog.raw_payload;
+  if (!raw) return null;
+  if (typeof raw === "object") return raw;
+
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    return null;
+  }
+};
+
+const isPendingNormalLeadAttentionCallLog = (callLog) => {
+  if (!callLog || callLog.outcome_applied_at) {
+    return false;
+  }
+
+  const rawPayload = getRawPayloadObject(callLog);
+  const attentionState = String(rawPayload?.attention_state || "")
+    .trim()
+    .toUpperCase();
+
+  return attentionState === NORMAL_LEAD_ATTENTION_STATE;
+};
+
+const getNormalLeadAttentionFromCallLog = (callLog) => {
+  if (!isPendingNormalLeadAttentionCallLog(callLog)) {
+    return {
+      normal_lead_attention_state: null,
+      normal_lead_attention_label: null,
+      needs_manual_day_outcome: false,
+      normal_lead_attention_at: null,
+    };
+  }
+
+  const rawPayload = getRawPayloadObject(callLog);
+  return {
+    normal_lead_attention_state: NORMAL_LEAD_ATTENTION_STATE,
+    normal_lead_attention_label:
+      String(rawPayload?.attention_label || "").trim() ||
+      NORMAL_LEAD_ATTENTION_LABEL,
+    needs_manual_day_outcome: true,
+    normal_lead_attention_at:
+      rawPayload?.attention_created_at ||
+      callLog?.created_at ||
+      callLog?.createdAt ||
+      null,
+  };
+};
+
+const getFollowUpHighlightState = (lead, reminderState, complianceRow) => {
+  const complianceStatus = String(complianceRow?.compliance_status || "")
+    .trim()
+    .toUpperCase();
+
+  if (
+    complianceStatus !== "CALLED" ||
+    !String(lead?.follow_up_date || "").trim() ||
+    !hasIncompleteOutcomeDays(lead) ||
+    isTerminalPixelEyeLeadValue(lead?.status) ||
+    isClosedFollowUpFlowState(reminderState)
+  ) {
+    return null;
+  }
+
+  return "CALL_RECEIVED_OUTCOME_PENDING";
+};
+
+const attachFollowUpState = (
+  lead,
+  reminderState,
+  complianceRow,
+  normalLeadAttentionCallLog,
+  historySummary = {},
+) => {
+  const highlightState = getFollowUpHighlightState(
+    lead,
+    reminderState,
+    complianceRow,
+  );
+
+  return {
+    ...attachReminderState(lead, reminderState, historySummary),
+    followup_highlight_state: highlightState,
+    called_outcome_missing: Boolean(highlightState),
+    compliance_status: complianceRow?.compliance_status ?? null,
+    matched_call_log_id: complianceRow?.matched_call_log_id ?? null,
+    matched_call_id: complianceRow?.matched_call_id ?? null,
+    matched_call_started_at: complianceRow?.matched_call_started_at ?? null,
+    ...getNormalLeadAttentionFromCallLog(normalLeadAttentionCallLog),
+  };
+};
+
+const resolvePendingNormalLeadAttentionCallLog = async (lead, options = {}) => {
+  if (!lead?.client_id) {
+    return null;
+  }
+
+  const identityClauses = [];
+  if (lead?.id) {
+    identityClauses.push({ lead_id: lead.id });
+  }
+  if (lead?.call_id) {
+    identityClauses.push({ call_id: lead.call_id });
+  }
+
+  if (identityClauses.length === 0) {
+    return null;
+  }
+
+  const logs = await db.PixelEyeCallLog.findAll({
+    where: {
+      client_id: lead.client_id,
+      [Op.or]: identityClauses,
+    },
+    order: [
+      ["created_at", "DESC"],
+      ["id", "DESC"],
+    ],
+    ...(options.transaction ? { transaction: options.transaction } : {}),
+  });
+
+  return logs.find((row) => isPendingNormalLeadAttentionCallLog(row)) || null;
+};
+
+const resolveNormalLeadAttentionCallLogMap = (callLogs = []) => {
+  const map = new Map();
+
+  for (const row of callLogs) {
+    if (!isPendingNormalLeadAttentionCallLog(row)) {
+      continue;
+    }
+
+    const key = buildClientCallKey(row.client_id, row.call_id, row.lead_id);
+    if (!map.has(key)) {
+      map.set(key, row);
+    }
+  }
+
+  return map;
+};
+
+const resolveNormalLeadAttentionCallLogsForLeads = async (
+  leads,
+  scopedTenant,
+) => {
+  const leadIds = leads
+    .map((lead) => lead?.id)
+    .filter((id) => Number.isFinite(Number(id)));
+  const callIds = leads
+    .map((lead) => String(lead?.call_id || "").trim())
+    .filter((callId) => Boolean(callId));
+
+  if (leadIds.length === 0 && callIds.length === 0) {
+    return [];
+  }
+
+  const identityClauses = [];
+  if (leadIds.length > 0) {
+    identityClauses.push({ lead_id: { [Op.in]: leadIds } });
+  }
+  if (callIds.length > 0) {
+    identityClauses.push({ call_id: { [Op.in]: callIds } });
+  }
+
+  return await db.PixelEyeCallLog.findAll({
+    where: {
+      ...(scopedTenant?.isSuperAdmin ? {} : { client_id: scopedTenant?.id }),
+      [Op.or]: identityClauses,
+    },
+    order: [
+      ["created_at", "DESC"],
+      ["id", "DESC"],
+    ],
+  });
+};
+
+const markNormalLeadAttentionResolved = async (
+  lead,
+  normalizedStatus,
+  transaction = null,
+) => {
+  const pendingCallLog = await resolvePendingNormalLeadAttentionCallLog(lead, {
+    transaction,
+  });
+
+  if (!pendingCallLog) {
+    return null;
+  }
+
+  const rawPayload = getRawPayloadObject(pendingCallLog) || {};
+  const nowIso = new Date().toISOString();
+
+  return await pendingCallLog.update(
+    {
+      outcome_status: normalizedStatus,
+      outcome_applied_at: new Date(),
+      raw_payload: {
+        ...rawPayload,
+        attention_state: NORMAL_LEAD_ATTENTION_STATE,
+        attention_label:
+          String(rawPayload.attention_label || "").trim() ||
+          NORMAL_LEAD_ATTENTION_LABEL,
+        attention_resolved_at: nowIso,
+        attention_resolved_via: "FOLLOW_UP_OUTCOME",
+      },
+    },
+    {
+      ...(transaction ? { transaction } : {}),
+    },
+  );
+};
+
+const createManualSameNumberAttentionCallLog = async (lead, data = {}) => {
+  if (!lead?.client_id || !lead?.id) {
+    return null;
+  }
+
+  const attentionCreatedAt = new Date().toISOString();
+
+  return await createPixelEyeCallLog({
+    client_id: lead.client_id,
+    lead_id: lead.id,
+    call_id: data.call_id || lead.call_id,
+    phone_number: data.phone_number || lead.phone_number,
+    customer_name: data.customer_name || lead.customer_name,
+    agent_name: data.agent_name || lead.agent_name,
+    date: data.date || lead.date,
+    time: data.time || lead.time,
+    status: data.status || lead.status,
+    source: "MANUAL_CREATE",
+    raw_payload: {
+      source: "MANUAL_CREATE",
+      attention_state: NORMAL_LEAD_ATTENTION_STATE,
+      attention_label: NORMAL_LEAD_ATTENTION_LABEL,
+      attention_source: "MANUAL_CREATE",
+      attention_created_at: attentionCreatedAt,
+    },
+  });
+};
+
 const hasOwnValue = (obj, key) =>
   Object.prototype.hasOwnProperty.call(obj || {}, key);
 
 const isBlank = (value) =>
   value === null || value === undefined || String(value).trim() === "";
 
-const DAY_FIELDS = ["day_1", "day_2", "day_3", "day_4", "day_5"];
+const getFollowUpDateFingerprint = (value) => {
+  if (isBlank(value)) {
+    return null;
+  }
+
+  try {
+    return resolveManualFollowUpScheduledAt(value).toISOString();
+  } catch (err) {
+    return String(value).trim();
+  }
+};
+
+const isSameFollowUpDate = (currentValue, nextValue) =>
+  getFollowUpDateFingerprint(currentValue) ===
+  getFollowUpDateFingerprint(nextValue);
+
+const normalizeLeadNotes = (value) => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  return normalized || null;
+};
+
+const COMPLETED_FOLLOW_UP_STATES = new Set(["cancelled", "completed"]);
+
+const getLatestReminderStateForLead = async (lead, options = {}) => {
+  if (!lead?.client_id) {
+    return null;
+  }
+
+  const identityClauses = [];
+
+  if (lead?.id) {
+    identityClauses.push({ lead_id: lead.id });
+  }
+
+  if (!lead?.id && lead?.normalized_phone_number) {
+    identityClauses.push({
+      normalized_phone_number: lead.normalized_phone_number,
+    });
+  }
+
+  if (lead?.call_id) {
+    identityClauses.push({ call_id: lead.call_id });
+  }
+
+  if (identityClauses.length === 0) {
+    return null;
+  }
+
+  return await db.PixelEyeLeadState.findOne({
+    where: {
+      client_id: lead.client_id,
+      [Op.or]: identityClauses,
+    },
+    order: [
+      ["updatedAt", "DESC"],
+      ["createdAt", "DESC"],
+    ],
+    ...(options.transaction ? { transaction: options.transaction } : {}),
+  });
+};
+
+const isClosedFollowUpFlowState = (reminderState) => {
+  if (!reminderState) return false;
+
+  if (reminderState.permanently_closed) {
+    return true;
+  }
+
+  const state = String(reminderState.state || "")
+    .trim()
+    .toLowerCase();
+  if (state === "cancelled") {
+    return true;
+  }
+
+  if (state !== "completed") {
+    return false;
+  }
+
+  const completionSource = String(reminderState.completion_source || "")
+    .trim()
+    .toLowerCase();
+  return completionSource !== "notification_sent";
+};
+
+const hasAllFollowUpDaysFilled = (lead) =>
+  DAY_FIELDS.every((field) => !isBlank(lead?.[field]));
+
+const getLatestFollowUpDayValue = (lead) => {
+  for (let index = DAY_FIELDS.length - 1; index >= 0; index -= 1) {
+    const value = lead?.[DAY_FIELDS[index]];
+    if (!isBlank(value)) {
+      return value;
+    }
+  }
+
+  return null;
+};
+
+const isTerminalPixelEyeLeadValue = (value) =>
+  isTerminalPixelEyeStatus(value) || isClosedFollowUpOutcome(value);
+
+/**
+ * Checks if a PixelEye lead is currently in an active follow-up lifecycle.
+ * Decision Logic (as per business rules):
+ * Completed if:
+ *  - day_1 to day_5 are all filled
+ *  - OR status is terminal/closed
+ *  - OR reminder/follow-up is permanently closed/cancelled
+ * Active if NOT completed.
+ */
+export const isPixelEyeLeadActive = async (lead) => {
+  if (!lead) return false;
+
+  // 1. Check day slots completion
+  if (hasAllFollowUpDaysFilled(lead)) return false;
+
+  // 2. Check terminal status (Closed, Visited, Not interested, etc.)
+  if (isTerminalPixelEyeLeadValue(lead.status)) {
+    return false;
+  }
+
+  const latestDayValue = getLatestFollowUpDayValue(lead);
+  if (isTerminalPixelEyeLeadValue(latestDayValue)) {
+    return false;
+  }
+
+  // 3. Check reminder state context
+  const reminderState = await getLatestReminderStateForLead(lead);
+
+  if (isClosedFollowUpFlowState(reminderState)) {
+    return false;
+  }
+
+  // If none of the terminal/closure conditions match and there are empty slots,
+  // the lead is considered active.
+  return true;
+};
 
 const getDayFieldIndex = (field) => DAY_FIELDS.indexOf(field);
 
@@ -80,34 +526,70 @@ const getValueFromUpdateOrLead = (updateData, lead, field) => {
   return lead?.[field];
 };
 
-const assertDayUpdateAllowed = (lead, updateData) => {
-  const changedDayField = DAY_FIELDS.find((field) =>
+const assertDayUpdateAllowed = (lead, updateData, options = {}) => {
+  const allowTerminalLeadStatus = Boolean(options?.allowTerminalLeadStatus);
+  const changedDayFields = DAY_FIELDS.filter((field) =>
     hasOwnValue(updateData, field),
   );
-  if (!changedDayField) {
+  if (changedDayFields.length === 0) {
     return;
   }
 
   const nextMainStatus = getValueFromUpdateOrLead(updateData, lead, "status");
-  if (isTerminalLeadStatus(nextMainStatus)) {
+
+  // 1. Lead must have an initial status set
+  if (isBlank(nextMainStatus)) {
+    throw new Error(
+      "Cannot update follow-up days because lead status is not set.",
+    );
+  }
+
+  // 2. Main status cannot be terminal
+  if (!allowTerminalLeadStatus && isTerminalLeadStatus(nextMainStatus)) {
     throw new Error(
       "Cannot update follow-up days because lead status is already closed/terminal.",
     );
   }
 
-  const dayIndex = getDayFieldIndex(changedDayField);
-  for (let i = 0; i < dayIndex; i += 1) {
-    const priorDayField = DAY_FIELDS[i];
-    const priorDayValue = getValueFromUpdateOrLead(
+  for (const changedDayField of changedDayFields) {
+    const dayIndex = getDayFieldIndex(changedDayField);
+    const dayNumber = dayIndex + 1;
+    const nextDayValue = getValueFromUpdateOrLead(
       updateData,
       lead,
-      priorDayField,
+      changedDayField,
     );
 
-    if (isTerminalLeadStatus(priorDayValue)) {
-      throw new Error(
-        "Cannot update next follow-up day because previous day is already closed/terminal.",
+    if (!isBlank(nextDayValue)) {
+      const normalizedDayValue = normalizePixelEyeOutcomeStatus(nextDayValue);
+      updateData[changedDayField] = normalizedDayValue;
+      const allowedStatuses = getAllowedStatusesForDay(dayNumber);
+      if (!allowedStatuses.includes(normalizedDayValue)) {
+        throw new Error(`Selected status is not allowed for Day ${dayNumber}.`);
+      }
+    }
+
+    for (let i = 0; i < dayIndex; i += 1) {
+      const priorDayField = DAY_FIELDS[i];
+      const priorDayValue = getValueFromUpdateOrLead(
+        updateData,
+        lead,
+        priorDayField,
       );
+
+      // 3. Prior day(s) must be set
+      if (isBlank(priorDayValue)) {
+        throw new Error(
+          `Cannot update ${changedDayField.replace("_", " ")} because prior day(s) (specifically ${priorDayField.replace("_", " ")}) are not set.`,
+        );
+      }
+
+      // 4. Prior day(s) cannot be terminal
+      if (isTerminalLeadStatus(priorDayValue)) {
+        throw new Error(
+          "Cannot update next follow-up day because previous day is already closed/terminal.",
+        );
+      }
     }
   }
 };
@@ -200,7 +682,7 @@ const persistPendingFollowUpCompliance = async ({
 
   if (!compliance) {
     console.error(
-      `[PixelEye] Failed to create/update pending compliance for call_id=${lead?.call_id || "â€”"}`,
+      `[PixelEye] Failed to create/update pending compliance for call_id=${lead?.call_id || "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"}`,
     );
   }
 
@@ -218,19 +700,13 @@ export const reschedulePixelEyeFollowUp = async (
 
   if (!lead) throw new Error("Lead not found or unauthorized");
 
-  if (isTerminalLeadStatus(lead.status)) {
-    throw new Error("Lead is terminal and cannot be rescheduled");
-  }
+  const existingState = await getLatestReminderStateForLead(lead);
 
-  const existingState = await db.PixelEyeLeadState.findOne({
-    where: {
-      client_id: lead.client_id,
-      call_id: lead.call_id,
-    },
-  });
-
-  if (existingState?.permanently_closed) {
-    throw new Error("Lead is permanently closed and cannot be rescheduled");
+  if (
+    isTerminalLeadStatus(lead.status) ||
+    isClosedFollowUpFlowState(existingState)
+  ) {
+    throw new Error("Cannot reschedule a closed lead.");
   }
 
   const oldFollowUpDate = lead.follow_up_date;
@@ -246,6 +722,13 @@ export const reschedulePixelEyeFollowUp = async (
 
   const updatedLead = await lead.update({
     follow_up_date: scheduledAt.toISOString(),
+  });
+
+  await cancelPendingFollowUpComplianceForLead({
+    client_id: updatedLead.client_id,
+    lead_id: updatedLead.id,
+    reason: "Superseded by updated follow-up date",
+    source: actor?.source || "FRONTEND",
   });
 
   const reminderState = await scheduleManualFollowUpReminder(
@@ -292,12 +775,17 @@ export const reschedulePixelEyeFollowUp = async (
 
 const CLOSE_OUTCOME_SET = new Set([
   "appointment fixed",
+  "doctor appointment fixed",
+  "walk in",
+  "visited",
   "not interested",
   "closed",
-  "converted",
   "wrong number",
-  "invalid number",
-  "patient not required",
+  "number not in service",
+  "not in hospital city",
+  "far from hospital",
+  "going to other hospital",
+  "not willing to come as of now",
 ]);
 
 const isClosedFollowUpOutcome = (value) => {
@@ -310,82 +798,212 @@ const isClosedFollowUpOutcome = (value) => {
   );
 };
 
-export const cancelPixelEyeFollowUp = async (id, tenantContext, data = {}) => {
-  const safeModel = tenantSafe(db.PixelEye, tenantContext);
-  const lead = await safeModel.findOne({ where: { id } });
-
-  if (!lead) {
-    throw new Error("Lead not found or unauthorized");
-  }
-
-  const nextStatus = String(data.status || "").trim();
-  const cancelReason =
-    String(data.reason || nextStatus || "Follow-up cancelled").trim() ||
-    "Follow-up cancelled";
-  const shouldPermanentlyClose =
-    isClosedFollowUpOutcome(nextStatus) ||
-    isClosedFollowUpOutcome(cancelReason);
-
-  const updateData = {};
-  if (nextStatus) {
-    updateData.status = nextStatus;
-  }
-
-  const updatedLead =
-    Object.keys(updateData).length > 0 ? await lead.update(updateData) : lead;
-
-  const existingState = await db.PixelEyeLeadState.findOne({
-    where: {
-      client_id: updatedLead.client_id,
-      call_id: updatedLead.call_id,
-    },
-  });
-
-  let reminderState = null;
-  if (existingState) {
-    reminderState = await existingState.update({
-      state: "cancelled",
-      permanently_closed: shouldPermanentlyClose,
-      cancel_reason: cancelReason,
-      last_status: updatedLead.status ?? existingState.last_status ?? null,
-      customer_name:
-        updatedLead.customer_name ?? existingState.customer_name ?? null,
-      phone_number:
-        updatedLead.phone_number ?? existingState.phone_number ?? null,
-      agent_name: updatedLead.agent_name ?? existingState.agent_name ?? null,
-    });
-  } else {
-    reminderState = await db.PixelEyeLeadState.create({
-      client_id: updatedLead.client_id,
-      call_id: updatedLead.call_id,
-      customer_name: updatedLead.customer_name ?? null,
-      phone_number: updatedLead.phone_number ?? null,
-      agent_name: updatedLead.agent_name ?? null,
-      last_status: updatedLead.status ?? null,
-      state: "cancelled",
-      schedule_type: null,
-      reason: null,
-      scheduled_at: null,
-      notification_sent: false,
-      notification_sent_at: null,
-      permanently_closed: shouldPermanentlyClose,
-      cancel_reason: cancelReason,
-      current_day: null,
-    });
-  }
-
-  console.log(
-    `[PixelEye] Cancelled follow-up for call_id=${updatedLead.call_id}` +
-      (existingState
-        ? ` permanently_closed=${shouldPermanentlyClose}`
-        : " (no active reminder row found)"),
-  );
+const serializeReminderStateSnapshot = (state) => {
+  if (!state) return null;
 
   return {
-    lead: updatedLead,
-    reminderState,
-    hadReminder: Boolean(existingState),
+    id: state.id ?? null,
+    state: state.state ?? null,
+    schedule_type: state.schedule_type ?? null,
+    scheduled_at: state.scheduled_at ?? null,
+    notification_sent: state.notification_sent ?? false,
+    notification_sent_at: state.notification_sent_at ?? null,
+    completion_source: state.completion_source ?? null,
+    permanently_closed: state.permanently_closed ?? false,
+    cancel_reason: state.cancel_reason ?? null,
+    current_day: state.current_day ?? null,
+    reason: state.reason ?? null,
   };
+};
+
+const serializeComplianceSnapshot = (row) => ({
+  id: row.id ?? null,
+  compliance_status: row.compliance_status ?? null,
+  scheduled_follow_up_date: row.scheduled_follow_up_date ?? null,
+  scheduled_follow_up_at: row.scheduled_follow_up_at ?? null,
+  allowed_until: row.allowed_until ?? null,
+  reason: row.reason ?? null,
+  source: row.source ?? null,
+});
+
+export const cancelPixelEyeFollowUp = async (
+  id,
+  tenantContext,
+  data = {},
+  actor = {},
+) => {
+  const safeModel = tenantSafe(db.PixelEye, tenantContext);
+
+  return await db.sequelize.transaction(async (transaction) => {
+    const lead = await safeModel.findOne({
+      where: { id },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+
+    if (!lead) {
+      throw new Error("Lead not found or unauthorized");
+    }
+
+    const nextStatus = String(data.status || "").trim();
+    const cancelReason =
+      String(data.reason || nextStatus || "Follow-up cancelled").trim() ||
+      "Follow-up cancelled";
+    const shouldPermanentlyClose =
+      isClosedFollowUpOutcome(nextStatus) ||
+      isClosedFollowUpOutcome(cancelReason);
+    const oldFollowUpDate = lead.follow_up_date ?? null;
+
+    const existingState = await getLatestReminderStateForLead(lead, {
+      transaction,
+    });
+    const previousReminder = serializeReminderStateSnapshot(existingState);
+    const pendingComplianceRows = await getPendingFollowUpComplianceForLead({
+      client_id: lead.client_id,
+      lead_id: lead.id,
+      transaction,
+      throwOnError: true,
+    });
+    const previousCompliance = pendingComplianceRows.map(
+      serializeComplianceSnapshot,
+    );
+
+    const updateData = {};
+    if (nextStatus) {
+      updateData.status = nextStatus;
+    }
+    if (!isBlank(oldFollowUpDate)) {
+      updateData.follow_up_date = null;
+    }
+
+    const updatedLead =
+      Object.keys(updateData).length > 0
+        ? await lead.update(updateData, { transaction })
+        : lead;
+
+    const cancelledComplianceCount =
+      await cancelPendingFollowUpComplianceForLead({
+        client_id: updatedLead.client_id,
+        lead_id: updatedLead.id,
+        reason: cancelReason,
+        source: actor?.source || "SYSTEM",
+        transaction,
+        throwOnError: true,
+      });
+    const cancelledComplianceIds = previousCompliance.map((row) => row.id);
+
+    let reminderState = null;
+    if (existingState) {
+      reminderState = await existingState.update(
+        {
+          lead_id: updatedLead.id ?? existingState.lead_id ?? null,
+          state: "cancelled",
+          schedule_type: null,
+          reason: null,
+          scheduled_at: null,
+          notification_sent: false,
+          notification_sent_at: null,
+          permanently_closed: shouldPermanentlyClose,
+          cancel_reason: cancelReason,
+          completion_source: null,
+          current_day: null,
+          last_status: updatedLead.status ?? existingState.last_status ?? null,
+          customer_name:
+            updatedLead.customer_name ?? existingState.customer_name ?? null,
+          phone_number:
+            updatedLead.phone_number ?? existingState.phone_number ?? null,
+          normalized_phone_number:
+            updatedLead.normalized_phone_number ||
+            normalizeLeadPhone(updatedLead.phone_number) ||
+            existingState.normalized_phone_number ||
+            null,
+          agent_name:
+            updatedLead.agent_name ?? existingState.agent_name ?? null,
+        },
+        { transaction },
+      );
+    } else {
+      reminderState = await db.PixelEyeLeadState.create(
+        {
+          client_id: updatedLead.client_id,
+          lead_id: updatedLead.id ?? null,
+          call_id: updatedLead.call_id,
+          customer_name: updatedLead.customer_name ?? null,
+          phone_number: updatedLead.phone_number ?? null,
+          normalized_phone_number:
+            updatedLead.normalized_phone_number ||
+            normalizeLeadPhone(updatedLead.phone_number) ||
+            null,
+          agent_name: updatedLead.agent_name ?? null,
+          last_status: updatedLead.status ?? null,
+          state: "cancelled",
+          schedule_type: null,
+          reason: null,
+          scheduled_at: null,
+          notification_sent: false,
+          notification_sent_at: null,
+          permanently_closed: shouldPermanentlyClose,
+          cancel_reason: cancelReason,
+          current_day: null,
+        },
+        { transaction },
+      );
+    }
+
+    const shouldWriteHistory =
+      !isBlank(oldFollowUpDate) ||
+      previousCompliance.length > 0 ||
+      String(previousReminder?.state || "").toLowerCase() === "scheduled";
+
+    if (shouldWriteHistory) {
+      const historyEntry = await createFollowUpHistoryEntry({
+        client_id: updatedLead.client_id,
+        lead_id: updatedLead.id,
+        call_id: updatedLead.call_id,
+        phone_number: updatedLead.phone_number,
+        customer_name: updatedLead.customer_name,
+        old_follow_up_date: oldFollowUpDate,
+        new_follow_up_date: null,
+        change_type: "CLEARED",
+        source: actor?.source || "SYSTEM",
+        reason: "Follow-up cancelled",
+        changed_by_user_id: actor?.changed_by_user_id ?? null,
+        changed_by_name: actor?.changed_by_name ?? null,
+        metadata: {
+          action: "FOLLOW_UP_CANCELLED",
+          old_follow_up_date: oldFollowUpDate,
+          new_follow_up_date: null,
+          prev_reminder: previousReminder,
+          new_reminder: serializeReminderStateSnapshot(reminderState),
+          prev_compliance: previousCompliance,
+          cancelled_compliance_ids: cancelledComplianceIds,
+          cancelled_compliance_count: cancelledComplianceCount,
+          source: actor?.source === "FRONTEND" ? "MANUAL" : "SYSTEM",
+          reason: "Follow-up cancelled",
+        },
+        transaction,
+      });
+
+      if (!historyEntry) {
+        throw new Error("Failed to create follow-up cancellation history");
+      }
+    }
+
+    console.log(
+      `[PixelEye] Cancelled follow-up for call_id=${updatedLead.call_id}` +
+        (existingState
+          ? ` permanently_closed=${shouldPermanentlyClose}`
+          : " (no active reminder row found)"),
+    );
+
+    return {
+      lead: updatedLead,
+      reminderState,
+      hadReminder: Boolean(existingState),
+      cancelledComplianceCount,
+      cancelledComplianceIds,
+    };
+  });
 };
 
 const buildTenantContextWithClientId = (tenantContext, clientId) => {
@@ -422,7 +1040,11 @@ export const listPixelEyeLeads = async (tenantContext, clientId) => {
 
   const reminderStateMap = new Map();
   for (const state of reminderStates) {
-    const key = buildClientCallKey(state.client_id, state.call_id);
+    const key = buildClientCallKey(
+      state.client_id,
+      state.call_id,
+      state.lead_id,
+    );
     if (!reminderStateMap.has(key)) {
       reminderStateMap.set(key, state);
     }
@@ -430,10 +1052,41 @@ export const listPixelEyeLeads = async (tenantContext, clientId) => {
 
   const historySummaryMap = await getFollowUpChangeSummaryMapForLeads(leads);
 
+  const complianceRows = await db.PixelEyeFollowUpCallCompliance.findAll({
+    where: scopedTenant?.isSuperAdmin ? {} : { client_id: scopedTenant?.id },
+    order: [
+      ["updatedAt", "DESC"],
+      ["createdAt", "DESC"],
+    ],
+  });
+
+  const complianceStateMap = new Map();
+  for (const row of complianceRows) {
+    const key = buildClientCallKey(row.client_id, row.call_id, row.lead_id);
+    if (!complianceStateMap.has(key)) {
+      complianceStateMap.set(key, row);
+    }
+  }
+
+  const attentionCallLogs = await resolveNormalLeadAttentionCallLogsForLeads(
+    leads,
+    scopedTenant,
+  );
+  const attentionCallLogMap =
+    resolveNormalLeadAttentionCallLogMap(attentionCallLogs);
+
   return leads.map((lead) =>
-    attachReminderState(
+    attachFollowUpState(
       lead,
-      reminderStateMap.get(buildClientCallKey(lead.client_id, lead.call_id)),
+      reminderStateMap.get(
+        buildClientCallKey(lead.client_id, lead.call_id, lead.id),
+      ),
+      complianceStateMap.get(
+        buildClientCallKey(lead.client_id, lead.call_id, lead.id),
+      ),
+      attentionCallLogMap.get(
+        buildClientCallKey(lead.client_id, lead.call_id, lead.id),
+      ),
       getFollowUpChangeSummaryForLead(historySummaryMap, lead),
     ),
   );
@@ -467,11 +1120,20 @@ export const getPixelEyeLead = async (id, tenantContext) => {
   const lead = await safeModel.findOne({ where: { id } });
   if (!lead) return null;
 
-  const reminderState = await db.PixelEyeLeadState.findOne({
+  const reminderState = await getLatestReminderStateForLead(lead);
+
+  const complianceRow = await db.PixelEyeFollowUpCallCompliance.findOne({
     where: {
       client_id: lead.client_id,
-      call_id: lead.call_id,
+      [Op.or]: [
+        ...(lead.id ? [{ lead_id: lead.id }] : []),
+        ...(lead.call_id ? [{ call_id: lead.call_id }] : []),
+      ],
     },
+    order: [
+      ["updatedAt", "DESC"],
+      ["createdAt", "DESC"],
+    ],
   });
 
   const historySummaryRows = await getFollowUpHistoryForLead({
@@ -488,27 +1150,68 @@ export const getPixelEyeLead = async (id, tenantContext) => {
       null,
   };
 
-  return attachReminderState(lead, reminderState, historySummary);
+  const normalLeadAttentionCallLog =
+    await resolvePendingNormalLeadAttentionCallLog(lead);
+
+  return attachFollowUpState(
+    lead,
+    reminderState,
+    complianceRow,
+    normalLeadAttentionCallLog,
+    historySummary,
+  );
 };
 
 export const createPixelEyeLead = async (data, clientId, actor = {}) => {
-  if (hasOwnValue(data, "follow_up_date") && !isBlank(data.follow_up_date)) {
-    getManualFollowUpScheduledAt(data.follow_up_date);
+  const normalizedPhoneNumber = normalizeLeadPhone(data.phone_number);
+  if (!normalizedPhoneNumber) {
+    throw new Error("Invalid phone number");
   }
 
-  const lead = await db.PixelEye.create({ ...data, client_id: clientId });
+  const createData = { ...data };
+  if (hasOwnValue(createData, "status")) {
+    createData.status = normalizePixelEyeMainStatus(createData.status);
+  }
+  if (hasOwnValue(createData, "notes")) {
+    createData.notes = normalizeLeadNotes(createData.notes);
+  }
+  for (const field of DAY_FIELDS) {
+    delete createData[field];
+  }
 
-  if (hasOwnValue(data, "follow_up_date") && !isBlank(data.follow_up_date)) {
+  if (
+    hasOwnValue(createData, "follow_up_date") &&
+    !isBlank(createData.follow_up_date)
+  ) {
+    getManualFollowUpScheduledAt(createData.follow_up_date);
+  }
+
+  const lead = await db.PixelEye.create({
+    ...createData,
+    client_id: clientId,
+    phone_number: normalizedPhoneNumber,
+    normalized_phone_number: normalizedPhoneNumber,
+    day_1: null,
+    day_2: null,
+    day_3: null,
+    day_4: null,
+    day_5: null,
+  });
+
+  if (
+    hasOwnValue(createData, "follow_up_date") &&
+    !isBlank(createData.follow_up_date)
+  ) {
     const manualReminderScheduled = await scheduleManualFollowUpIfEligible(
       lead,
-      data.follow_up_date,
-      data,
+      createData.follow_up_date,
+      createData,
     );
 
     if (manualReminderScheduled) {
       await persistPendingFollowUpCompliance({
         lead,
-        followUpDate: data.follow_up_date,
+        followUpDate: createData.follow_up_date,
         source: "SYSTEM",
         reason: "Pending follow-up call check",
       });
@@ -520,7 +1223,7 @@ export const createPixelEyeLead = async (data, clientId, actor = {}) => {
         phone_number: lead.phone_number,
         customer_name: lead.customer_name,
         old_follow_up_date: null,
-        new_follow_up_date: lead.follow_up_date ?? data.follow_up_date,
+        new_follow_up_date: lead.follow_up_date ?? createData.follow_up_date,
         change_type: "CREATED",
         reason: "Follow-up date created",
         changed_by_user_id: actor?.changed_by_user_id ?? null,
@@ -533,66 +1236,31 @@ export const createPixelEyeLead = async (data, clientId, actor = {}) => {
       return lead;
     }
   }
-
-  // Fire-and-forget: schedule callback based on initial status.
-  processLeadStatus(lead, clientId, "create").catch((err) =>
-    console.error(
-      `[PixelEye] processLeadStatus(create) failed for call_id=${lead?.call_id}:`,
-      err?.message,
-    ),
-  );
+  // Keep lead and reminder state consistent: surface scheduling failures.
+  await processLeadStatus(lead, clientId, "create");
   return lead;
 };
 
 export const findPixelEyeLeadByPhone = async (clientId, phoneNumber) => {
-  const rawPhone = String(phoneNumber || "").trim();
-  if (!rawPhone) return null;
-
-  const exactMatch = await db.PixelEye.findOne({
-    where: { client_id: clientId, phone_number: rawPhone },
-    order: [["createdAt", "DESC"]],
-  });
-
-  if (exactMatch) {
-    return exactMatch;
-  }
-
-  const normalizedIncoming = normalizePhone(rawPhone);
+  const normalizedIncoming = normalizeLeadPhone(phoneNumber);
   if (!normalizedIncoming) return null;
-  const incomingLast10 =
-    normalizedIncoming.length > 10
-      ? normalizedIncoming.slice(-10)
-      : normalizedIncoming;
 
-  const normalizedDbPhone = fn(
-    "REPLACE",
-    fn(
-      "REPLACE",
-      fn(
-        "REPLACE",
-        fn("REPLACE", fn("REPLACE", col("phone_number"), " ", ""), "-", ""),
-        "+",
-        "",
-      ),
-      "(",
-      "",
-    ),
-    ")",
-    "",
-  );
-
-  const lead = await db.PixelEye.findOne({
+  const latestLead = await db.PixelEye.findOne({
     where: {
       client_id: clientId,
-      [Op.or]: [
-        where(normalizedDbPhone, normalizedIncoming),
-        where(fn("RIGHT", normalizedDbPhone, 10), incomingLast10),
-      ],
+      normalized_phone_number: normalizedIncoming,
     },
-    order: [["createdAt", "DESC"]],
+    order: [
+      ["createdAt", "DESC"],
+      ["id", "DESC"],
+    ],
   });
 
-  return lead;
+  if (!latestLead) {
+    return null;
+  }
+
+  return (await isPixelEyeLeadActive(latestLead)) ? latestLead : null;
 };
 
 export const updatePixelEyeLead = async (
@@ -605,6 +1273,45 @@ export const updatePixelEyeLead = async (
   const lead = await safeModel.findOne({ where: { id } });
 
   if (!lead) throw new Error("Lead not found or unauthorized");
+
+  const role = String(tenantContext?.role || "")
+    .trim()
+    .toLowerCase();
+  const isClientRole = role === "client";
+
+  if (isClientRole) {
+    const hasDirectDayFieldUpdate = DAY_FIELDS.some((field) =>
+      hasOwnValue(data, field),
+    );
+    const hasMappedDayUpdate =
+      hasOwnValue(data, "day") || hasOwnValue(data, "value");
+
+    if (hasDirectDayFieldUpdate || hasMappedDayUpdate) {
+      throw new Error("Use Update Outcome to update day status.");
+    }
+  }
+
+  if (hasOwnValue(data, "follow_up_date") && !isBlank(lead.follow_up_date)) {
+    if (isBlank(data.follow_up_date)) {
+      throw new Error("Use the cancel follow-up endpoint.");
+    }
+
+    if (isSameFollowUpDate(lead.follow_up_date, data.follow_up_date)) {
+      delete data.follow_up_date;
+    } else {
+      throw new Error("Use the reschedule follow-up endpoint.");
+    }
+  }
+
+  if (hasOwnValue(data, "follow_up_date")) {
+    const reminderState = await getLatestReminderStateForLead(lead);
+    if (
+      isTerminalLeadStatus(lead.status) ||
+      isClosedFollowUpFlowState(reminderState)
+    ) {
+      throw new Error("Cannot update follow-up date for a closed lead.");
+    }
+  }
 
   const previousFollowUpDate = lead.follow_up_date;
   const hasFollowUpDateUpdate = hasOwnValue(data, "follow_up_date");
@@ -641,7 +1348,30 @@ export const updatePixelEyeLead = async (
     getManualFollowUpScheduledAt(data.follow_up_date);
   }
 
+  if (hasOwnValue(data, "phone_number")) {
+    const normalizedPhoneNumber = normalizeLeadPhone(data.phone_number);
+    if (!normalizedPhoneNumber) {
+      throw new Error("Invalid phone number");
+    }
+
+    data.phone_number = normalizedPhoneNumber;
+    data.normalized_phone_number = normalizedPhoneNumber;
+  }
+
   let updateData = { ...data };
+  if (hasOwnValue(updateData, "status")) {
+    updateData.status = normalizePixelEyeMainStatus(updateData.status);
+  }
+  for (const dayField of DAY_FIELDS) {
+    if (hasOwnValue(updateData, dayField)) {
+      updateData[dayField] = normalizePixelEyeOutcomeStatus(
+        updateData[dayField],
+      );
+    }
+  }
+  if (hasOwnValue(updateData, "notes")) {
+    updateData.notes = normalizeLeadNotes(updateData.notes);
+  }
   if (hasOwnValue(updateData, "reason")) {
     delete updateData.reason;
   }
@@ -663,7 +1393,10 @@ export const updatePixelEyeLead = async (
       throw new Error("Invalid day field");
     }
 
-    updateData = { ...updateData, [dayField]: data.value };
+    updateData = {
+      ...updateData,
+      [dayField]: normalizePixelEyeOutcomeStatus(data.value),
+    };
     delete updateData.day;
     delete updateData.value;
   }
@@ -671,6 +1404,10 @@ export const updatePixelEyeLead = async (
   // Prevent tenant hijacking during update
   if (!tenantContext.isSuperAdmin) {
     delete updateData.client_id;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return lead;
   }
 
   assertDayUpdateAllowed(lead, updateData);
@@ -702,11 +1439,6 @@ export const updatePixelEyeLead = async (
       updatedLead,
       updatedLead.client_id,
       "update-terminal",
-    ).catch((err) =>
-      console.error(
-        `[PixelEye] processLeadStatus(update-terminal) failed for call_id=${updatedLead?.call_id}:`,
-        err?.message,
-      ),
     );
     return updatedLead;
   }
@@ -742,13 +1474,7 @@ export const updatePixelEyeLead = async (
     Object.prototype.hasOwnProperty.call(updateData, "status") &&
     updateData.status !== statusBefore
   ) {
-    await processLeadStatus(updatedLead, updatedLead.client_id, "update").catch(
-      (err) =>
-        console.error(
-          `[PixelEye] processLeadStatus(update) failed for call_id=${updatedLead?.call_id}:`,
-          err?.message,
-        ),
-    );
+    await processLeadStatus(updatedLead, updatedLead.client_id, "update");
   }
 
   // Trigger notification logic when a day field is manually updated.
@@ -763,11 +1489,6 @@ export const updatePixelEyeLead = async (
         updatedLead.client_id,
         dayNumber,
         updateData[dayField],
-      ).catch((err) =>
-        console.error(
-          `[PixelEye] processDayStatus(${dayField}) failed for call_id=${updatedLead?.call_id}:`,
-          err?.message,
-        ),
       );
       break; // Only one day field should change per API request
     }
@@ -776,34 +1497,482 @@ export const updatePixelEyeLead = async (
   return updatedLead;
 };
 
-export const deletePixelEyeLead = async (id, tenantContext) => {
-  const safeModel = tenantSafe(db.PixelEye, tenantContext);
-  const deleted = await safeModel.destroy({ where: { id } });
-
-  if (!deleted) throw new Error("Lead not found or unauthorized");
-  return true;
-};
-
-export const markPixelEyeFollowUpHandled = async (
+export const applyPixelEyeFollowUpOutcome = async (
   id,
+  status,
   tenantContext,
-  reason,
+  transaction = null,
 ) => {
   const safeModel = tenantSafe(db.PixelEye, tenantContext);
-  const lead = await safeModel.findOne({ where: { id } });
+  const normalizedOutcomeStatus = normalizePixelEyeOutcomeStatus(status);
 
-  if (!lead) {
+  const runOutcomeUpdate = async (transactionContext) => {
+    const lead = await safeModel.findOne({
+      where: { id },
+      transaction: transactionContext,
+      lock: transactionContext.LOCK.UPDATE,
+    });
+
+    if (!lead) {
+      throw new Error("Lead not found or unauthorized");
+    }
+
+    const reminderState = await getLatestReminderStateForLead(lead, {
+      transaction,
+    });
+
+    if (
+      isTerminalPixelEyeLeadValue(lead.status) ||
+      isTerminalPixelEyeLeadValue(getLatestFollowUpDayValue(lead)) ||
+      isClosedFollowUpFlowState(reminderState) ||
+      hasAllFollowUpDaysFilled(lead)
+    ) {
+      throw new Error("Outcome flow is already completed.");
+    }
+
+    const nextDayIndex = DAY_FIELDS.findIndex((field) => isBlank(lead[field]));
+    if (nextDayIndex === -1) {
+      throw new Error("Outcome flow is already completed.");
+    }
+
+    const updatedDay = DAY_FIELDS[nextDayIndex];
+    const nextDayNumber = nextDayIndex + 1;
+    const allowedStatuses = getAllowedStatusesForDay(nextDayNumber);
+
+    if (!allowedStatuses.includes(normalizedOutcomeStatus)) {
+      throw new Error(
+        `Selected status is not allowed for Day ${nextDayNumber}.`,
+      );
+    }
+
+    assertDayUpdateAllowed(
+      lead,
+      { [updatedDay]: normalizedOutcomeStatus },
+      {
+        allowTerminalLeadStatus: true,
+      },
+    );
+
+    const updatedLead = await lead.update(
+      { [updatedDay]: normalizedOutcomeStatus },
+      { transaction: transactionContext },
+    );
+
+    return {
+      lead: updatedLead,
+      updatedDay,
+      dayNumber: nextDayNumber,
+    };
+  };
+
+  if (transaction) {
+    return await runOutcomeUpdate(transaction);
+  }
+
+  return await db.sequelize.transaction(runOutcomeUpdate);
+};
+
+export const updatePixelEyeFollowUpOutcome = async (
+  id,
+  status,
+  tenantContext,
+) => {
+  const safeModel = tenantSafe(db.PixelEye, tenantContext);
+  const leadBefore = await safeModel.findOne({ where: { id } });
+  if (!leadBefore) {
     throw new Error("Lead not found or unauthorized");
   }
 
-  const handledState = await markFollowUpReminderHandled(lead, {
-    clientId: lead.client_id,
-    callId: lead.call_id,
-    reason,
+  const clientId = leadBefore.client_id;
+  const callId = leadBefore.call_id;
+  const oldFollowUpDate = leadBefore?.follow_up_date ?? null;
+  const nextDayIndex = DAY_FIELDS.findIndex((field) =>
+    isBlank(leadBefore[field]),
+  );
+  const dayField = nextDayIndex >= 0 ? DAY_FIELDS[nextDayIndex] : null;
+  const oldDayValue = dayField ? (leadBefore?.[dayField] ?? null) : null;
+
+  // Capture previous reminder snapshot
+  const prevReminder = await db.PixelEyeLeadState.findOne({
+    where: {
+      client_id: clientId,
+      ...(leadBefore.id ? { lead_id: leadBefore.id } : {}),
+      ...(callId ? { call_id: callId } : {}),
+    },
+    order: [
+      ["updatedAt", "DESC"],
+      ["createdAt", "DESC"],
+    ],
   });
 
-  return {
-    lead,
-    reminderState: handledState,
+  const prevReminderSnapshot = prevReminder
+    ? {
+        id: prevReminder.id,
+        state: prevReminder.state,
+        schedule_type: prevReminder.schedule_type,
+        scheduled_at: prevReminder.scheduled_at,
+        notification_sent: prevReminder.notification_sent,
+        completion_source: prevReminder.completion_source,
+        current_day: prevReminder.current_day,
+        permanently_closed: prevReminder.permanently_closed,
+      }
+    : null;
+
+  // Capture previous compliance rows
+  const prevComplianceRows = await db.PixelEyeFollowUpCallCompliance.findAll({
+    where: {
+      client_id: clientId,
+      ...(leadBefore.id ? { lead_id: leadBefore.id } : {}),
+      ...(callId ? { call_id: callId } : {}),
+    },
+    order: [
+      ["updatedAt", "DESC"],
+      ["createdAt", "DESC"],
+    ],
+  });
+
+  const prevCompliance = (prevComplianceRows || []).map((r) => ({
+    id: r.id,
+    compliance_status: r.compliance_status,
+    scheduled_follow_up_at: r.scheduled_follow_up_at,
+    allowed_until: r.allowed_until,
+  }));
+
+  const normalizedStatus = normalizePixelEyeOutcomeStatus(status);
+  const outcome = await applyPixelEyeFollowUpOutcome(
+    id,
+    normalizedStatus,
+    tenantContext,
+  );
+  const resolvedDayField =
+    dayField || outcome.updatedDay || `day_${outcome.dayNumber}`;
+
+  // Apply outcome and process scheduling (override manual reminder)
+  await processDayStatus(
+    outcome.lead,
+    outcome.lead.client_id,
+    outcome.dayNumber,
+    normalizedStatus,
+    { source: "FOLLOW_UP_OUTCOME", overrideManualReminder: true },
+  );
+
+  // Resolve pending compliance for this lead so it will not become MISSED later.
+  try {
+    await cancelPendingFollowUpComplianceForLead({
+      client_id: outcome.lead.client_id,
+      lead_id: outcome.lead.id,
+      reason: "Resolved by manual follow-up outcome update",
+      source: "FOLLOW_UP_OUTCOME",
+    });
+  } catch (err) {
+    console.error(
+      "Failed to cancel pending follow-up compliance:",
+      err?.message || err,
+    );
+  }
+
+  // Refresh lead and capture new values
+  let updatedLead = await db.PixelEye.findOne({
+    where: { id: outcome.lead.id },
+  });
+
+  await markNormalLeadAttentionResolved(updatedLead, normalizedStatus);
+
+  if (!isBlank(oldFollowUpDate) && !isBlank(updatedLead?.follow_up_date)) {
+    updatedLead = await updatedLead.update({ follow_up_date: null });
+  }
+
+  const newFollowUpDate = updatedLead?.follow_up_date ?? null;
+  const newDayValue = updatedLead?.[resolvedDayField] ?? null;
+
+  // New reminder snapshot
+  const newReminder = await db.PixelEyeLeadState.findOne({
+    where: {
+      client_id: clientId,
+      ...(updatedLead?.id ? { lead_id: updatedLead.id } : {}),
+      ...(callId ? { call_id: callId } : {}),
+    },
+    order: [
+      ["updatedAt", "DESC"],
+      ["createdAt", "DESC"],
+    ],
+  });
+
+  const newReminderSnapshot = newReminder
+    ? {
+        id: newReminder.id,
+        state: newReminder.state,
+        schedule_type: newReminder.schedule_type,
+        scheduled_at: newReminder.scheduled_at,
+        notification_sent: newReminder.notification_sent,
+        completion_source: newReminder.completion_source,
+        current_day: newReminder.current_day,
+        permanently_closed: newReminder.permanently_closed,
+      }
+    : null;
+
+  const newComplianceRows = await db.PixelEyeFollowUpCallCompliance.findAll({
+    where: {
+      client_id: clientId,
+      ...(updatedLead?.id ? { lead_id: updatedLead.id } : {}),
+      ...(callId ? { call_id: callId } : {}),
+    },
+    order: [
+      ["updatedAt", "DESC"],
+      ["createdAt", "DESC"],
+    ],
+  });
+
+  const newCompliance = (newComplianceRows || []).map((r) => ({
+    id: r.id,
+    compliance_status: r.compliance_status,
+    scheduled_follow_up_at: r.scheduled_follow_up_at,
+    allowed_until: r.allowed_until,
+    reason: r.reason || null,
+  }));
+
+  // Build metadata
+  const metadata = {
+    action: "OUTCOME_APPLIED",
+    day_field: resolvedDayField,
+    outcome_status: normalizedStatus,
+    old_day_value: oldDayValue ?? null,
+    new_day_value: newDayValue ?? null,
+    old_follow_up_date: oldFollowUpDate ?? null,
+    new_follow_up_date: newFollowUpDate ?? null,
+    follow_up_date_cleared_reason:
+      "Resolved by manual follow-up outcome update",
+    prev_reminder: prevReminderSnapshot,
+    new_reminder: newReminderSnapshot,
+    prev_compliance: prevCompliance,
+    new_compliance: newCompliance,
   };
+
+  // If follow_up_date existed before, clear it and write CLEARED with metadata
+  if (!isBlank(oldFollowUpDate)) {
+    await createFollowUpHistoryEntry({
+      client_id: updatedLead.client_id,
+      lead_id: updatedLead.id,
+      call_id: updatedLead.call_id,
+      phone_number: updatedLead.phone_number,
+      customer_name: updatedLead.customer_name,
+      old_follow_up_date: oldFollowUpDate,
+      new_follow_up_date: null,
+      change_type: "CLEARED",
+      source: "SYSTEM",
+      reason: "Follow-up outcome updated",
+      metadata,
+    });
+  } else {
+    // No follow_up_date to clear ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â write a metadata-bearing UPDATED entry once
+    await createFollowUpHistoryEntry({
+      client_id: updatedLead.client_id,
+      lead_id: updatedLead.id,
+      call_id: updatedLead.call_id,
+      phone_number: updatedLead.phone_number,
+      customer_name: updatedLead.customer_name,
+      old_follow_up_date: oldFollowUpDate,
+      new_follow_up_date: newFollowUpDate,
+      change_type: "UPDATED",
+      source: "SYSTEM",
+      reason: "Follow-up outcome applied",
+      metadata,
+    });
+  }
+
+  return {
+    lead: updatedLead,
+    updated_day: outcome.updatedDay,
+    status: normalizedStatus,
+  };
+};
+
+const buildManualCreateDuplicateMetadataUpdate = (data = {}) => {
+  const allowedMetadataFields = [
+    "customer_name",
+    "agent_name",
+    "source",
+    "type_of_enquiry",
+    "notes",
+  ];
+  const updateData = {};
+
+  for (const field of allowedMetadataFields) {
+    if (!hasOwnValue(data, field)) {
+      continue;
+    }
+
+    updateData[field] =
+      field === "notes" ? normalizeLeadNotes(data[field]) : data[field];
+  }
+
+  return updateData;
+};
+
+const buildManualFollowUpSignalMetadataUpdate = (data = {}) => {
+  const allowedMetadataFields = [
+    "customer_name",
+    "source",
+    "type_of_enquiry",
+    "notes",
+  ];
+  const updateData = {};
+
+  for (const field of allowedMetadataFields) {
+    if (!hasOwnValue(data, field)) {
+      continue;
+    }
+
+    updateData[field] =
+      field === "notes" ? normalizeLeadNotes(data[field]) : data[field];
+  }
+
+  return updateData;
+};
+
+const isManualFollowUpSignalLead = async (lead) => {
+  if (!lead?.id || isBlank(lead.follow_up_date)) {
+    return false;
+  }
+
+  return await isPixelEyeLeadActive(lead);
+};
+
+const markManualFollowUpSignalCompliance = async (lead, data = {}) => {
+  const statusText = String(data.status || "").trim();
+  const reason = statusText
+    ? `Manual same-phone follow-up signal received: ${statusText}`
+    : "Manual same-phone follow-up signal received";
+
+  let compliance = await markPendingFollowUpComplianceCalledForLead({
+    client_id: lead.client_id,
+    lead_id: lead.id,
+    follow_up_date: lead.follow_up_date,
+    reason,
+    source: "FRONTEND",
+  });
+
+  if (!compliance && !isBlank(lead.follow_up_date)) {
+    const pendingCompliance = await createOrUpdatePendingFollowUpCompliance({
+      client_id: lead.client_id,
+      lead_id: lead.id,
+      call_id: lead.call_id,
+      phone_number: lead.phone_number,
+      customer_name: lead.customer_name,
+      agent_name: lead.agent_name,
+      follow_up_date: lead.follow_up_date,
+      source: "FRONTEND",
+      reason: "Pending follow-up call check from manual same-phone signal",
+    });
+
+    if (pendingCompliance) {
+      compliance = await markPendingFollowUpComplianceCalledForLead({
+        client_id: lead.client_id,
+        lead_id: lead.id,
+        follow_up_date: lead.follow_up_date,
+        reason,
+        source: "FRONTEND",
+      });
+    }
+  }
+
+  return compliance;
+};
+
+export const continuePixelEyeLeadFromManualCreate = async (
+  lead,
+  data = {},
+  tenantContext,
+) => {
+  if (!lead?.id) {
+    throw new Error("Lead not found or unauthorized");
+  }
+
+  const metadataUpdate = (await isManualFollowUpSignalLead(lead))
+    ? buildManualFollowUpSignalMetadataUpdate(data)
+    : buildManualCreateDuplicateMetadataUpdate(data);
+
+  const updatedLead =
+    Object.keys(metadataUpdate).length > 0
+      ? await lead.update(metadataUpdate)
+      : lead;
+
+  await createManualSameNumberAttentionCallLog(updatedLead, data);
+
+  const enrichedLead = await getPixelEyeLead(updatedLead.id, tenantContext);
+
+  return {
+    lead: enrichedLead || updatedLead,
+    action: "same_number_outcome_pending",
+    result: "same_number_outcome_pending",
+    updated_day: null,
+    status: null,
+    normal_lead_attention_state: NORMAL_LEAD_ATTENTION_STATE,
+    normal_lead_attention_label: NORMAL_LEAD_ATTENTION_LABEL,
+    needs_manual_day_outcome: true,
+  };
+};
+
+export const deletePixelEyeLead = async (id, tenantContext) => {
+  const safePixelEye = tenantSafe(db.PixelEye, tenantContext);
+  // Use a transaction to keep related reminder state and compliance rows in sync.
+  return await db.sequelize.transaction(async (tx) => {
+    const lead = await safePixelEye.findOne({ where: { id }, transaction: tx });
+    if (!lead) throw new Error("Lead not found or unauthorized");
+
+    const clientId = lead.client_id;
+    const callId = lead.call_id;
+
+    // Remove any follow-up compliance rows linked to this lead (by lead_id) or call_id for this client
+    const safeCompliance = tenantSafe(
+      db.PixelEyeFollowUpCallCompliance,
+      tenantContext,
+    );
+    await safeCompliance.destroy({ where: { lead_id: id }, transaction: tx });
+
+    // Also remove any legacy/matched compliance rows referencing the call_id for this client
+    if (callId) {
+      await safeCompliance.destroy({
+        where: { client_id: clientId, call_id: callId },
+        transaction: tx,
+      });
+    }
+
+    // Remove any reminder state for this client+call
+    const safeState = tenantSafe(db.PixelEyeLeadState, tenantContext);
+    if (callId) {
+      await safeState.destroy({
+        where: { client_id: clientId, call_id: callId },
+        transaction: tx,
+      });
+    }
+
+    // Remove follow-up history entries for this lead or call (destructive purge)
+    const safeHistory = tenantSafe(db.PixelEyeFollowUpHistory, tenantContext);
+    await safeHistory.destroy({ where: { lead_id: id }, transaction: tx });
+    if (callId) {
+      await safeHistory.destroy({
+        where: { client_id: clientId, call_id: callId },
+        transaction: tx,
+      });
+    }
+
+    // Remove raw payloads for this lead (permissive purge)
+    const safeCallLog = tenantSafe(db.PixelEyeCallLog, tenantContext);
+    if (callId) {
+      await safeCallLog.destroy({
+        where: { client_id: clientId, call_id: callId },
+        transaction: tx,
+      });
+    }
+
+    // Finally remove the lead row
+    const deleted = await safePixelEye.destroy({
+      where: { id },
+      transaction: tx,
+    });
+    if (!deleted) throw new Error("Lead not found");
+
+    return true;
+  });
 };

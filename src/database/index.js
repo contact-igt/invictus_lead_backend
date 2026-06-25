@@ -50,12 +50,13 @@ db.PixelEyeCallLog = PixelEyeCallLogTable(Sequelize, sequelize);
 db.PixelEyeFollowUpCallCompliance = PixelEyeFollowUpCallComplianceTable(Sequelize, sequelize);
 db.VlsPropertyLaw = vlsPropertyLawTable(Sequelize, sequelize);
 db.VlsFamilyLaw = vlsFamilyLawTable(Sequelize, sequelize);
-db.PixelEye = PixelEyeTable(Sequelize, sequelize);
 
 const addClientId = (model) => {
   model.belongsTo(db.Client, { foreignKey: "client_id", as: "client" });
   db.Client.hasMany(model, { foreignKey: "client_id" });
 };
+
+
 
 addClientId(db.Management);
 addClientId(db.VlsLawPractice);

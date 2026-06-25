@@ -1,4 +1,5 @@
 import db from "../../database/index.js";
+import { normalizePixelEyePhoneNumber } from "./pixelEyePhoneNumber.js";
 
 const PIXELEYE_TIMEZONE = "Asia/Kolkata";
 
@@ -128,8 +129,7 @@ const buildDateTimeFromDateAndTime = (date, time) => {
 };
 
 export const normalizePhoneNumber = (phoneNumber) => {
-  const digits = String(phoneNumber || "").replace(/\D/g, "");
-  return digits || null;
+  return normalizePixelEyePhoneNumber(phoneNumber);
 };
 
 export const buildCallDateTime = ({ date, time, createdAt } = {}) => {
@@ -166,6 +166,53 @@ const toIntegerOrNull = (value) => {
   return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
 };
 
+const toDateOrNull = (value) => {
+  const parsed = parseDateValue(value);
+  return parsed ? new Date(parsed.getTime()) : null;
+};
+
+const hasExplicitValue = (data, key) => {
+  if (!Object.prototype.hasOwnProperty.call(data || {}, key)) {
+    return false;
+  }
+
+  const value = data[key];
+  return value !== undefined && value !== null && value !== "";
+};
+
+export const buildPixelEyeCallLogOutcomeMarkerPayload = (
+  data = {},
+  { includeNulls = false } = {},
+) => {
+  const payload = {};
+  const outcomeDayNumber = toIntegerOrNull(data.outcome_day_number);
+  const outcomeStatus = normalizeText(data.outcome_status) || null;
+  const outcomeAppliedAt = toDateOrNull(data.outcome_applied_at);
+
+  if (
+    includeNulls ||
+    (hasExplicitValue(data, "outcome_day_number") && outcomeDayNumber !== null)
+  ) {
+    payload.outcome_day_number = outcomeDayNumber;
+  }
+
+  if (
+    includeNulls ||
+    (hasExplicitValue(data, "outcome_status") && outcomeStatus !== null)
+  ) {
+    payload.outcome_status = outcomeStatus;
+  }
+
+  if (
+    includeNulls ||
+    (hasExplicitValue(data, "outcome_applied_at") && outcomeAppliedAt !== null)
+  ) {
+    payload.outcome_applied_at = outcomeAppliedAt;
+  }
+
+  return payload;
+};
+
 export const createPixelEyeCallLog = async (data = {}) => {
   try {
     const clientId = data.client_id ?? null;
@@ -188,11 +235,11 @@ export const createPixelEyeCallLog = async (data = {}) => {
       createdAt: data.createdAt ?? data.created_at,
     });
 
-    const payload = {
+    const basePayload = {
       client_id: clientId,
       lead_id: data.lead_id ?? null,
       call_id: callId,
-      phone_number: normalizeText(data.phone_number) || null,
+      phone_number: normalizedPhoneNumber,
       normalized_phone_number: normalizedPhoneNumber,
       customer_name: normalizeText(data.customer_name) || null,
       agent_name: normalizeText(data.agent_name) || null,
@@ -208,18 +255,38 @@ export const createPixelEyeCallLog = async (data = {}) => {
       disposition: normalizeText(data.disposition) || null,
     };
 
+    const createPayload = {
+      ...basePayload,
+      ...buildPixelEyeCallLogOutcomeMarkerPayload(data, {
+        includeNulls: true,
+      }),
+    };
+
     const existingLog = await db.PixelEyeCallLog.findOne({
       where: {
         client_id: clientId,
         call_id: callId,
       },
+      ...(data.transaction ? { transaction: data.transaction } : {}),
     });
 
     if (existingLog) {
-      return await existingLog.update(payload);
+      // Duplicate Runo webhooks often refresh the raw call log without outcome
+      // metadata. Never let that update clear the idempotency markers that keep
+      // a later duplicate from applying the same follow-up outcome again.
+      const updatePayload = {
+        ...basePayload,
+        ...buildPixelEyeCallLogOutcomeMarkerPayload(data),
+      };
+
+      return await existingLog.update(updatePayload, {
+        ...(data.transaction ? { transaction: data.transaction } : {}),
+      });
     }
 
-    return await db.PixelEyeCallLog.create(payload);
+    return await db.PixelEyeCallLog.create(createPayload, {
+      ...(data.transaction ? { transaction: data.transaction } : {}),
+    });
   } catch (err) {
     console.error(
       `[PixelEye Call Log] createPixelEyeCallLog failed: ${err?.message || err}`,

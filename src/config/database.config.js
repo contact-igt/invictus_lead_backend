@@ -1,6 +1,36 @@
-import dotenv from "dotenv";
+import { requireEnv } from "./env.config.js";
+import ServerEnvironmentConfig from "./server.config.js";
 
-dotenv.config();
+const databaseEnvNames = {
+  production: {
+    host: "DATABASE_PRO_HOST",
+    user: "DATABASE_PRO_USER",
+    password: "DATABASE_PRO_PASSWORD",
+    database: "DATABASE_PRO_DB",
+  },
+  development: {
+    host: "DATABASE_DEV_HOST",
+    user: "DATABASE_DEV_USER",
+    password: "DATABASE_DEV_PASSWORD",
+    database: "DATABASE_DEV_DB",
+  },
+  local: {
+    host: "DATABASE_HOST",
+    user: "DATABASE_USER",
+    password: "DATABASE_PASSWORD",
+    database: "DATABASE_DB",
+  },
+};
+
+const activeDatabaseEnvNames =
+  databaseEnvNames[ServerEnvironmentConfig.server.line];
+
+Object.entries(activeDatabaseEnvNames).forEach(([field, envName]) => {
+  requireEnv(envName, {
+    allowEmpty:
+      ServerEnvironmentConfig.server.line === "local" && field === "password",
+  });
+});
 
 const DatabaseEnvironmentConfig = {
   live: {
