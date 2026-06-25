@@ -1,49 +1,7 @@
 import Joi from "joi";
+import { normalizePixelEyeMainStatus } from "../../modules/pixelEye/pixelEyeStatusPolicy.js";
 
 const RUNO_TIMEZONE = "Asia/Kolkata";
-
-const STATUS_VALUES = [
-  "Busy",
-  "Not Answering",
-  "Switched Off",
-  "Missed Call",
-  "On Another Call",
-  "DND",
-  "Dnp 1",
-  "Dnp 2",
-  "Dnp 3",
-  "Dnp 4",
-  "Not Speaking",
-  "Disconnecting",
-  "Not in Network",
-  "Incoming Call Not Available",
-  "Number Not in Service",
-  "Wrong Number",
-  "Wrongly Dialed",
-  "Fraud Call",
-  "Enquiry",
-  "Hot Follow-up",
-  "Follow-up Required",
-  "Will Call Later",
-  "Will Call & Take Appointment Later",
-  "Medicine",
-  "Doctor Time",
-  "Follow-up Post Appointment",
-  "Want to Speak With Doctor",
-  "Appointment Fixed",
-  "Appointment Cancelled",
-  "Visited",
-  "Walk-in",
-  "Not Interested",
-  "Not Willing to Come Now",
-  "Searching for Specific Hospital",
-  "Going to Other Hospital",
-  "Not in Hyderabad",
-  "Long Distance",
-  "Address Requested",
-  "Closed",
-  "Others",
-];
 
 const nullableString = Joi.string().trim().allow(null, "");
 
@@ -122,6 +80,29 @@ const toStringOrUndefined = (value) => {
   return String(value).trim();
 };
 
+const getNormalizedCallId = (body, envelope) => {
+  return toStringOrUndefined(
+    getFirstValue(envelope, ["call_id", "callId", "call_Id"]) ||
+      getFirstValue(body, ["call_id", "callId", "call_Id"]),
+  );
+};
+
+const logWebhookValidationShape = (body, envelope, normalizedCallId) => {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+
+  console.debug("[PixelEyeWebhookValidation] received keys", {
+    bodyKeys: Object.keys(body || {}),
+    payloadKeys:
+      envelope && envelope !== body && typeof envelope === "object"
+        ? Object.keys(envelope)
+        : [],
+    hasNormalizedCallId: Boolean(normalizedCallId),
+    normalizedCallId: normalizedCallId || null,
+  });
+};
+
 const normalizeWebhookPayload = (body) => {
   const envelope =
     body?.payload && typeof body.payload === "object"
@@ -147,9 +128,7 @@ const normalizeWebhookPayload = (body) => {
           getFirstValue(envelope, ["_client_key", "client_key"]),
       ) || undefined,
     payload: {
-      call_id: toStringOrUndefined(
-        getFirstValue(envelope, ["call_id", "callId", "call_Id"]),
-      ),
+      call_id: getNormalizedCallId(body, envelope),
       customer_name: toStringOrUndefined(
         getFirstValue(envelope, ["customerName", "customer_name"]),
       ),
@@ -167,12 +146,18 @@ const normalizeWebhookPayload = (body) => {
       time:
         toStringOrUndefined(getFirstValue(envelope, ["time"])) || split?.time,
       status:
-        toStringOrUndefined(getFirstValue(envelope, ["status"])) || "Enquiry",
+        normalizePixelEyeMainStatus(
+          toStringOrUndefined(getFirstValue(envelope, ["status"])),
+        ) || "Enquiry",
       type_of_enquiry: toStringOrUndefined(
         getFirstValue(envelope, ["typeOfEnquiry", "type_of_enquiry"]),
       ),
       follow_up_date: toStringOrUndefined(
-        getFirstValue(envelope, ["followUpDate", "follow_up_date", "followup_date"]),
+        getFirstValue(envelope, [
+          "followUpDate",
+          "follow_up_date",
+          "followup_date",
+        ]),
       ),
       source:
         toStringOrUndefined(getFirstValue(envelope, ["source"])) || "Runo",
@@ -193,9 +178,7 @@ const webhookPayloadSchema = Joi.object({
     agent_name: nullableString.optional(),
     date: Joi.string().trim().required(),
     time: Joi.string().trim().required(),
-    status: Joi.string()
-      .valid(...STATUS_VALUES)
-      .required(),
+    status: Joi.string().trim().required(),
     type_of_enquiry: nullableString.optional(),
     follow_up_date: nullableString.optional(),
     source: nullableString.optional(),
@@ -218,10 +201,40 @@ export const validatePixelEyeWebhookPayload = async (req, res, next) => {
       details: ["Request body must be a JSON object"],
     };
 
+    console.error("[PixelEyeWebhookAPI][ERROR] validation failed", {
+      reason: "Request body must be a JSON object",
+    });
+
     return res.status(400).json(responsePayload);
   }
 
   const normalized = normalizeWebhookPayload(req.body);
+  const envelope =
+    req.body?.payload && typeof req.body.payload === "object"
+      ? req.body.payload
+      : req.body?.data && typeof req.body.data === "object"
+        ? req.body.data
+        : req.body;
+
+  logWebhookValidationShape(req.body, envelope, normalized?.payload?.call_id);
+
+  if (!normalized?.payload?.call_id) {
+    console.error("[PixelEyeWebhookAPI][ERROR] validation failed", {
+      reason: "call_id/callId is required.",
+      bodyKeys: Object.keys(req.body || {}),
+      payloadKeys:
+        envelope && envelope !== req.body && typeof envelope === "object"
+          ? Object.keys(envelope)
+          : [],
+    });
+
+    return res.status(400).json({
+      success: false,
+      message: "Malformed payload",
+      details: ["call_id/callId is required."],
+    });
+  }
+
   const { error, value } = webhookPayloadSchema.validate(normalized, {
     abortEarly: false,
     stripUnknown: true,
@@ -230,12 +243,22 @@ export const validatePixelEyeWebhookPayload = async (req, res, next) => {
   if (error) {
     const responsePayload = buildValidationErrorResponse(error);
 
+    console.error("[PixelEyeWebhookAPI][ERROR] validation failed", {
+      call_id: normalized?.payload?.call_id || null,
+      details: responsePayload.details,
+    });
+
     return res.status(400).json(responsePayload);
   }
 
   req.webhookPayload = value._client_key
     ? { ...value.payload, _client_key: value._client_key }
     : value.payload;
+
+  console.log("[PixelEyeWebhookAPI][SUCCESS] validation passed", {
+    call_id: req.webhookPayload.call_id,
+    client_key: req.webhookPayload._client_key || null,
+  });
 
   return next();
 };

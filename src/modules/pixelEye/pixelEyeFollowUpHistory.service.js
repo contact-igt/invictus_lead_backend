@@ -1,5 +1,6 @@
 import { Op, fn, col } from "sequelize";
 import db from "../../database/index.js";
+import { normalizePixelEyePhoneNumber } from "./pixelEyePhoneNumber.js";
 import {
   PIXEL_EYE_FOLLOW_UP_HISTORY_CHANGE_TYPES,
   PIXEL_EYE_FOLLOW_UP_HISTORY_SOURCE_TYPES,
@@ -10,7 +11,22 @@ const DEFAULT_SOURCE = "SYSTEM";
 
 const normalizeText = (value) => String(value || "").trim();
 
-const isBlank = (value) => value === null || value === undefined || String(value).trim() === "";
+const isBlank = (value) =>
+  value === null || value === undefined || String(value).trim() === "";
+
+const isOutcomeAppliedMetadata = (metadata) =>
+  Boolean(
+    metadata &&
+    typeof metadata === "object" &&
+    String(metadata.action || "").trim() === "OUTCOME_APPLIED",
+  );
+
+const isFollowUpCancelledMetadata = (metadata) =>
+  Boolean(
+    metadata &&
+    typeof metadata === "object" &&
+    String(metadata.action || "").trim() === "FOLLOW_UP_CANCELLED",
+  );
 
 const buildClientCallHistoryKey = (clientId, callId) =>
   `${clientId}:${normalizeText(callId)}`;
@@ -88,15 +104,27 @@ const logHistoryError = (fnName, err, context = {}) => {
 const buildBaseWhere = ({ client_id, lead_id, call_id }) => {
   const where = {};
 
-  if (client_id !== undefined && client_id !== null && String(client_id).trim() !== "") {
+  if (
+    client_id !== undefined &&
+    client_id !== null &&
+    String(client_id).trim() !== ""
+  ) {
     where.client_id = client_id;
   }
 
-  if (lead_id !== undefined && lead_id !== null && String(lead_id).trim() !== "") {
+  if (
+    lead_id !== undefined &&
+    lead_id !== null &&
+    String(lead_id).trim() !== ""
+  ) {
     where.lead_id = lead_id;
   }
 
-  if (call_id !== undefined && call_id !== null && String(call_id).trim() !== "") {
+  if (
+    call_id !== undefined &&
+    call_id !== null &&
+    String(call_id).trim() !== ""
+  ) {
     where.call_id = String(call_id).trim();
   }
 
@@ -113,12 +141,18 @@ export const createFollowUpHistoryEntry = async (data = {}) => {
   try {
     const hasOldValue = !isBlank(data.old_follow_up_date);
     const hasNewValue = !isBlank(data.new_follow_up_date);
+    const allowMetadataOnly =
+      isOutcomeAppliedMetadata(data.metadata) ||
+      isFollowUpCancelledMetadata(data.metadata);
 
-    if (!hasOldValue && !hasNewValue) {
+    if (!hasOldValue && !hasNewValue && !allowMetadataOnly) {
       return null;
     }
 
-    if (isSameFollowUpValue(data.old_follow_up_date, data.new_follow_up_date)) {
+    if (
+      isSameFollowUpValue(data.old_follow_up_date, data.new_follow_up_date) &&
+      !allowMetadataOnly
+    ) {
       return null;
     }
 
@@ -137,21 +171,31 @@ export const createFollowUpHistoryEntry = async (data = {}) => {
       client_id: data.client_id,
       lead_id: data.lead_id,
       call_id: normalizeText(data.call_id),
-      phone_number: isBlank(data.phone_number) ? null : normalizeText(data.phone_number),
-      customer_name: isBlank(data.customer_name) ? null : normalizeText(data.customer_name),
+      phone_number: normalizePixelEyePhoneNumber(data.phone_number),
+      customer_name: isBlank(data.customer_name)
+        ? null
+        : normalizeText(data.customer_name),
       old_follow_up_date: hasOldValue ? data.old_follow_up_date : null,
       new_follow_up_date: hasNewValue ? data.new_follow_up_date : null,
+      metadata: data.metadata ?? null,
       change_type: changeType,
       reason: isBlank(data.reason) ? null : normalizeText(data.reason),
       changed_by_user_id:
-        data.changed_by_user_id === undefined || data.changed_by_user_id === null || String(data.changed_by_user_id).trim() === ""
+        data.changed_by_user_id === undefined ||
+        data.changed_by_user_id === null ||
+        String(data.changed_by_user_id).trim() === ""
           ? null
           : data.changed_by_user_id,
-      changed_by_name: isBlank(data.changed_by_name) ? null : normalizeText(data.changed_by_name),
+      changed_by_name: isBlank(data.changed_by_name)
+        ? null
+        : normalizeText(data.changed_by_name),
       source,
     };
 
-    return await db.PixelEyeFollowUpHistory.create(payload);
+    return await db.PixelEyeFollowUpHistory.create(
+      payload,
+      data.transaction ? { transaction: data.transaction } : undefined,
+    );
   } catch (err) {
     logHistoryError("createFollowUpHistoryEntry", err, context);
     return null;
@@ -167,11 +211,19 @@ export const getFollowUpHistoryForLead = async ({
     const where = buildBaseWhere({ client_id });
     const filters = [];
 
-    if (lead_id !== undefined && lead_id !== null && String(lead_id).trim() !== "") {
+    if (
+      lead_id !== undefined &&
+      lead_id !== null &&
+      String(lead_id).trim() !== ""
+    ) {
       filters.push({ lead_id });
     }
 
-    if (call_id !== undefined && call_id !== null && String(call_id).trim() !== "") {
+    if (
+      call_id !== undefined &&
+      call_id !== null &&
+      String(call_id).trim() !== ""
+    ) {
       filters.push({ call_id: String(call_id).trim() });
     }
 
@@ -187,7 +239,11 @@ export const getFollowUpHistoryForLead = async ({
       ],
     });
   } catch (err) {
-    logHistoryError("getFollowUpHistoryForLead", err, { client_id, lead_id, call_id });
+    logHistoryError("getFollowUpHistoryForLead", err, {
+      client_id,
+      lead_id,
+      call_id,
+    });
     return [];
   }
 };
@@ -290,7 +346,10 @@ export const getFollowUpChangeSummaryForLead = (summaryMap, lead) => {
     return null;
   }
 
-  return summaryMap.get(buildClientCallHistoryKey(lead.client_id, lead.call_id)) || null;
+  return (
+    summaryMap.get(buildClientCallHistoryKey(lead.client_id, lead.call_id)) ||
+    null
+  );
 };
 
 export {

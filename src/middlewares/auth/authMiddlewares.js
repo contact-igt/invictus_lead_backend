@@ -51,13 +51,27 @@ const authenticateToken = (req, res, next) => {
   if (!token) {
     return res.status(401).json({ message: "Unauthorized" });
   }
-  jwt.verify(token, ServerEnvironmentConfig.jwt_key, (err, user) => {
-    if (err) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
-    req.user = user;
+  try {
+    const decoded = jwt.verify(token, ServerEnvironmentConfig.jwt_key);
+    req.user = decoded;
     next();
-  });
+  } catch (err) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+};
+
+const authorizeManagementRole = (req, res, next) => {
+  const role = req.user?.role?.toLowerCase();
+  // Role based access flow: super-admin, admin, and client (tenant managers)
+  // are all authorized to perform management actions like deleting leads.
+  const allowedRoles = ["super-admin", "admin", "client"];
+  if (!allowedRoles.includes(role)) {
+    return res.status(403).json({
+      message: "You don't have permission to manage this resource",
+    });
+  }
+
+  next();
 };
 
 // super admin token auth
@@ -81,7 +95,7 @@ const authenticateSuperAdminToken = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (err) {
-    return res.status(403).json({ message: "Unauthorized" });
+    return res.status(401).json({ message: "Unauthorized" });
   }
 };
 
@@ -106,7 +120,7 @@ const authenticateManagementToken = async (req, res, next) => {
     req.user = decoded;
     next();
   } catch (err) {
-    return res.status(403).json({ message: "Unauthorized" });
+    return res.status(401).json({ message: "Unauthorized" });
   }
 };
 
@@ -114,6 +128,7 @@ export {
   generateAccessToken,
   generateRefreshToken,
   authenticateToken,
+  authorizeManagementRole,
   authenticateManagementToken,
   authenticateSuperAdminToken,
 };

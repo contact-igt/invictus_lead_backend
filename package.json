@@ -9,7 +9,9 @@
     "seed:pixelEye": "node src/scripts/seedpixeleye.js",
     "db:drop": "node src/scripts/dropTables.js",
     "db:truncate": "node src/scripts/truncateTables.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:pixeleye-followup": "node src/scripts/integration/pixeleye_followup_integration_test.js",
+    "test:pixeleye-followup-outcome-metadata": "node src/scripts/integration/verifyPixelEyeFollowUpOutcomeMetadata.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

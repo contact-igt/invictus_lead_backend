@@ -1,8 +1,19 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { loginController } from "./auth.controller.js";
 
 const router = express.Router();
 
-router.post("/login", loginController);
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Too many authentication attempts. Please try again later.",
+  },
+});
+
+router.post("/login", authLimiter, loginController);
 
 export default router;

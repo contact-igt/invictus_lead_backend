@@ -1,9 +1,6 @@
 import { tableName } from "../tableName.js";
 
-export const PIXEL_EYE_CALL_LOG_SOURCE_VALUES = [
-  "RUNO_WEBHOOK",
-  "SYSTEM",
-];
+export const PIXEL_EYE_CALL_LOG_SOURCE_VALUES = ["RUNO_WEBHOOK", "SYSTEM"];
 
 const buildCommonAttributes = (Sequelize, sequelize) => ({
   id: {
@@ -80,6 +77,18 @@ const buildCommonAttributes = (Sequelize, sequelize) => ({
     type: Sequelize.STRING,
     allowNull: true,
   },
+  outcome_day_number: {
+    type: Sequelize.INTEGER,
+    allowNull: true,
+  },
+  outcome_status: {
+    type: Sequelize.STRING,
+    allowNull: true,
+  },
+  outcome_applied_at: {
+    type: Sequelize.DATE,
+    allowNull: true,
+  },
   createdAt: {
     type: "TIMESTAMP",
     defaultValue: sequelize.literal("CURRENT_TIMESTAMP"),
@@ -94,7 +103,10 @@ const buildCommonAttributes = (Sequelize, sequelize) => ({
   },
 });
 
-export const buildPixelEyeCallLogCreateTableDefinition = (Sequelize, sequelize) => {
+export const buildPixelEyeCallLogCreateTableDefinition = (
+  Sequelize,
+  sequelize,
+) => {
   const attributes = buildCommonAttributes(Sequelize, sequelize);
 
   return {
@@ -116,6 +128,9 @@ export const buildPixelEyeCallLogCreateTableDefinition = (Sequelize, sequelize) 
     duration_seconds: attributes.duration_seconds,
     recording_url: attributes.recording_url,
     disposition: attributes.disposition,
+    outcome_day_number: attributes.outcome_day_number,
+    outcome_status: attributes.outcome_status,
+    outcome_applied_at: attributes.outcome_applied_at,
     created_at: attributes.createdAt,
     updated_at: attributes.updatedAt,
   };
