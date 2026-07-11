@@ -6,9 +6,21 @@ export const tableName = {
   VLSLAWAIBE: "vls_aibes",
   VLSLAWPROPERTY: "vls_property_laws",
   VLSLAWFAMILY: "vls_family_laws",
+  VLS_MACT_MASTER_CLASS: "vls_mact_master_class_leads",
   PIXELEYE: "pixel_eyes",
+  PIXELEYE_WEBSITE_LEADS: "pixel_eye_website_leads",
   PIXELEYE_LEAD_STATE: "pixel_eye_lead_states",
   PIXELEYE_FOLLOW_UP_HISTORY: "pixel_eye_follow_up_history",
   PIXELEYE_CALL_LOGS: "pixel_eye_call_logs",
   PIXELEYE_FOLLOW_UP_CALL_COMPLIANCE: "pixel_eye_follow_up_call_compliance",
+  AARAV_EYE_CARE: "aarav_eye_care_leads",
+  ANTARDRASHTI_NETRALAYA: "antardrashti_netralaya_leads",
+  RIO: "rio_leads",
 };
+
+
+
+
+
+
+

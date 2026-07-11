@@ -1,4 +1,4 @@
-import express from "express";
+﻿import express from "express";
 import {
   getClients,
   getClientById,
@@ -10,6 +10,7 @@ import { authenticateSuperAdminToken } from "../../middlewares/auth/authMiddlewa
 import {
   validateCreateClient,
   validateUpdateClient,
+  validateClientId,
 } from "../../middlewares/validation/clientValidation.js";
 
 const router = express.Router();
@@ -17,9 +18,11 @@ const router = express.Router();
 router.use(authenticateSuperAdminToken);
 
 router.get("/", getClients);
-router.get("/:id", getClientById);
+router.get("/:id", validateClientId, getClientById);
 router.post("/", validateCreateClient, createClientRecord);
-router.patch("/:id", validateUpdateClient, updateClientRecord);
-router.delete("/:id", deleteClientRecord);
+router.patch("/:id", validateClientId, validateUpdateClient, updateClientRecord);
+router.delete("/:id", validateClientId, deleteClientRecord);
 
 export default router;
+
+

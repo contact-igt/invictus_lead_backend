@@ -1,4 +1,4 @@
-import express from "express";
+﻿import express from "express";
 import {
   getUsers,
   getUser,
@@ -11,6 +11,7 @@ import { attachTenantContext } from "../../middlewares/auth/tenantMiddleware.js"
 import {
   validateCreateUser,
   validateUpdateUser,
+  validateUserId,
 } from "../../middlewares/validation/usersValidation.js";
 
 const router = express.Router();
@@ -19,9 +20,11 @@ router.use(authenticateManagementToken);
 router.use(attachTenantContext);
 
 router.get("/", getUsers);
-router.get("/:id", getUser);
+router.get("/:id", validateUserId, getUser);
 router.post("/", validateCreateUser, createUserHandler);
-router.patch("/:id", validateUpdateUser, updateUserHandler);
-router.delete("/:id", deleteUserHandler);
+router.patch("/:id", validateUserId, validateUpdateUser, updateUserHandler);
+router.delete("/:id", validateUserId, deleteUserHandler);
 
 export default router;
+
+

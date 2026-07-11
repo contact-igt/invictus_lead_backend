@@ -10,6 +10,7 @@ import {
 import { resolvePublicTenant } from "../../../middlewares/auth/publicTenantMiddleware.js";
 import { authenticateToken } from "../../../middlewares/auth/authMiddlewares.js";
 import { attachTenantContext } from "../../../middlewares/auth/tenantMiddleware.js";
+import { scopeSuperAdminToClient } from "../../../middlewares/auth/clientContextMiddleware.js";
 import { validateFamilyLawRegistration } from "../../../middlewares/validation/familyLawValidation.js";
 
 const router = express.Router();
@@ -23,10 +24,11 @@ router.post(
 );
 
 // Protected: Admin CRUD
-router.get("/", authenticateToken, attachTenantContext, getFamilyLawHandler);
-router.get("/:id", authenticateToken, attachTenantContext, getFamilyLawByIdHandler);
-router.post("/", authenticateToken, attachTenantContext, validateFamilyLawRegistration, createFamilyLawAdminHandler);
-router.patch("/:id", authenticateToken, attachTenantContext, updateFamilyLawHandler);
-router.delete("/:id", authenticateToken, attachTenantContext, deleteFamilyLawHandler);
+router.use(authenticateToken, attachTenantContext, scopeSuperAdminToClient("vls_law"));
+router.get("/", getFamilyLawHandler);
+router.get("/:id", getFamilyLawByIdHandler);
+router.post("/", validateFamilyLawRegistration, createFamilyLawAdminHandler);
+router.patch("/:id", updateFamilyLawHandler);
+router.delete("/:id", deleteFamilyLawHandler);
 
 export default router;

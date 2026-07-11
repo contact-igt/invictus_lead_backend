@@ -1,52 +1,11 @@
-import db from "../../database/index.js";
 import { tenantSafe } from "../../utils/tenantContext.js";
-import { Op } from "sequelize";
 import {
-  extractClientModuleKey,
-  normalizeClientKey,
-} from "../../utils/clientKey.js";
+  resolveClientId,
+  resolveScopedTenant,
+} from "../../utils/resolveClientContext.js";
 import { getDynamicModel } from "./modelRegistry.js";
 
-const resolveClientIdFromKey = async (clientKeyRaw) => {
-  const clientKey = normalizeClientKey(clientKeyRaw);
-  if (!clientKey) return null;
-
-  const exactClient = await db.Client.findOne({
-    where: { client_key: clientKey },
-  });
-  if (exactClient) return exactClient.id;
-
-  const moduleKey = extractClientModuleKey(clientKey);
-  if (!moduleKey || moduleKey !== clientKey) {
-    return null;
-  }
-
-  const matchedClients = await db.Client.findAll({
-    where: {
-      client_key: {
-        [Op.like]: `${moduleKey}_%`,
-      },
-    },
-    order: [["id", "ASC"]],
-  });
-
-  if (matchedClients.length === 1) {
-    return matchedClients[0].id;
-  }
-
-  return null;
-};
-
-const resolveClientId = async (tenant, payload) => {
-  if (!tenant.isSuperAdmin) {
-    return tenant.id;
-  }
-
-  const clientKeyRaw = payload._client_key || payload.client_key;
-  if (!clientKeyRaw) return null;
-
-  return resolveClientIdFromKey(clientKeyRaw);
-};
+const EXPECTED_CLIENT_MODULE = "vls_law";
 
 const ensureModel = (modelKey) => {
   const model = getDynamicModel(modelKey);
@@ -56,30 +15,34 @@ const ensureModel = (modelKey) => {
   return model;
 };
 
-export const listDynamicRecords = async (modelKey, tenant) => {
+export const listDynamicRecords = async (modelKey, tenant, requestedClientKey) => {
   const model = ensureModel(modelKey);
-  const safeModel = tenantSafe(model, tenant);
+  const scopedTenant = await resolveScopedTenant({ tenant, requestedClientKey, expectedModuleKey: EXPECTED_CLIENT_MODULE });
+  const safeModel = tenantSafe(model, scopedTenant);
 
   return await safeModel.findAll({
     order: [["createdAt", "DESC"]],
   });
 };
 
-export const getDynamicRecord = async (modelKey, id, tenant) => {
+export const getDynamicRecord = async (modelKey, id, tenant, requestedClientKey) => {
   const model = ensureModel(modelKey);
-  const safeModel = tenantSafe(model, tenant);
+  const scopedTenant = await resolveScopedTenant({ tenant, requestedClientKey, expectedModuleKey: EXPECTED_CLIENT_MODULE });
+  const safeModel = tenantSafe(model, scopedTenant);
 
   return await safeModel.findOne({ where: { id } });
 };
 
-export const createDynamicRecord = async (modelKey, data, tenant) => {
+export const createDynamicRecord = async (modelKey, data, tenant, requestedClientKey) => {
   const model = ensureModel(modelKey);
   const payload = { ...data };
 
-  const clientId = await resolveClientId(tenant, payload);
-  if (!clientId) {
-    throw new Error("Could not determine client context");
-  }
+  const clientId = await resolveClientId({
+    tenant,
+    requestedClientKey:
+      requestedClientKey || payload._client_key || payload.client_key,
+    expectedModuleKey: EXPECTED_CLIENT_MODULE,
+  });
 
   delete payload._client_key;
   delete payload.client_key;
@@ -90,9 +53,10 @@ export const createDynamicRecord = async (modelKey, data, tenant) => {
   });
 };
 
-export const updateDynamicRecord = async (modelKey, id, data, tenant) => {
+export const updateDynamicRecord = async (modelKey, id, data, tenant, requestedClientKey) => {
   const model = ensureModel(modelKey);
-  const safeModel = tenantSafe(model, tenant);
+  const scopedTenant = await resolveScopedTenant({ tenant, requestedClientKey, expectedModuleKey: EXPECTED_CLIENT_MODULE });
+  const safeModel = tenantSafe(model, scopedTenant);
 
   const record = await safeModel.findOne({ where: { id } });
   if (!record) {
@@ -110,9 +74,10 @@ export const updateDynamicRecord = async (modelKey, id, data, tenant) => {
   return await record.update(payload);
 };
 
-export const deleteDynamicRecord = async (modelKey, id, tenant) => {
+export const deleteDynamicRecord = async (modelKey, id, tenant, requestedClientKey) => {
   const model = ensureModel(modelKey);
-  const safeModel = tenantSafe(model, tenant);
+  const scopedTenant = await resolveScopedTenant({ tenant, requestedClientKey, expectedModuleKey: EXPECTED_CLIENT_MODULE });
+  const safeModel = tenantSafe(model, scopedTenant);
 
   const deleted = await safeModel.destroy({ where: { id } });
   if (!deleted) {
