@@ -29,9 +29,11 @@ import db from "../../database/index.js";
 import { Op } from "sequelize";
 import PDFDocument from "pdfkit";
 import {
-  extractClientModuleKey,
-  normalizeClientKey,
-} from "../../utils/clientKey.js";
+  resolveClientId as resolveContextClientId,
+  resolveScopedTenant,
+} from "../../utils/resolveClientContext.js";
+
+const PIXEL_EYE_CLIENT_KEY = "pixeleye";
 
 const EXPORT_COLUMNS = [
   { key: "serial", label: "#" },
@@ -533,63 +535,32 @@ const buildExportFileName = (format) => {
 };
 
 const resolveClientIdFromKey = async (clientKeyRaw) => {
-  const clientKey = normalizeClientKey(clientKeyRaw);
-  if (!clientKey) return null;
-
-  const exactClient = await db.Client.findOne({
-    where: { client_key: clientKey },
-  });
-  if (exactClient) return exactClient.id;
-
-  const moduleKey = extractClientModuleKey(clientKey);
-  if (!moduleKey || moduleKey !== clientKey) {
+  try {
+    return await resolveContextClientId({
+      tenant: { isSuperAdmin: true },
+      requestedClientKey: clientKeyRaw,
+      expectedModuleKey: PIXEL_EYE_CLIENT_KEY,
+    });
+  } catch {
     return null;
   }
-
-  const matchedClients = await db.Client.findAll({
-    where: {
-      client_key: {
-        [Op.like]: `${moduleKey}_%`,
-      },
-    },
-    order: [["id", "ASC"]],
-  });
-
-  if (matchedClients.length === 1) {
-    return matchedClients[0].id;
-  }
-
-  return null;
 };
 
 // Resolve client_id for super-admin who has no clientId in JWT
 const resolveClientId = async (body, tenant) => {
-  if (tenant.id) return tenant.id;
-
-  return resolveClientIdFromKey(body._client_key || body.client_key);
+  return resolveContextClientId({
+    tenant,
+    requestedClientKey: body._client_key || body.client_key,
+    expectedModuleKey: PIXEL_EYE_CLIENT_KEY,
+  });
 };
 
-const resolveDeleteTenantContext = async (req) => {
-  if (!req?.tenant?.isSuperAdmin) {
-    return req.tenant;
-  }
-
-  const requestedClientKey = req.query._client_key || req.query.client_key;
-  if (!requestedClientKey) {
-    return null;
-  }
-
-  const clientId = await resolveClientIdFromKey(requestedClientKey);
-  if (!clientId) {
-    return null;
-  }
-
-  return {
-    ...req.tenant,
-    id: clientId,
-    isSuperAdmin: false,
-  };
-};
+const resolvePixelEyeTenant = (req) =>
+  resolveScopedTenant({
+    tenant: req.tenant,
+    requestedClientKey: req.query._client_key || req.query.client_key,
+    expectedModuleKey: PIXEL_EYE_CLIENT_KEY,
+  });
 
 const resolvePixelEyeErrorStatus = (message = "") => {
   const normalized = message.toLowerCase();
@@ -665,20 +636,11 @@ const getHistoryActor = (user) => ({
 
 export const getLeads = async (req, res) => {
   try {
-    const requestedClientKey = req.query._client_key || req.query.client_key;
-    const clientId =
-      req.tenant.isSuperAdmin && requestedClientKey
-        ? await resolveClientIdFromKey(requestedClientKey)
-        : null;
-    if (req.tenant.isSuperAdmin && requestedClientKey && !clientId) {
-      return res
-        .status(400)
-        .json({ message: "Could not determine client context." });
-    }
-    const leads = await listPixelEyeLeads(req.tenant, clientId);
+    const scopedTenant = await resolvePixelEyeTenant(req);
+    const leads = await listPixelEyeLeads(scopedTenant);
     return res.status(200).json({ data: leads });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(err.status || 500).json({ message: err.message });
   }
 };
 
@@ -694,20 +656,10 @@ export const exportLeads = async (req, res) => {
     }
 
     const filters = normalizeExportFilters(req.query);
-    const requestedClientKey = req.query._client_key || req.query.client_key;
-    const clientId =
-      req.tenant.isSuperAdmin && requestedClientKey
-        ? await resolveClientIdFromKey(requestedClientKey)
-        : null;
-    if (req.tenant.isSuperAdmin && requestedClientKey && !clientId) {
-      return res
-        .status(400)
-        .json({ message: "Could not determine client context." });
-    }
+    const scopedTenant = await resolvePixelEyeTenant(req);
     const leads = await listPixelEyeLeadsForExport(
-      req.tenant,
+      scopedTenant,
       filters,
-      clientId,
     );
     const fileName = buildExportFileName(format);
 
@@ -730,17 +682,18 @@ export const exportLeads = async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
     return res.status(200).send(pdfPayload);
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(err.status || 500).json({ message: err.message });
   }
 };
 
 export const getLeadById = async (req, res) => {
   try {
-    const lead = await getPixelEyeLead(req.params.id, req.tenant);
+    const scopedTenant = await resolvePixelEyeTenant(req);
+    const lead = await getPixelEyeLead(req.params.id, scopedTenant);
     if (!lead) return res.status(404).json({ message: "Lead not found" });
     return res.status(200).json({ data: lead });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return res.status(err.status || 500).json({ message: err.message });
   }
 };
 
@@ -851,7 +804,8 @@ export const createLead = async (req, res) => {
 
 export const updateLead = async (req, res) => {
   try {
-    const currentLead = await getPixelEyeLead(req.params.id, req.tenant);
+    const scopedTenant = await resolvePixelEyeTenant(req);
+    const currentLead = await getPixelEyeLead(req.params.id, scopedTenant);
     if (!currentLead) {
       return res.status(404).json({ message: "Lead not found" });
     }
@@ -877,7 +831,7 @@ export const updateLead = async (req, res) => {
     const lead = await updatePixelEyeLead(
       req.params.id,
       req.body,
-      req.tenant,
+      scopedTenant,
       getHistoryActor(req.user),
     );
     return res
@@ -910,13 +864,7 @@ export const updateLeadFollowUpOutcome = async (req, res) => {
 
 export const deleteLead = async (req, res) => {
   try {
-    const scopedTenant = await resolveDeleteTenantContext(req);
-
-    if (!scopedTenant) {
-      return res
-        .status(400)
-        .json({ message: "Could not determine client context." });
-    }
+    const scopedTenant = await resolvePixelEyeTenant(req);
 
     if (!scopedTenant.isSuperAdmin && !scopedTenant.id) {
       return res

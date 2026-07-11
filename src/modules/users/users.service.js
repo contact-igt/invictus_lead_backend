@@ -1,4 +1,4 @@
-import bcrypt from "bcrypt";
+﻿import bcrypt from "bcrypt";
 import db from "../../database/index.js";
 import { tenantSafe } from "../../utils/tenantContext.js";
 import { normalizeClientKey } from "../../utils/clientKey.js";
@@ -62,7 +62,10 @@ export const createUser = async (data, tenant) => {
   let clientId = null;
 
   if (tenant.isSuperAdmin) {
-    if (payload.client_key) {
+    if (payload.role !== "super-admin" && !payload.client_key) {
+      throw new Error("client_key is required for admin/client users");
+    }
+    if (payload.role !== "super-admin" && payload.client_key) {
       clientId = await resolveClientIdFromKey(payload.client_key);
       if (!clientId) {
         throw new Error("Invalid client_key");
@@ -151,3 +154,5 @@ export const deleteUser = async (id, tenant) => {
   }
   return true;
 };
+
+

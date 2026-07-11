@@ -13,6 +13,11 @@ import { PixelEyeLeadStateTable } from "./tables/PixelEyeLeadStateTable/index.js
 import { PixelEyeFollowUpHistoryTable } from "./tables/PixelEyeFollowUpHistoryTable/index.js";
 import { PixelEyeCallLogTable } from "./tables/PixelEyeCallLogTable/index.js";
 import { PixelEyeFollowUpCallComplianceTable } from "./tables/PixelEyeFollowUpCallComplianceTable/index.js";
+import { PixelEyeWebsiteLeadTable } from "./tables/PixelEyeWebsiteLeadTable/index.js";
+import { AaravEyeCareTable } from "./tables/AaravEyeCareTable/index.js";
+import { AntardrashtiNetralayaTable } from "./tables/AntardrashtiNetralayaTable/index.js";
+import { RioTable } from "./tables/RioTable/index.js";
+import { VlsMactMasterClassTable } from "./tables/VlsMactMasterClassTable/index.js";
 
 const dbconfig =
   ServerEnvironmentConfig?.server?.line === "production"
@@ -48,8 +53,13 @@ db.PixelEyeLeadState = PixelEyeLeadStateTable(Sequelize, sequelize);
 db.PixelEyeFollowUpHistory = PixelEyeFollowUpHistoryTable(Sequelize, sequelize);
 db.PixelEyeCallLog = PixelEyeCallLogTable(Sequelize, sequelize);
 db.PixelEyeFollowUpCallCompliance = PixelEyeFollowUpCallComplianceTable(Sequelize, sequelize);
+db.PixelEyeWebsiteLead = PixelEyeWebsiteLeadTable(Sequelize, sequelize);
+db.AaravEyeCare = AaravEyeCareTable(Sequelize, sequelize);
+db.AntardrashtiNetralaya = AntardrashtiNetralayaTable(Sequelize, sequelize);
+db.Rio = RioTable(Sequelize, sequelize);
 db.VlsPropertyLaw = vlsPropertyLawTable(Sequelize, sequelize);
 db.VlsFamilyLaw = vlsFamilyLawTable(Sequelize, sequelize);
+db.VlsMactMasterClass = VlsMactMasterClassTable(Sequelize, sequelize);
 
 const addClientId = (model) => {
   model.belongsTo(db.Client, { foreignKey: "client_id", as: "client" });
@@ -64,7 +74,18 @@ addClientId(db.VlsLawAcademy);
 addClientId(db.VlsLawAibe);
 addClientId(db.VlsPropertyLaw);
 addClientId(db.VlsFamilyLaw);
+addClientId(db.VlsMactMasterClass);
 addClientId(db.PixelEye);
 addClientId(db.PixelEyeLeadState);
+addClientId(db.AaravEyeCare);
+addClientId(db.AntardrashtiNetralaya);
+addClientId(db.Rio);
+addClientId(db.PixelEyeWebsiteLead);
 
 export default db;
+
+
+
+
+
+

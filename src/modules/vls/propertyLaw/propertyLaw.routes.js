@@ -10,6 +10,7 @@ import {
 import { resolvePublicTenant } from "../../../middlewares/auth/publicTenantMiddleware.js";
 import { authenticateToken } from "../../../middlewares/auth/authMiddlewares.js";
 import { attachTenantContext } from "../../../middlewares/auth/tenantMiddleware.js";
+import { scopeSuperAdminToClient } from "../../../middlewares/auth/clientContextMiddleware.js";
 import { validatePropertyLawRegistration } from "../../../middlewares/validation/propertyLawValidation.js";
 
 const router = express.Router();
@@ -23,10 +24,11 @@ router.post(
 );
 
 // ── Protected: Admin CRUD ─────────────────────────────────────────────────────
-router.get("/", authenticateToken, attachTenantContext, getPropertyLawHandler);
-router.get("/:id", authenticateToken, attachTenantContext, getPropertyLawByIdHandler);
-router.post("/", authenticateToken, attachTenantContext, validatePropertyLawRegistration, createPropertyLawAdminHandler);
-router.patch("/:id", authenticateToken, attachTenantContext, updatePropertyLawHandler);
-router.delete("/:id", authenticateToken, attachTenantContext, deletePropertyLawHandler);
+router.use(authenticateToken, attachTenantContext, scopeSuperAdminToClient("vls_law"));
+router.get("/", getPropertyLawHandler);
+router.get("/:id", getPropertyLawByIdHandler);
+router.post("/", validatePropertyLawRegistration, createPropertyLawAdminHandler);
+router.patch("/:id", updatePropertyLawHandler);
+router.delete("/:id", deletePropertyLawHandler);
 
 export default router;

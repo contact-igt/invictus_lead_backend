@@ -2,6 +2,7 @@ import db from "../../database/index.js";
 import {
   isSupportedClientKey,
   normalizeClientKey,
+  SUPPORTED_CLIENT_MODULES,
 } from "../../utils/clientKey.js";
 
 const normalizeClientPayload = (data, { isUpdate = false } = {}) => {
@@ -15,7 +16,7 @@ const normalizeClientPayload = (data, { isUpdate = false } = {}) => {
     payload.client_key = normalizeClientKey(payload.client_key);
     if (payload.client_key && !isSupportedClientKey(payload.client_key)) {
       throw new Error(
-        "Invalid client_key. Supported module prefixes: pixeleye, vls_law",
+        `Invalid client_key. Supported module prefixes: ${SUPPORTED_CLIENT_MODULES.join(", ")}`,
       );
     }
   }

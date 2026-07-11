@@ -9,12 +9,17 @@ import UsersRouter from "./modules/users/users.routes.js";
 import ClientRouter from "./modules/client/client.routes.js";
 import DynamicRouter from "./modules/dynamic/dynamic.routes.js";
 import PixelEyeRouter from "./modules/pixelEye/pixelEye.routes.js";
+import PixelEyeWebsiteLeadRouter from "./modules/pixelEyeWebsiteLeads/pixelEyeWebsiteLead.routes.js";
 import PixelEyeWebhookRouter from "./modules/pixelEye/webhook/pixelEyeWebhook.routes.js";
 import { startPixelEyeScheduler } from "./modules/pixelEye/pixelEyeScheduler.js";
 import { startPixelEyeFollowUpComplianceScheduler } from "./modules/pixelEye/pixelEyeFollowUpComplianceScheduler.js";
 import PropertyLawRouter from "./modules/vls/propertyLaw/propertyLaw.routes.js";
 import FamilyLawRouter from "./modules/vls/familyLaw/familyLaw.routes.js";
 import VlsAibeRouter from "./modules/vls/vlsAibe/vlsAibe.routes.js";
+import AaravEyeCareRouter from "./modules/aaravEyeCare/aaravEyeCare.routes.js";
+import AntardrashtiNetralayaRouter from "./modules/antardrashtiNetralaya/antardrashtiNetralaya.routes.js";
+import RioRouter from "./modules/rio/rio.routes.js";
+import VlsMactMasterClassRouter from "./modules/vlsMactMasterClass/vlsMactMasterClass.routes.js";
 import { ensurePixelEyeLeadStateCurrentDayColumn } from "./database/migrations/ensurePixelEyeLeadStateCurrentDay.js";
 import { ensurePixelEyeLeadStateLeadIdColumn } from "./database/migrations/ensurePixelEyeLeadStateLeadId.js";
 import { ensurePixelEyeLeadStateCompletionSourceColumn } from "./database/migrations/ensurePixelEyeLeadStateCompletionSource.js";
@@ -106,10 +111,15 @@ app.use("/api/v1/users", UsersRouter);
 app.use("/api/v1/dynamic", DynamicRouter);
 app.use("/api/v1/clients", ClientRouter);
 app.use("/api/v1/pixeleye", PixelEyeWebhookRouter);
+app.use("/api/v1/pixeleye/website-leads", PixelEyeWebsiteLeadRouter);
 app.use("/api/v1/pixeleye", PixelEyeRouter);
 app.use("/api/v1/property-law", PropertyLawRouter);
 app.use("/api/v1/family-law", FamilyLawRouter);
 app.use("/api/v1/vls-aibe", VlsAibeRouter);
+app.use("/api/v1/vls-mact-master-class", VlsMactMasterClassRouter);
+app.use("/api/v1/aarav-eye-care", AaravEyeCareRouter);
+app.use("/api/v1/antardrashti-netralaya", AntardrashtiNetralayaRouter);
+app.use("/api/v1/rio", RioRouter);
 
 // Base route
 app.get("/", (req, res) => {
@@ -147,3 +157,10 @@ await connect_mysql();
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT} [${line ?? "local"} mode]`);
 });
+
+
+
+
+
+
+

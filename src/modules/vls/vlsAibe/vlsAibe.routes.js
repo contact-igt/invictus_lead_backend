@@ -10,6 +10,7 @@ import {
 import { resolvePublicTenant } from "../../../middlewares/auth/publicTenantMiddleware.js";
 import { authenticateToken } from "../../../middlewares/auth/authMiddlewares.js";
 import { attachTenantContext } from "../../../middlewares/auth/tenantMiddleware.js";
+import { scopeSuperAdminToClient } from "../../../middlewares/auth/clientContextMiddleware.js";
 import { validateVlsAibeRegistration } from "../../../middlewares/validation/vlsAibeValidation.js";
 
 const router = express.Router();
@@ -23,16 +24,15 @@ router.post(
 );
 
 // Admin CRUD (protected)
-router.get("/", authenticateToken, attachTenantContext, listVlsAibeHandler);
-router.get("/:id", authenticateToken, attachTenantContext, getVlsAibeByIdHandler);
+router.use(authenticateToken, attachTenantContext, scopeSuperAdminToClient("vls_law"));
+router.get("/", listVlsAibeHandler);
+router.get("/:id", getVlsAibeByIdHandler);
 router.post(
   "/",
-  authenticateToken,
-  attachTenantContext,
   validateVlsAibeRegistration,
   createVlsAibeAdminHandler,
 );
-router.patch("/:id", authenticateToken, attachTenantContext, updateVlsAibeHandler);
-router.delete("/:id", authenticateToken, attachTenantContext, deleteVlsAibeHandler);
+router.patch("/:id", updateVlsAibeHandler);
+router.delete("/:id", deleteVlsAibeHandler);
 
 export default router;
