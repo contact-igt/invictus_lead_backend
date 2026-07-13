@@ -450,7 +450,7 @@ const persistPendingFollowUpCompliance = async ({
 
   if (!compliance) {
     console.error(
-      `[PixelEye] Failed to create/update pending compliance from webhook for call_id=${lead?.call_id || "â€”"}`,
+      `[PixelEye] Failed to create/update pending compliance from webhook for call_id=${lead?.call_id || "-"}`,
     );
   }
 

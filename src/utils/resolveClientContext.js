@@ -28,5 +28,9 @@ export const resolveClientId = async ({ tenant, requestedClientKey, expectedModu
 export const resolveScopedTenant = async (options) => {
   if (!options.tenant?.isSuperAdmin) return options.tenant;
   const clientId = await resolveClientId(options);
-  return { ...options.tenant, id: clientId, clientId, isSuperAdmin: false };
+  return Object.assign(
+    Object.create(Object.getPrototypeOf(options.tenant)),
+    options.tenant,
+    { id: clientId, clientId, isSuperAdmin: false },
+  );
 };
