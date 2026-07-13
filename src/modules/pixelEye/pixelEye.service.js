@@ -682,7 +682,7 @@ const persistPendingFollowUpCompliance = async ({
 
   if (!compliance) {
     console.error(
-      `[PixelEye] Failed to create/update pending compliance for call_id=${lead?.call_id || "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â"}`,
+      `[PixelEye] Failed to create/update pending compliance for call_id=${lead?.call_id || "-"}`,
     );
   }
 
@@ -1764,7 +1764,7 @@ export const updatePixelEyeFollowUpOutcome = async (
       metadata,
     });
   } else {
-    // No follow_up_date to clear ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â write a metadata-bearing UPDATED entry once
+    // No follow_up_date to clear - write a metadata-bearing UPDATED entry once
     await createFollowUpHistoryEntry({
       client_id: updatedLead.client_id,
       lead_id: updatedLead.id,
