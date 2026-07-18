@@ -1,4 +1,4 @@
-﻿const CLIENT_KEY_ALIASES = {
+const CLIENT_KEY_ALIASES = {
   pixel_eye: "pixeleye",
   vlslaw: "vls_law",
 };
@@ -9,6 +9,8 @@ export const SUPPORTED_CLIENT_MODULES = [
   "aarav_eye_care",
   "antardrashti_netralaya",
   "rio",
+  'shanti_eye_tech',
+  'phoenix_fitness',
 ];
 
 export const normalizeClientKey = (key) => {

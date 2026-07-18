@@ -1,6 +1,7 @@
 import PDFDocument from "pdfkit";
 import { Op, fn, col } from "sequelize";
 import db from "../../database/index.js";
+import { getInclusiveDateRange, getTodayBounds } from "../../utils/dateTime.js";
 import { resolveClientId } from "../../utils/resolveClientContext.js";
 
 const VLS_CLIENT_KEY = "vls_law";
@@ -65,37 +66,9 @@ const normalizePayload = (data) => ({
   utm_source: normalizeOptionalText(data.utm_source),
 });
 
-const getIstDateParts = (date = new Date()) => {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: IST_TIMEZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = formatter.formatToParts(date);
-  const valueByType = Object.fromEntries(
-    parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]),
-  );
-
-  return {
-    year: Number(valueByType.year),
-    month: Number(valueByType.month),
-    day: Number(valueByType.day),
-  };
-};
-
-const buildIstDate = (year, month, day, time) =>
-  new Date(
-    `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${time}+05:30`,
-  );
-
 const getIstRangeBounds = () => {
-  const now = new Date();
-  const { year, month, day } = getIstDateParts(now);
-  return {
-    now,
-    todayStart: buildIstDate(year, month, day, "00:00:00.000"),
-  };
+  const { now, start: todayStart } = getTodayBounds();
+  return { now, todayStart };
 };
 
 const formatDate = (value) => {
@@ -146,13 +119,11 @@ const formatCaptured = (value) => {
 };
 
 const buildInclusiveDateRange = (start, end) => {
-  const range = {};
-  if (start) range[Op.gte] = new Date(start);
-  if (end) {
-    const inclusiveEnd = new Date(end);
-    inclusiveEnd.setHours(23, 59, 59, 999);
-    range[Op.lte] = inclusiveEnd;
-  }
+  const { start: rangeStart, end: rangeEnd } = getInclusiveDateRange(start, end);
+  const range = {
+    ...(rangeStart ? { [Op.gte]: rangeStart } : {}),
+    ...(rangeEnd ? { [Op.lte]: rangeEnd } : {}),
+  };
   return Object.keys(range).length ? range : null;
 };
 

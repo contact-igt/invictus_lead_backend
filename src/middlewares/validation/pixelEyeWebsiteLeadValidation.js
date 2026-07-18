@@ -74,9 +74,8 @@ export const pixelEyeWebsiteLeadExportSchema = Joi.object({
   _client_key: Joi.string().trim().lowercase().max(100).optional(),
 }).unknown(false);
 
-const pixelEyeWebsiteLeadContextSchema = Joi.object({
-  _client_key: Joi.string().trim().lowercase().max(100).optional(),
-}).unknown(false);
+const pixelEyeWebsiteLeadContextSchema = pixelEyeWebsiteLeadListSchema
+  .fork(["page", "limit"], (schema) => schema.optional());
 
 const validate = (source, schema) => (req, res, next) => {
   const { error, value } = schema.validate(req[source], {

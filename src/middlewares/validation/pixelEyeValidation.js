@@ -5,6 +5,7 @@ import {
   normalizePixelEyeMainStatus,
   normalizePixelEyeOutcomeStatus,
 } from "../../modules/pixelEye/pixelEyeStatusPolicy.js";
+import { formatAppDateAndTime, parseAppDateTime } from "../../utils/dateTime.js";
 
 const DAY_FIELDS = ["day_1", "day_2", "day_3", "day_4", "day_5"];
 
@@ -33,79 +34,13 @@ const getFirstValue = (payload, keys) => {
   return undefined;
 };
 
-const RUNO_TIMEZONE = "Asia/Kolkata";
-
-const formatDateTimeInTimeZone = (date, timeZone = RUNO_TIMEZONE) => {
-  const dateParts = new Intl.DateTimeFormat("en-GB", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-
-  const timeParts = new Intl.DateTimeFormat("en-GB", {
-    timeZone,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-
-  const year = dateParts.find((part) => part.type === "year")?.value;
-  const month = dateParts.find((part) => part.type === "month")?.value;
-  const day = dateParts.find((part) => part.type === "day")?.value;
-
-  const hour = timeParts.find((part) => part.type === "hour")?.value;
-  const minute = timeParts.find((part) => part.type === "minute")?.value;
-  const second = timeParts.find((part) => part.type === "second")?.value;
-
-  if (!year || !month || !day || !hour || !minute || !second) {
-    return null;
-  }
-
-  return {
-    date: `${year}-${month}-${day}`,
-    time: `${hour}:${minute}:${second}`,
-  };
-};
-
-const parseCreatedTimestamp = (dateTimeRaw) => {
-  if (dateTimeRaw === undefined || dateTimeRaw === null || dateTimeRaw === "") {
-    return null;
-  }
-
-  if (typeof dateTimeRaw === "number" && Number.isFinite(dateTimeRaw)) {
-    // Runo often sends epoch in seconds, similar to Apps Script conversion: new Date(ts * 1000).
-    const millis = dateTimeRaw < 1e12 ? dateTimeRaw * 1000 : dateTimeRaw;
-    const parsed = new Date(millis);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  const text = String(dateTimeRaw).trim();
-  if (!text) return null;
-
-  if (/^\d+(\.\d+)?$/.test(text)) {
-    const numericTs = Number(text);
-    if (!Number.isFinite(numericTs)) return null;
-    const millis = numericTs < 1e12 ? numericTs * 1000 : numericTs;
-    const parsed = new Date(millis);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  const parsed = new Date(text);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
 const splitDateTime = (dateTimeRaw) => {
-  const parsed = parseCreatedTimestamp(dateTimeRaw);
+  const parsed = parseAppDateTime(dateTimeRaw);
   if (!parsed) return null;
-  return formatDateTimeInTimeZone(parsed, RUNO_TIMEZONE);
+  return formatAppDateAndTime(parsed);
 };
 
-const nowAsDateTime = () => {
-  const now = new Date();
-  return formatDateTimeInTimeZone(now, RUNO_TIMEZONE);
-};
+const nowAsDateTime = () => formatAppDateAndTime(new Date());
 
 const toStringOrUndefined = (value) =>
   value === undefined || value === null ? undefined : String(value).trim();

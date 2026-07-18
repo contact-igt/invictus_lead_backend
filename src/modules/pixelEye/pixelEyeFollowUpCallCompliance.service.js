@@ -1,4 +1,4 @@
-﻿import { Op } from "sequelize";
+import { Op } from "sequelize";
 import db from "../../database/index.js";
 import {
   findCallLogsForFollowUpDate,
@@ -6,68 +6,24 @@ import {
 } from "./pixelEyeCallLog.service.js";
 import { isTerminalLeadStatus } from "./pixelEyeNotification.service.js";
 import { createFollowUpHistoryEntry } from "./pixelEyeFollowUpHistory.service.js";
+import { buildAppDateTime, formatAppDateAndTime, parseAppDateTime } from "../../utils/dateTime.js";
 
-const PIXELEYE_TIMEZONE = "Asia/Kolkata";
 const DEFAULT_PENDING_REASON = "Pending follow-up call check";
 const DEFAULT_CALLED_REASON = "Call found from Runo webhook";
 const DEFAULT_MISSED_REASON = "No call found after allowed window";
 
 const normalizeText = (value) => String(value || "").trim();
 
-const parseDateValue = (value) => {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
+const parseDateValue = (value) => parseAppDateTime(value);
 
-  if (value instanceof Date) {
-    const parsed = new Date(value.getTime());
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  if (typeof value === "number" && Number.isFinite(value)) {
-    const millis = value < 1e12 ? value * 1000 : value;
-    const parsed = new Date(millis);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  const text = normalizeText(value);
-  if (!text) return null;
-
-  const parsed = new Date(text);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const formatDatePartsInTimeZone = (date, timeZone = PIXELEYE_TIMEZONE) => {
-  const dateParts = new Intl.DateTimeFormat("en-GB", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-
-  const timeParts = new Intl.DateTimeFormat("en-GB", {
-    timeZone,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-
-  const year = dateParts.find((part) => part.type === "year")?.value;
-  const month = dateParts.find((part) => part.type === "month")?.value;
-  const day = dateParts.find((part) => part.type === "day")?.value;
-  const hour = timeParts.find((part) => part.type === "hour")?.value;
-  const minute = timeParts.find((part) => part.type === "minute")?.value;
-  const second = timeParts.find((part) => part.type === "second")?.value;
-
-  if (!year || !month || !day || !hour || !minute || !second) {
-    return null;
-  }
-
-  return {
-    scheduled_follow_up_date: `${year}-${month}-${day}`,
-    scheduled_follow_up_time: `${hour}:${minute}:${second}`,
-  };
+const formatDatePartsInTimeZone = (value) => {
+  const parts = formatAppDateAndTime(value);
+  return parts
+    ? {
+        scheduled_follow_up_date: parts.date,
+        scheduled_follow_up_time: parts.time,
+      }
+    : null;
 };
 
 const normalizeDateOnly = (value) => {
@@ -114,14 +70,14 @@ const buildFollowUpTimestamp = (followUpDate) => {
   const directTime = normalizeTimeOnly(followUpDate);
 
   if (directDate && directTime) {
-    const scheduled = new Date(`${directDate}T${directTime}+05:30`);
+    const scheduled = buildAppDateTime(directDate, directTime);
     if (!Number.isNaN(scheduled.getTime())) {
       return scheduled;
     }
   }
 
   if (directDate) {
-    const scheduled = new Date(`${directDate}T09:00:00+05:30`);
+    const scheduled = buildAppDateTime(directDate, "09:00:00");
     if (!Number.isNaN(scheduled.getTime())) {
       return scheduled;
     }
@@ -136,22 +92,22 @@ const buildFollowUpTimestamp = (followUpDate) => {
 
 const getManualFollowUpAllowedUntil = (
   followUpDate,
-  timeZone = PIXELEYE_TIMEZONE,
 ) => {
   const scheduledAt = buildFollowUpTimestamp(followUpDate);
   if (!scheduledAt) {
     return null;
   }
 
-  const formatted = formatDatePartsInTimeZone(scheduledAt, timeZone);
+  const formatted = formatDatePartsInTimeZone(scheduledAt);
   if (!formatted?.scheduled_follow_up_date) {
     return null;
   }
 
-  const allowedUntil = new Date(
-    `${formatted.scheduled_follow_up_date}T23:59:59+05:30`,
+  const allowedUntil = buildAppDateTime(
+    formatted.scheduled_follow_up_date,
+    "23:59:59.999",
   );
-  if (Number.isNaN(allowedUntil.getTime())) {
+  if (!allowedUntil) {
     return null;
   }
 

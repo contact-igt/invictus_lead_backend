@@ -1,67 +1,17 @@
 import db from "../../database/index.js";
 import { normalizePixelEyePhoneNumber } from "./pixelEyePhoneNumber.js";
-
-const PIXELEYE_TIMEZONE = "Asia/Kolkata";
+import { buildAppDateTime, formatAppDateAndTime, parseAppDateTime } from "../../utils/dateTime.js";
 
 const normalizeText = (value) => String(value || "").trim();
 
-const formatDatePartsInTimeZone = (date, timeZone = PIXELEYE_TIMEZONE) => {
-  const dateParts = new Intl.DateTimeFormat("en-GB", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-
-  const timeParts = new Intl.DateTimeFormat("en-GB", {
-    timeZone,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).formatToParts(date);
-
-  const year = dateParts.find((part) => part.type === "year")?.value;
-  const month = dateParts.find((part) => part.type === "month")?.value;
-  const day = dateParts.find((part) => part.type === "day")?.value;
-  const hour = timeParts.find((part) => part.type === "hour")?.value;
-  const minute = timeParts.find((part) => part.type === "minute")?.value;
-  const second = timeParts.find((part) => part.type === "second")?.value;
-
-  if (!year || !month || !day || !hour || !minute || !second) {
-    return null;
-  }
-
-  return {
-    call_date: `${year}-${month}-${day}`,
-    call_time: `${hour}:${minute}:${second}`,
-  };
+const formatDatePartsInTimeZone = (value) => {
+  const parts = formatAppDateAndTime(value);
+  return parts
+    ? { call_date: parts.date, call_time: parts.time }
+    : null;
 };
 
-const parseDateValue = (value) => {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
-
-  if (value instanceof Date) {
-    const parsed = new Date(value.getTime());
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  if (typeof value === "number" && Number.isFinite(value)) {
-    const millis = value < 1e12 ? value * 1000 : value;
-    const parsed = new Date(millis);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  const text = normalizeText(value);
-  if (!text) {
-    return null;
-  }
-
-  const parsed = new Date(text);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
+const parseDateValue = (value) => parseAppDateTime(value);
 
 const normalizeDateOnly = (value) => {
   const text = normalizeText(value);
@@ -106,7 +56,7 @@ const buildDateTimeFromDateAndTime = (date, time) => {
   }
 
   if (callTime) {
-    const combined = new Date(`${callDate}T${callTime}+05:30`);
+    const combined = buildAppDateTime(callDate, callTime);
     if (!Number.isNaN(combined.getTime())) {
       return {
         call_date: callDate,
@@ -116,7 +66,7 @@ const buildDateTimeFromDateAndTime = (date, time) => {
     }
   }
 
-  const fallback = new Date(`${callDate}T00:00:00+05:30`);
+  const fallback = buildAppDateTime(callDate, "00:00:00");
   if (Number.isNaN(fallback.getTime())) {
     return null;
   }

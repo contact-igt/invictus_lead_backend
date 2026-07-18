@@ -32,6 +32,9 @@ import { ensurePixelEyePhoneNormalization } from "./database/migrations/ensurePi
 import ensureAddFollowUpHistoryMetadataColumn from "./database/migrations/ensureAddFollowUpHistoryMetadataColumn.js";
 import { ensurePixelEyeLeadNotesColumn } from "./database/migrations/ensurePixelEyeLeadNotesColumn.js";
 
+import ShantiEyeTechRouter from './modules/shantiEyeTech/shantiEyeTech.routes.js';
+import PhoenixFitnessRouter from './modules/phoenixFitness/phoenixFitness.routes.js';
+
 const app = express();
 
 // Set security HTTP headers
@@ -120,6 +123,9 @@ app.use("/api/v1/vls-mact-master-class", VlsMactMasterClassRouter);
 app.use("/api/v1/aarav-eye-care", AaravEyeCareRouter);
 app.use("/api/v1/antardrashti-netralaya", AntardrashtiNetralayaRouter);
 app.use("/api/v1/rio", RioRouter);
+
+app.use('/api/v1/shanti-eye-tech', ShantiEyeTechRouter);
+app.use('/api/v1/phoenix-fitness', PhoenixFitnessRouter);
 
 // Base route
 app.get("/", (req, res) => {

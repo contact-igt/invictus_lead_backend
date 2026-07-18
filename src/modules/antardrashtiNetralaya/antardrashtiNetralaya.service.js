@@ -1,6 +1,7 @@
-﻿import PDFDocument from "pdfkit";
+import PDFDocument from "pdfkit";
 import { Op, fn, col } from "sequelize";
 import db from "../../database/index.js";
+import { getInclusiveDateRange, getMonthBounds, getTodayBounds } from "../../utils/dateTime.js";
 import { resolveClientId } from "../../utils/resolveClientContext.js";
 
 const ANTARDRASHTI_NETRALAYA_CLIENT_KEY = "antardrashti_netralaya";
@@ -70,42 +71,10 @@ const normalizePayload = (data) => {
   return payload;
 };
 
-const getIstDateParts = (date = new Date()) => {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: IST_TIMEZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-
-  const parts = formatter.formatToParts(date);
-  const valueByType = Object.fromEntries(
-    parts
-      .filter((part) => part.type !== "literal")
-      .map((part) => [part.type, part.value]),
-  );
-
-  return {
-    year: Number(valueByType.year),
-    month: Number(valueByType.month),
-    day: Number(valueByType.day),
-  };
-};
-
-const buildIstDate = (year, month, day, time) =>
-  new Date(
-    `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${time}+05:30`,
-  );
-
 const getIstRangeBounds = () => {
-  const now = new Date();
-  const { year, month, day } = getIstDateParts(now);
-
-  return {
-    now,
-    todayStart: buildIstDate(year, month, day, "00:00:00.000"),
-    monthStart: buildIstDate(year, month, 1, "00:00:00.000"),
-  };
+  const { now, start: todayStart } = getTodayBounds();
+  const { start: monthStart } = getMonthBounds();
+  return { now, todayStart, monthStart };
 };
 
 const buildLeadFilters = (filters = {}) => {
@@ -132,15 +101,11 @@ const buildLeadFilters = (filters = {}) => {
   if (utm_source) queryFilters.utm_source = utm_source;
 
   if (start_date || end_date) {
-    queryFilters.created_at = {};
-    if (start_date) {
-      queryFilters.created_at[Op.gte] = new Date(start_date);
-    }
-    if (end_date) {
-      const inclusiveEnd = new Date(end_date);
-      inclusiveEnd.setHours(23, 59, 59, 999);
-      queryFilters.created_at[Op.lte] = inclusiveEnd;
-    }
+    const { start, end } = getInclusiveDateRange(start_date, end_date);
+    queryFilters.created_at = {
+      ...(start ? { [Op.gte]: start } : {}),
+      ...(end ? { [Op.lte]: end } : {}),
+    };
   }
 
   return queryFilters;

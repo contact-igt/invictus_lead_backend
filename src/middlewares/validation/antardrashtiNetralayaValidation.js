@@ -1,4 +1,4 @@
-﻿import Joi from "joi";
+import Joi from "joi";
 
 export const ANTARDRASHTI_NETRALAYA_SERVICES = [
   "Cataract",
@@ -61,9 +61,8 @@ export const antardrashtiNetralayaExportSchema = Joi.object({
   _client_key: Joi.string().trim().lowercase().max(100).optional(),
 }).unknown(false);
 
-const antardrashtiNetralayaContextSchema = Joi.object({
-  _client_key: Joi.string().trim().lowercase().max(100).optional(),
-}).unknown(false);
+const antardrashtiNetralayaContextSchema = antardrashtiNetralayaListSchema
+  .fork(["page", "limit"], (schema) => schema.optional());
 
 const validate = (source, schema) => (req, res, next) => {
   const { error, value } = schema.validate(req[source], {

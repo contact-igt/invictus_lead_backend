@@ -89,9 +89,8 @@ export const rioListSchema = Joi.object({
 export const rioExportSchema = rioListSchema.keys({
   format: Joi.string().valid("csv", "pdf").required(),
 });
-const rioContextSchema = Joi.object({
-  _client_key: Joi.string().trim().lowercase().max(100).optional(),
-}).unknown(false);
+const rioContextSchema = rioListSchema
+  .fork(["page", "limit"], (schema) => schema.optional());
 
 const validate = (source, schema) => (req, res, next) => {
   const { error, value } = schema.validate(req[source], {
