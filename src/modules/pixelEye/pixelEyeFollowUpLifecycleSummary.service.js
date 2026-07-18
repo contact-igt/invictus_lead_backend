@@ -2,6 +2,7 @@ import { Op } from "sequelize";
 import db from "../../database/index.js";
 import { listPixelEyeLeads } from "./pixelEye.service.js";
 import { isTerminalLeadStatus } from "./pixelEyeNotification.service.js";
+import { normalizeAppDate } from "../../utils/dateTime.js";
 
 const EMPTY_SUMMARY = {
   active_manual: 0,
@@ -21,25 +22,7 @@ const normalizeLower = (value) => normalizeText(value).toLowerCase();
 
 const normalizeUpper = (value) => normalizeText(value).toUpperCase();
 
-const normalizeDateForFilter = (value) => {
-  const text = normalizeText(value);
-  if (!text) return "";
-
-  const directDate = text.match(/^\d{4}-\d{2}-\d{2}/);
-  if (directDate) {
-    return directDate[0];
-  }
-
-  const parsed = new Date(text);
-  if (Number.isNaN(parsed.getTime())) {
-    return "";
-  }
-
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
+const normalizeDateForFilter = (value) => normalizeAppDate(value);
 
 const isLeadInsideFollowUpDateRange = (lead, filters = {}) => {
   const from = normalizeDateForFilter(filters.from);

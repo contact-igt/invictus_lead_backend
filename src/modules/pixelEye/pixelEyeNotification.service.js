@@ -6,6 +6,7 @@ import {
   getStatusCategory,
   isTerminalPixelEyeStatus,
 } from "./pixelEyeStatusPolicy.js";
+import { formatAppDateTime, parseAppDateTime } from "../../utils/dateTime.js";
 
 const TIMEZONE_LABEL = "IST";
 const GOOGLE_CHAT_WEBHOOK_TIMEOUT_MS = 15_000;
@@ -89,16 +90,8 @@ export const resolveManualFollowUpScheduledAt = (followUpDate) => {
     return null;
   }
 
-  let scheduledAt;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    scheduledAt = new Date(`${text}T09:00:00+05:30`);
-  } else if (/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}/.test(text)) {
-    scheduledAt = new Date(text.replace(" ", "T"));
-  } else {
-    scheduledAt = new Date(text);
-  }
-
-  if (Number.isNaN(scheduledAt.getTime())) {
+  const scheduledAt = parseAppDateTime(text, "09:00:00");
+  if (!scheduledAt) {
     throw new Error("Invalid follow_up_date");
   }
 
@@ -1377,17 +1370,7 @@ export const getNotificationSummary = async (clientId) => {
 // UTILITY
 // ---------------------------------------------------------------------------
 
-const _formatDateTime = (dateObj) => {
-  return dateObj.toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
-};
+const _formatDateTime = (dateObj) => formatAppDateTime(dateObj);
 
 const _logError = (fn, err, callId) => {
   console.error(

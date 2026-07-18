@@ -58,9 +58,8 @@ export const vlsMactMasterClassExportSchema = vlsMactMasterClassListSchema.keys(
   format: Joi.string().valid("csv", "pdf").required(),
 }).fork(["page", "limit"], (schema) => schema.optional());
 
-export const vlsMactMasterClassContextSchema = Joi.object({
-  _client_key: Joi.string().trim().lowercase().max(100).optional(),
-}).unknown(false);
+export const vlsMactMasterClassContextSchema = vlsMactMasterClassListSchema
+  .fork(["page", "limit"], (schema) => schema.optional());
 
 const validate = (source, schema) => (req, res, next) => {
   const { error, value } = schema.validate(req[source], {

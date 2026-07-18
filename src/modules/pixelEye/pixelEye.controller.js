@@ -32,6 +32,7 @@ import {
   resolveClientId as resolveContextClientId,
   resolveScopedTenant,
 } from "../../utils/resolveClientContext.js";
+import { formatAppDateAndTime, formatAppFileDate, formatAppDateTime } from "../../utils/dateTime.js";
 
 const PIXEL_EYE_CLIENT_KEY = "pixeleye";
 
@@ -66,20 +67,8 @@ const formatDateValue = (value) => {
 
 const formatDateTimeValue = (value) => {
   if (!value) return "";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return String(value).trim();
-  }
-
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-  const hours = String(parsed.getHours()).padStart(2, "0");
-  const minutes = String(parsed.getMinutes()).padStart(2, "0");
-  const seconds = String(parsed.getSeconds()).padStart(2, "0");
-
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  const parts = formatAppDateAndTime(value);
+  return parts ? `${parts.date} ${parts.time}` : String(value).trim();
 };
 
 const normalizeExportFilters = (query = {}) => ({
@@ -193,14 +182,7 @@ const formatReadableDateTime = (value) => {
     return sanitizePdfText(value);
   }
 
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  }).format(parsed);
+  return formatAppDateTime(parsed, { day: "2-digit", month: "short" });
 };
 
 const hasLeadOutcome = (lead) =>
@@ -530,7 +512,7 @@ const createPdfPayload = (leads, filters) =>
   });
 
 const buildExportFileName = (format) => {
-  const dateSegment = new Date().toISOString().slice(0, 10);
+  const dateSegment = formatAppFileDate();
   return `pixel-eye-leads-${dateSegment}.${format}`;
 };
 

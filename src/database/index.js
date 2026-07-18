@@ -19,6 +19,10 @@ import { AntardrashtiNetralayaTable } from "./tables/AntardrashtiNetralayaTable/
 import { RioTable } from "./tables/RioTable/index.js";
 import { VlsMactMasterClassTable } from "./tables/VlsMactMasterClassTable/index.js";
 
+import { ShantiEyeTechTable } from './tables/ShantiEyeTechTable/index.js';
+import { PhoenixFitnessTable } from './tables/PhoenixFitnessTable/index.js';
+import { DATABASE_TIME_ZONE_OFFSET } from "../config/timezone.config.js";
+
 const dbconfig =
   ServerEnvironmentConfig?.server?.line === "production"
     ? DatabaseEnvironmentConfig?.live
@@ -33,7 +37,7 @@ const sequelize = new Sequelize(
   {
     host: dbconfig?.host,
     dialect: "mysql",
-    timezone: "+05:30",
+    timezone: DATABASE_TIME_ZONE_OFFSET,
     logging: false,
   },
 );
@@ -60,6 +64,8 @@ db.Rio = RioTable(Sequelize, sequelize);
 db.VlsPropertyLaw = vlsPropertyLawTable(Sequelize, sequelize);
 db.VlsFamilyLaw = vlsFamilyLawTable(Sequelize, sequelize);
 db.VlsMactMasterClass = VlsMactMasterClassTable(Sequelize, sequelize);
+db.ShantiEyeTech = ShantiEyeTechTable(Sequelize, sequelize);
+db.PhoenixFitness = PhoenixFitnessTable(Sequelize, sequelize);
 
 const addClientId = (model) => {
   model.belongsTo(db.Client, { foreignKey: "client_id", as: "client" });
@@ -81,6 +87,9 @@ addClientId(db.AaravEyeCare);
 addClientId(db.AntardrashtiNetralaya);
 addClientId(db.Rio);
 addClientId(db.PixelEyeWebsiteLead);
+
+addClientId(db.ShantiEyeTech);
+addClientId(db.PhoenixFitness);
 
 export default db;
 

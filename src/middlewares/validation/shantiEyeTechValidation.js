@@ -1,91 +1,79 @@
 import Joi from "joi";
 
-const AARAV_EYE_CARE_SERVICES = [
-  // "General Ophthalmology",
-  // "Pediatric Ophthalmology",
-  // "Retina Eye Care",
-  // "Glaucoma Services",
-  // "Neuro Ophthalmology",
-  // "LASIK - Specs Removal",
-  // "SMILE - Specs Removal",
-  // "ICL - Specs Removal",
-  // "Cataract Surgery",
-  // "Oculoplasty Treatment",
-
-  "General Ophthalmology",
-  "Pediatric Ophthalmology",
-  "Retina Eye Care",
-  "Glaucoma Services",
-  "Neuro Ophthalmology",
-  "Lasik - Specs Removal",
-  "SMILE - Specs Removal",
-  "ICL - Specs Removal",
-  "Cataract Surgery",
-  "Oculoplasty Treatment"
-];
-
 const optionalText = (max) =>
   Joi.string().trim().max(max).allow(null, "").optional();
 
+const SHANTI_EYE_TECH_SERVICES = [
+  "Cataract",
+  "Lasik",
+  "Pediatric",
+  "Glaucoma",
+  "Retina",
+];
+
 const optionalService = Joi.string()
   .trim()
-  .valid(...AARAV_EYE_CARE_SERVICES)
+  .valid(...SHANTI_EYE_TECH_SERVICES)
   .allow(null, "")
   .optional();
 
-export const aaravEyeCareCreateSchema = Joi.object({
+const serviceFilter = Joi.string()
+  .trim()
+  .valid(...SHANTI_EYE_TECH_SERVICES, "")
+  .optional();
+const createFields = {
   name: Joi.string().trim().max(150).required(),
   mobile_number: Joi.string().trim().max(20).required(),
   service: optionalService,
+  message: optionalText(5000),
   ip_address: optionalText(45),
   utm_source: optionalText(255),
-}).unknown(false);
+};
 
-export const aaravEyeCarePublicCreateSchema = Joi.object({
-  name: Joi.string().trim().max(150).required(),
-  mobile_number: Joi.string().trim().max(20).required(),
-  service: optionalService,
-  ip_address: optionalText(45),
-  utm_source: optionalText(255),
+export const shantiEyeTechCreateSchema = Joi.object(createFields).unknown(false);
+
+export const shantiEyeTechPublicCreateSchema = Joi.object({
+  ...createFields,
   client_key: Joi.string().trim().lowercase().max(100).optional(),
 }).unknown(false);
 
-export const aaravEyeCareUpdateSchema = Joi.object({
+export const shantiEyeTechUpdateSchema = Joi.object({
   name: Joi.string().trim().max(150).optional(),
   mobile_number: Joi.string().trim().max(20).optional(),
   service: optionalService,
+  message: optionalText(5000),
   ip_address: optionalText(45),
   utm_source: optionalText(255),
 })
   .min(1)
   .unknown(false);
 
-export const aaravEyeCareIdSchema = Joi.object({
+export const shantiEyeTechIdSchema = Joi.object({
   id: Joi.number().integer().positive().required(),
 }).unknown(false);
 
-export const aaravEyeCareListSchema = Joi.object({
+export const shantiEyeTechListSchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(20),
   search: Joi.string().trim().max(255).allow("").optional(),
-  service: Joi.string().trim().max(255).allow("").optional(),
+  service: serviceFilter,
   utm_source: Joi.string().trim().max(255).allow("").optional(),
   start_date: Joi.date().iso().optional(),
   end_date: Joi.date().iso().min(Joi.ref("start_date")).optional(),
   _client_key: Joi.string().trim().lowercase().max(100).optional(),
 }).unknown(false);
 
-export const aaravEyeCareExportSchema = Joi.object({
+export const shantiEyeTechExportSchema = Joi.object({
   format: Joi.string().valid("csv", "pdf").required(),
   search: Joi.string().trim().max(255).allow("").optional(),
-  service: Joi.string().trim().max(255).allow("").optional(),
+  service: serviceFilter,
   utm_source: Joi.string().trim().max(255).allow("").optional(),
   start_date: Joi.date().iso().optional(),
   end_date: Joi.date().iso().min(Joi.ref("start_date")).optional(),
   _client_key: Joi.string().trim().lowercase().max(100).optional(),
 }).unknown(false);
 
-const aaravEyeCareContextSchema = aaravEyeCareListSchema
+const shantiEyeTechContextSchema = shantiEyeTechListSchema
   .fork(["page", "limit"], (schema) => schema.optional());
 
 const validate = (source, schema) => (req, res, next) => {
@@ -115,28 +103,28 @@ const validate = (source, schema) => (req, res, next) => {
   next();
 };
 
-export const validateAaravEyeCareCreate = validate(
+export const validateShantiEyeTechCreate = validate(
   "body",
-  aaravEyeCareCreateSchema,
+  shantiEyeTechCreateSchema,
 );
-export const validateAaravEyeCarePublicCreate = validate(
+export const validateShantiEyeTechPublicCreate = validate(
   "body",
-  aaravEyeCarePublicCreateSchema,
+  shantiEyeTechPublicCreateSchema,
 );
-export const validateAaravEyeCareUpdate = validate(
+export const validateShantiEyeTechUpdate = validate(
   "body",
-  aaravEyeCareUpdateSchema,
+  shantiEyeTechUpdateSchema,
 );
-export const validateAaravEyeCareId = validate("params", aaravEyeCareIdSchema);
-export const validateAaravEyeCareList = validate(
+export const validateShantiEyeTechId = validate("params", shantiEyeTechIdSchema);
+export const validateShantiEyeTechList = validate(
   "query",
-  aaravEyeCareListSchema,
+  shantiEyeTechListSchema,
 );
-export const validateAaravEyeCareExport = validate(
+export const validateShantiEyeTechExport = validate(
   "query",
-  aaravEyeCareExportSchema,
+  shantiEyeTechExportSchema,
 );
-export const validateAaravEyeCareContext = validate(
+export const validateShantiEyeTechContext = validate(
   "query",
-  aaravEyeCareContextSchema,
+  shantiEyeTechContextSchema,
 );
