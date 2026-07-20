@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import {
   generateAccessToken,
   generateRefreshToken,
+  verifyRefreshToken,
 } from "../../middlewares/auth/authMiddlewares.js";
 import { loginService } from "./auth.service.js";
 
@@ -46,5 +47,29 @@ export const loginController = async (req, res) => {
   } catch (err) {
     console.error("[login]", err);
     return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const refreshController = async (req, res) => {
+  const { refreshToken: suppliedRefreshToken } = req.body || {};
+
+  if (!suppliedRefreshToken) {
+    return res.status(400).json({ message: "Refresh token required" });
+  }
+
+  try {
+    const decoded = verifyRefreshToken(suppliedRefreshToken);
+    const user = await loginService(decoded.email);
+
+    if (!user || user.id !== decoded.id) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    return res.status(200).json({
+      accessToken: generateAccessToken(user),
+      refreshToken: generateRefreshToken(user),
+    });
+  } catch {
+    return res.status(401).json({ message: "Unauthorized" });
   }
 };

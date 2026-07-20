@@ -13,7 +13,7 @@ import {
   authenticateToken,
   authorizeManagementRole,
 } from "../../middlewares/auth/authMiddlewares.js";
-import { resolvePublicTenant } from "../../middlewares/auth/publicTenantMiddleware.js";
+import { resolvePublicTenantForModule } from "../../middlewares/auth/publicTenantMiddleware.js";
 import { attachTenantContext } from "../../middlewares/auth/tenantMiddleware.js";
 import {
   validateShantiEyeTechCreate,
@@ -29,7 +29,7 @@ const router = express.Router();
 
 router.post(
   "/register",
-  resolvePublicTenant,
+  resolvePublicTenantForModule("shanti_eye_tech"),
   validateShantiEyeTechPublicCreate,
   registerShantiEyeTechPublicLead,
 );

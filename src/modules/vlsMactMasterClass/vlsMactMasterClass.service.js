@@ -3,6 +3,7 @@ import { Op, fn, col } from "sequelize";
 import db from "../../database/index.js";
 import { getInclusiveDateRange, getTodayBounds } from "../../utils/dateTime.js";
 import { resolveClientId } from "../../utils/resolveClientContext.js";
+import { escapeCsvValue } from "../../utils/csv.js";
 
 const VLS_CLIENT_KEY = "vls_law";
 const IST_TIMEZONE = "Asia/Kolkata";
@@ -224,11 +225,6 @@ const listRows = async (filters, tenant, options = {}) => {
   }
 
   return db.VlsMactMasterClass.findAll(query);
-};
-
-const escapeCsvValue = (value) => {
-  const normalized = value == null ? "" : String(value);
-  return `"${normalized.replace(/"/g, '""')}"`;
 };
 
 const buildCsvBuffer = (rows) => {

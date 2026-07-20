@@ -24,6 +24,7 @@ import {
   authorizeManagementRole,
 } from "../../middlewares/auth/authMiddlewares.js";
 import { attachTenantContext } from "../../middlewares/auth/tenantMiddleware.js";
+import { scopeSuperAdminToClient } from "../../middlewares/auth/clientContextMiddleware.js";
 import {
   validatePixelEyeCreate,
   validatePixelEyeUpdate,
@@ -34,6 +35,7 @@ const router = express.Router();
 
 router.use(authenticateToken);
 router.use(attachTenantContext);
+router.use(scopeSuperAdminToClient("pixeleye"));
 
 router.get("/", getLeads);
 router.get("/export", exportLeads);

@@ -12,6 +12,22 @@ const getClientKey = (user) => {
   return null;
 };
 
+const ACCESS_TOKEN_TYPE = "access";
+const REFRESH_TOKEN_TYPE = "refresh";
+
+const verifyTokenType = (token, expectedType) => {
+  const decoded = jwt.verify(token, ServerEnvironmentConfig.jwt_key);
+  if (decoded.tokenType !== expectedType) {
+    const error = new Error("Invalid token type");
+    error.name = "JsonWebTokenError";
+    throw error;
+  }
+  return decoded;
+};
+
+const verifyRefreshToken = (token) =>
+  verifyTokenType(token, REFRESH_TOKEN_TYPE);
+
 const generateAccessToken = (user) => {
   return jwt.sign(
     {
@@ -21,6 +37,7 @@ const generateAccessToken = (user) => {
       role: user.role ? user.role : "user",
       clientId: user.client_id || null,
       clientKey: getClientKey(user),
+      tokenType: ACCESS_TOKEN_TYPE,
     },
     ServerEnvironmentConfig?.jwt_key,
     { expiresIn: "24h" },
@@ -36,6 +53,7 @@ const generateRefreshToken = (user) => {
       role: user.role ? user.role : "user",
       clientId: user.client_id || null,
       clientKey: getClientKey(user),
+      tokenType: REFRESH_TOKEN_TYPE,
     },
     ServerEnvironmentConfig?.jwt_key,
     {
@@ -52,7 +70,7 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ message: "Unauthorized" });
   }
   try {
-    const decoded = jwt.verify(token, ServerEnvironmentConfig.jwt_key);
+    const decoded = verifyTokenType(token, ACCESS_TOKEN_TYPE);
     req.user = decoded;
     next();
   } catch (err) {
@@ -84,7 +102,7 @@ const authenticateSuperAdminToken = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, ServerEnvironmentConfig.jwt_key);
+    const decoded = verifyTokenType(token, ACCESS_TOKEN_TYPE);
 
     if (decoded.role !== "super-admin") {
       return res.status(403).json({
@@ -109,7 +127,7 @@ const authenticateManagementToken = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, ServerEnvironmentConfig.jwt_key);
+    const decoded = verifyTokenType(token, ACCESS_TOKEN_TYPE);
 
     if (decoded.role !== "super-admin" && decoded.role !== "admin") {
       return res.status(403).json({
@@ -131,4 +149,5 @@ export {
   authorizeManagementRole,
   authenticateManagementToken,
   authenticateSuperAdminToken,
+  verifyRefreshToken,
 };

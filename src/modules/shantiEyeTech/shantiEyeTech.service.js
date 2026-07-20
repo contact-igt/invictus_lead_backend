@@ -3,6 +3,8 @@ import { Op, fn, col } from "sequelize";
 import db from "../../database/index.js";
 import { getInclusiveDateRange, getMonthBounds, getTodayBounds } from "../../utils/dateTime.js";
 import { resolveClientId } from "../../utils/resolveClientContext.js";
+import { escapeCsvValue } from "../../utils/csv.js";
+import { withCreatedAtRange } from "../../utils/sequelizeFilters.js";
 
 const SHANTI_EYE_TECH_CLIENT_KEY = "shanti_eye_tech";
 const IST_TIMEZONE = "Asia/Kolkata";
@@ -36,13 +38,6 @@ const createHttpError = (status, message) => {
 };
 
 const resolveTenantWhere = async (tenant, requestedClientKey, filters = {}) => {
-  if (!tenant?.isSuperAdmin) {
-    if (!tenant?.id) {
-      throw createHttpError(403, "A valid tenant context is required");
-    }
-    return tenant.getScope(filters);
-  }
-
   const clientId = await resolveClientId({
     tenant,
     requestedClientKey,
@@ -165,11 +160,6 @@ const mapExportRow = (lead, index) => ({
   created_at: formatTimestamp(lead.created_at),
   updated_at: formatTimestamp(lead.updated_at),
 });
-
-const escapeCsvValue = (value) => {
-  const normalized = value == null ? "" : String(value);
-  return `"${normalized.replace(/"/g, '""')}"`;
-};
 
 const buildCsvBuffer = (rows) => {
   const lines = [CSV_HEADERS.map(escapeCsvValue).join(",")];
@@ -312,16 +302,10 @@ export const getShantiEyeTechSummary = async (filters, tenant) => {
     await Promise.all([
       db.ShantiEyeTech.count({ where }),
       db.ShantiEyeTech.count({
-        where: {
-          ...where,
-          created_at: { [Op.gte]: todayStart, [Op.lte]: now },
-        },
+        where: withCreatedAtRange(where, todayStart, now),
       }),
       db.ShantiEyeTech.count({
-        where: {
-          ...where,
-          created_at: { [Op.gte]: monthStart, [Op.lte]: now },
-        },
+        where: withCreatedAtRange(where, monthStart, now),
       }),
       db.ShantiEyeTech.findOne({
         attributes: ["service", [fn("COUNT", col("service")), "service_count"]],

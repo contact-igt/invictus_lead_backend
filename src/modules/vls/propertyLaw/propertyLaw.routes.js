@@ -7,7 +7,7 @@ import {
   getPropertyLawByIdHandler,
   deletePropertyLawHandler,
 } from "./propertyLaw.controller.js";
-import { resolvePublicTenant } from "../../../middlewares/auth/publicTenantMiddleware.js";
+import { resolvePublicTenantForModule } from "../../../middlewares/auth/publicTenantMiddleware.js";
 import { authenticateToken } from "../../../middlewares/auth/authMiddlewares.js";
 import { attachTenantContext } from "../../../middlewares/auth/tenantMiddleware.js";
 import { scopeSuperAdminToClient } from "../../../middlewares/auth/clientContextMiddleware.js";
@@ -18,7 +18,7 @@ const router = express.Router();
 // ── Public: Landing page form submission after Razorpay payment ───────────────
 router.post(
   "/register",
-  resolvePublicTenant,
+  resolvePublicTenantForModule("vls_law"),
   validatePropertyLawRegistration,
   registerPropertyLawHandler,
 );

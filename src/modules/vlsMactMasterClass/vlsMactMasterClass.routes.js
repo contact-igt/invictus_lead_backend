@@ -12,7 +12,7 @@ import {
 import { authenticateToken } from "../../middlewares/auth/authMiddlewares.js";
 import { attachTenantContext } from "../../middlewares/auth/tenantMiddleware.js";
 import { scopeSuperAdminToClient } from "../../middlewares/auth/clientContextMiddleware.js";
-import { resolvePublicTenant } from "../../middlewares/auth/publicTenantMiddleware.js";
+import { resolvePublicTenantForModule } from "../../middlewares/auth/publicTenantMiddleware.js";
 import {
   validateVlsMactMasterClassContext,
   validateVlsMactMasterClassCreate,
@@ -27,7 +27,7 @@ const router = express.Router();
 
 router.post(
   "/register",
-  resolvePublicTenant,
+  resolvePublicTenantForModule("vls_law"),
   validateVlsMactMasterClassPublicCreate,
   registerVlsMactMasterClassPublicLead,
 );

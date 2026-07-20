@@ -14,7 +14,7 @@ import {
   authorizeManagementRole,
 } from "../../middlewares/auth/authMiddlewares.js";
 import { attachTenantContext } from "../../middlewares/auth/tenantMiddleware.js";
-import { resolvePublicTenant } from "../../middlewares/auth/publicTenantMiddleware.js";
+import { resolvePublicTenantForModule } from "../../middlewares/auth/publicTenantMiddleware.js";
 import {
   validateAntardrashtiNetralayaCreate,
   validateAntardrashtiNetralayaUpdate,
@@ -29,7 +29,7 @@ const router = express.Router();
 
 router.post(
   "/register",
-  resolvePublicTenant,
+  resolvePublicTenantForModule("antardrashti_netralaya"),
   validateAntardrashtiNetralayaPublicCreate,
   registerAntardrashtiNetralayaPublicLead,
 );

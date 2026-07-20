@@ -11,7 +11,7 @@ import {
 } from "./pixelEyeWebsiteLead.controller.js";
 import { authenticateToken } from "../../middlewares/auth/authMiddlewares.js";
 import { attachTenantContext } from "../../middlewares/auth/tenantMiddleware.js";
-import { resolvePublicTenant } from "../../middlewares/auth/publicTenantMiddleware.js";
+import { resolvePublicTenantForModule } from "../../middlewares/auth/publicTenantMiddleware.js";
 import {
   validatePixelEyeWebsiteLeadContext,
   validatePixelEyeWebsiteLeadCreate,
@@ -26,7 +26,7 @@ const router = express.Router();
 
 router.post(
   "/register",
-  resolvePublicTenant,
+  resolvePublicTenantForModule("pixeleye"),
   validatePixelEyeWebsiteLeadPublicCreate,
   registerPixelEyeWebsitePublicLead,
 );
