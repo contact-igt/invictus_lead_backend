@@ -1,4 +1,4 @@
-const CLIENT_KEY_ALIASES = {
+export const CLIENT_KEY_ALIASES = {
   pixel_eye: "pixeleye",
   vlslaw: "vls_law",
 };

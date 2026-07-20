@@ -7,7 +7,7 @@ import {
   getVlsAibeByIdHandler,
   deleteVlsAibeHandler,
 } from "./vlsAibe.controller.js";
-import { resolvePublicTenant } from "../../../middlewares/auth/publicTenantMiddleware.js";
+import { resolvePublicTenantForModule } from "../../../middlewares/auth/publicTenantMiddleware.js";
 import { authenticateToken } from "../../../middlewares/auth/authMiddlewares.js";
 import { attachTenantContext } from "../../../middlewares/auth/tenantMiddleware.js";
 import { scopeSuperAdminToClient } from "../../../middlewares/auth/clientContextMiddleware.js";
@@ -18,7 +18,7 @@ const router = express.Router();
 // Public registration (landing page, post-payment)
 router.post(
   "/register",
-  resolvePublicTenant,
+  resolvePublicTenantForModule("vls_law"),
   validateVlsAibeRegistration,
   registerVlsAibeHandler,
 );

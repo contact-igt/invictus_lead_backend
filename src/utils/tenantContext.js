@@ -12,6 +12,7 @@ export class TenantContext {
         : null) ??
       null;
     this.role = user?.role || "user";
+    this.clientKey = user?.clientKey ?? user?.client_key ?? null;
     this.isSuperAdmin =
       typeof user?.isSuperAdmin === "boolean"
         ? user.isSuperAdmin

@@ -23,7 +23,7 @@ const serviceFilter = Joi.string()
   .optional();
 const createFields = {
   name: Joi.string().trim().max(150).required(),
-  mobile_number: Joi.string().trim().max(20).required(),
+  mobile_number: Joi.string().trim().max(20).pattern(/^[0-9+\-()\s]+$/).required(),
   service: optionalService,
   message: optionalText(5000),
   ip_address: optionalText(45),
@@ -39,7 +39,7 @@ export const shantiEyeTechPublicCreateSchema = Joi.object({
 
 export const shantiEyeTechUpdateSchema = Joi.object({
   name: Joi.string().trim().max(150).optional(),
-  mobile_number: Joi.string().trim().max(20).optional(),
+  mobile_number: Joi.string().trim().max(20).pattern(/^[0-9+\-()\s]+$/).optional(),
   service: optionalService,
   message: optionalText(5000),
   ip_address: optionalText(45),

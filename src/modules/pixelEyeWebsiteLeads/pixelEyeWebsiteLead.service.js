@@ -3,6 +3,8 @@ import { Op, fn, col } from "sequelize";
 import db from "../../database/index.js";
 import { getInclusiveDateRange, getMonthBounds, getTodayBounds } from "../../utils/dateTime.js";
 import { resolveClientId } from "../../utils/resolveClientContext.js";
+import { escapeCsvValue } from "../../utils/csv.js";
+import { withCreatedAtRange } from "../../utils/sequelizeFilters.js";
 
 const PIXEL_EYE_CLIENT_KEY = "pixeleye";
 const IST_TIMEZONE = "Asia/Kolkata";
@@ -78,13 +80,6 @@ const normalizePayload = (data) => {
 };
 
 const resolveTenantWhere = async (tenant, requestedClientKey, filters = {}) => {
-  if (!tenant?.isSuperAdmin) {
-    if (!tenant?.id) {
-      throw createHttpError(403, "A valid tenant context is required");
-    }
-    return tenant.getScope(filters);
-  }
-
   const clientId = await resolveClientId({
     tenant,
     requestedClientKey,
@@ -159,11 +154,6 @@ const listLeadRows = async (filters, tenant, options = {}) => {
   }
 
   return db.PixelEyeWebsiteLead.findAll(query);
-};
-
-const escapeCsvValue = (value) => {
-  const normalized = value == null ? "" : String(value);
-  return `"${normalized.replace(/"/g, '""')}"`;
 };
 
 const buildCsvBuffer = (rows) => {
@@ -383,22 +373,10 @@ export const getPixelEyeWebsiteLeadSummary = async (filters, tenant) => {
   const [totalLeads, todayLeads, thisMonthLeads, topServiceRow] = await Promise.all([
     db.PixelEyeWebsiteLead.count({ where }),
     db.PixelEyeWebsiteLead.count({
-      where: {
-        ...where,
-        created_at: {
-          [Op.gte]: todayStart,
-          [Op.lte]: now,
-        },
-      },
+      where: withCreatedAtRange(where, todayStart, now),
     }),
     db.PixelEyeWebsiteLead.count({
-      where: {
-        ...where,
-        created_at: {
-          [Op.gte]: monthStart,
-          [Op.lte]: now,
-        },
-      },
+      where: withCreatedAtRange(where, monthStart, now),
     }),
     db.PixelEyeWebsiteLead.findOne({
       attributes: ["service", [fn("COUNT", col("service")), "service_count"]],

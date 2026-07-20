@@ -3,6 +3,8 @@ import { Op, fn, col } from "sequelize";
 import db from "../../database/index.js";
 import { getInclusiveDateRange, getMonthBounds, getTodayBounds } from "../../utils/dateTime.js";
 import { resolveClientId } from "../../utils/resolveClientContext.js";
+import { escapeCsvValue } from "../../utils/csv.js";
+import { withCreatedAtRange } from "../../utils/sequelizeFilters.js";
 
 const AARAV_EYE_CARE_CLIENT_KEY = "aarav_eye_care";
 const IST_TIMEZONE = "Asia/Kolkata";
@@ -34,13 +36,6 @@ const createHttpError = (status, message) => {
 };
 
 const resolveTenantWhere = async (tenant, requestedClientKey, filters = {}) => {
-  if (!tenant?.isSuperAdmin) {
-    if (!tenant?.id) {
-      throw createHttpError(403, "A valid tenant context is required");
-    }
-    return tenant.getScope(filters);
-  }
-
   const clientId = await resolveClientId({
     tenant,
     requestedClientKey,
@@ -200,11 +195,6 @@ const mapLeadToExportRow = (lead, index) => ({
   created_at: formatExportTimestamp(lead.created_at),
   updated_at: formatExportTimestamp(lead.updated_at),
 });
-
-const escapeCsvValue = (value) => {
-  const normalized = value == null ? "" : String(value);
-  return `"${normalized.replace(/"/g, '""')}"`;
-};
 
 const buildCsvBuffer = (rows) => {
   const lines = [CSV_HEADERS.map(escapeCsvValue).join(",")];
@@ -452,22 +442,10 @@ export const getAaravEyeCareSummary = async (filters, tenant) => {
   const [totalLeads, todayLeads, thisMonthLeads, topServiceRow] = await Promise.all([
     db.AaravEyeCare.count({ where }),
     db.AaravEyeCare.count({
-      where: {
-        ...where,
-        created_at: {
-          [Op.gte]: todayStart,
-          [Op.lte]: now,
-        },
-      },
+      where: withCreatedAtRange(where, todayStart, now),
     }),
     db.AaravEyeCare.count({
-      where: {
-        ...where,
-        created_at: {
-          [Op.gte]: monthStart,
-          [Op.lte]: now,
-        },
-      },
+      where: withCreatedAtRange(where, monthStart, now),
     }),
     db.AaravEyeCare.findOne({
       attributes: ["service", [fn("COUNT", col("service")), "service_count"]],

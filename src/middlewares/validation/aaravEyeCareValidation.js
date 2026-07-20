@@ -35,7 +35,7 @@ const optionalService = Joi.string()
 
 export const aaravEyeCareCreateSchema = Joi.object({
   name: Joi.string().trim().max(150).required(),
-  mobile_number: Joi.string().trim().max(20).required(),
+  mobile_number: Joi.string().trim().max(20).pattern(/^[0-9+\-()\s]+$/).required(),
   service: optionalService,
   ip_address: optionalText(45),
   utm_source: optionalText(255),
@@ -43,7 +43,7 @@ export const aaravEyeCareCreateSchema = Joi.object({
 
 export const aaravEyeCarePublicCreateSchema = Joi.object({
   name: Joi.string().trim().max(150).required(),
-  mobile_number: Joi.string().trim().max(20).required(),
+  mobile_number: Joi.string().trim().max(20).pattern(/^[0-9+\-()\s]+$/).required(),
   service: optionalService,
   ip_address: optionalText(45),
   utm_source: optionalText(255),
@@ -52,7 +52,7 @@ export const aaravEyeCarePublicCreateSchema = Joi.object({
 
 export const aaravEyeCareUpdateSchema = Joi.object({
   name: Joi.string().trim().max(150).optional(),
-  mobile_number: Joi.string().trim().max(20).optional(),
+  mobile_number: Joi.string().trim().max(20).pattern(/^[0-9+\-()\s]+$/).optional(),
   service: optionalService,
   ip_address: optionalText(45),
   utm_source: optionalText(255),

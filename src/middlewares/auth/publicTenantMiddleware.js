@@ -1,11 +1,14 @@
 import db from "../../database/index.js";
-import { normalizeClientKey } from "../../utils/clientKey.js";
+import {
+  extractClientModuleKey,
+  normalizeClientKey,
+} from "../../utils/clientKey.js";
 
 /**
  * Middleware to resolve a tenant (client_id) from a public client_key.
  * Expects 'X-Client-Key' header or 'client_key' in body.
  */
-export const resolvePublicTenant = async (req, res, next) => {
+const resolvePublicTenantRequest = (expectedModuleKey) => async (req, res, next) => {
   const clientKeyRaw = req.headers["x-client-key"] || req.body.client_key;
 
   if (!clientKeyRaw) {
@@ -15,6 +18,13 @@ export const resolvePublicTenant = async (req, res, next) => {
   }
 
   const normalizedKey = normalizeClientKey(clientKeyRaw);
+
+  if (
+    expectedModuleKey &&
+    extractClientModuleKey(normalizedKey) !== expectedModuleKey
+  ) {
+    return res.status(401).json({ message: "Invalid Client Key" });
+  }
   
   try {
     const client = await db.Client.findOne({
@@ -33,3 +43,10 @@ export const resolvePublicTenant = async (req, res, next) => {
     return res.status(500).json({ message: "Internal Server Error during tenant resolution" });
   }
 };
+
+// Backward-compatible generic resolver. New public module routes should use
+// resolvePublicTenantForModule so a valid key cannot be used across modules.
+export const resolvePublicTenant = resolvePublicTenantRequest();
+
+export const resolvePublicTenantForModule = (expectedModuleKey) =>
+  resolvePublicTenantRequest(expectedModuleKey);

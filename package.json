@@ -9,9 +9,12 @@
     "seed:pixelEye": "node src/scripts/seedpixeleye.js",
     "db:drop": "node src/scripts/dropTables.js",
     "db:truncate": "node src/scripts/truncateTables.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "test:pixeleye-followup": "node src/scripts/integration/pixeleye_followup_integration_test.js",
-    "test:pixeleye-followup-outcome-metadata": "node src/scripts/integration/verifyPixelEyeFollowUpOutcomeMetadata.js"
+    "test": "npm run test:client-security && npm run test:client-modules && npm run test:core-security && npm run test:pixeleye-followup && npm run test:pixeleye-followup-outcome-metadata",
+    "test:client-security": "node src/scripts/verifyClientModuleSecurity.js",
+    "test:client-modules": "node src/scripts/verifyClientModuleParity.js",
+    "test:core-security": "node src/scripts/verifyCoreSecurityUtilities.js",
+    "test:pixeleye-followup": "node src/scripts/verifyPixelEyeStatusPolicyUpdate.js",
+    "test:pixeleye-followup-outcome-metadata": "node src/scripts/verifyPixelEyeCallLogIdempotency.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

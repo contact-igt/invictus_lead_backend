@@ -1,6 +1,6 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import { loginController } from "./auth.controller.js";
+import { loginController, refreshController } from "./auth.controller.js";
 
 const router = express.Router();
 
@@ -15,5 +15,6 @@ const authLimiter = rateLimit({
 });
 
 router.post("/login", authLimiter, loginController);
+router.post("/refresh", authLimiter, refreshController);
 
 export default router;
