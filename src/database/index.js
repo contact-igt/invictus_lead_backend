@@ -21,6 +21,7 @@ import { VlsMactMasterClassTable } from "./tables/VlsMactMasterClassTable/index.
 
 import { ShantiEyeTechTable } from './tables/ShantiEyeTechTable/index.js';
 import { PhoenixFitnessTable } from './tables/PhoenixFitnessTable/index.js';
+import { ApiLogTable } from "./tables/ApiLogTable/index.js";
 import { DATABASE_TIME_ZONE_OFFSET } from "../config/timezone.config.js";
 
 const dbconfig =
@@ -66,6 +67,7 @@ db.VlsFamilyLaw = vlsFamilyLawTable(Sequelize, sequelize);
 db.VlsMactMasterClass = VlsMactMasterClassTable(Sequelize, sequelize);
 db.ShantiEyeTech = ShantiEyeTechTable(Sequelize, sequelize);
 db.PhoenixFitness = PhoenixFitnessTable(Sequelize, sequelize);
+db.ApiLog = ApiLogTable(Sequelize, sequelize);
 
 const addClientId = (model) => {
   model.belongsTo(db.Client, { foreignKey: "client_id", as: "client" });
