@@ -34,6 +34,8 @@ import { ensurePixelEyeLeadNotesColumn } from "./database/migrations/ensurePixel
 
 import ShantiEyeTechRouter from './modules/shantiEyeTech/shantiEyeTech.routes.js';
 import PhoenixFitnessRouter from './modules/phoenixFitness/phoenixFitness.routes.js';
+import ApiLogsRouter from "./modules/apiLogs/apiLogs.routes.js";
+import { apiAuditLogger } from "./middlewares/apiAuditLogger.js";
 
 const app = express();
 
@@ -60,6 +62,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use(apiAuditLogger);
 
 // Rate limiting
 const apiLimiter = rateLimit({
@@ -126,6 +129,7 @@ app.use("/api/v1/rio", RioRouter);
 
 app.use('/api/v1/shanti-eye-tech', ShantiEyeTechRouter);
 app.use('/api/v1/phoenix-fitness', PhoenixFitnessRouter);
+app.use("/api/v1/api-logs", ApiLogsRouter);
 
 // Base route
 app.get("/", (req, res) => {

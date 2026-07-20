@@ -18,6 +18,7 @@ export const tableName = {
   RIO: "rio_leads",
   SHANTI_EYE_TECH: 'shanti_eye_tech_leads',
   PHOENIX_FITNESS: 'phoenix_fitness_leads',
+  API_LOGS: 'api_logs',
 };
 
 
