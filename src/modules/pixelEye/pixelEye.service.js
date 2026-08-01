@@ -1015,13 +1015,25 @@ const buildTenantContextWithClientId = (tenantContext, clientId) => {
   };
 };
 
-export const listPixelEyeLeads = async (tenantContext, clientId) => {
+export const listPixelEyeLeads = async (
+  tenantContext,
+  queryFilters = {},
+  clientId,
+) => {
   const scopedTenant = buildTenantContextWithClientId(tenantContext, clientId);
   const scopedClientId =
     clientId || (tenantContext?.isSuperAdmin ? null : tenantContext?.id);
   const safeModel = tenantSafe(db.PixelEye, tenantContext);
+
+  const baseFilters = buildLeadFilters(queryFilters);
+  const whereClause = scopedClientId
+    ? { ...baseFilters, client_id: scopedClientId }
+    : Object.keys(baseFilters).length > 0
+      ? baseFilters
+      : undefined;
+
   const leads = await safeModel.findAll({
-    where: scopedClientId ? { client_id: scopedClientId } : undefined,
+    where: whereClause,
     order: [
       ["updatedAt", "DESC"],
       ["createdAt", "DESC"],
