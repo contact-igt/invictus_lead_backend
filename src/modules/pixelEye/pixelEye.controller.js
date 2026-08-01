@@ -619,7 +619,14 @@ const getHistoryActor = (user) => ({
 export const getLeads = async (req, res) => {
   try {
     const scopedTenant = await resolvePixelEyeTenant(req);
-    const leads = await listPixelEyeLeads(scopedTenant);
+    const filters = {
+      dateFrom: String(req.query.dateFrom || req.query.from || "").trim(),
+      dateTo: String(req.query.dateTo || req.query.to || "").trim(),
+      agent: String(req.query.agent || req.query.agent_name || "").trim(),
+      status: String(req.query.status || "").trim(),
+      search: String(req.query.search || "").trim(),
+    };
+    const leads = await listPixelEyeLeads(scopedTenant, filters);
     return res.status(200).json({ data: leads });
   } catch (err) {
     return res.status(err.status || 500).json({ message: err.message });
