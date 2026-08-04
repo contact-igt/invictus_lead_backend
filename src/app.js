@@ -55,14 +55,6 @@ app.disable("etag");
 const corsOptions = {
   origin: true,
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "Accept",
-    "Origin",
-    "Access-Control-Allow-Origin",
-  ],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204,
