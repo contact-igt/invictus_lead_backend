@@ -168,7 +168,7 @@ const PORT = parseInt(process.env.PORT, 10) || parseInt(rawPort, 10) || 8000;
 
 await connect_mysql();
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT} [${line ?? "local"} mode]`);
 });
 
