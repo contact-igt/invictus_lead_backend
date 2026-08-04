@@ -11,6 +11,7 @@ export const SUPPORTED_CLIENT_MODULES = [
   "rio",
   'shanti_eye_tech',
   'phoenix_fitness',
+  'invictus',
 ];
 
 export const normalizeClientKey = (key) => {

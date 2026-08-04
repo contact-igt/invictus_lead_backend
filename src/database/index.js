@@ -23,6 +23,8 @@ import { VlsConsumerProtectionLawMasterClassTable } from "./tables/VlsConsumerPr
 import { ShantiEyeTechTable } from './tables/ShantiEyeTechTable/index.js';
 import { PhoenixFitnessTable } from './tables/PhoenixFitnessTable/index.js';
 import { ApiLogTable } from "./tables/ApiLogTable/index.js";
+import { InvictusGeneralEnquiryTable } from "./tables/InvictusGeneralEnquiryTable/index.js";
+import { InvictusCareersApplicationTable } from "./tables/InvictusCareersApplicationTable/index.js";
 import { DATABASE_TIME_ZONE_OFFSET } from "../config/timezone.config.js";
 
 const dbconfig =
@@ -70,6 +72,8 @@ db.VlsConsumerProtectionLawMasterClass = VlsConsumerProtectionLawMasterClassTabl
 db.ShantiEyeTech = ShantiEyeTechTable(Sequelize, sequelize);
 db.PhoenixFitness = PhoenixFitnessTable(Sequelize, sequelize);
 db.ApiLog = ApiLogTable(Sequelize, sequelize);
+db.InvictusGeneralEnquiry = InvictusGeneralEnquiryTable(Sequelize, sequelize);
+db.InvictusCareersApplication = InvictusCareersApplicationTable(Sequelize, sequelize);
 
 const addClientId = (model) => {
   model.belongsTo(db.Client, { foreignKey: "client_id", as: "client" });

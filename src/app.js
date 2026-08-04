@@ -36,6 +36,7 @@ import { ensurePixelEyeLeadNotesColumn } from "./database/migrations/ensurePixel
 import ShantiEyeTechRouter from './modules/shantiEyeTech/shantiEyeTech.routes.js';
 import PhoenixFitnessRouter from './modules/phoenixFitness/phoenixFitness.routes.js';
 import ApiLogsRouter from "./modules/apiLogs/apiLogs.routes.js";
+import InvictusEnquiryRouter from "./modules/invictusEnquiry/invictusEnquiry.routes.js";
 import { apiAuditLogger } from "./middlewares/apiAuditLogger.js";
 
 const app = express();
@@ -132,6 +133,7 @@ app.use("/api/v1/rio", RioRouter);
 app.use('/api/v1/shanti-eye-tech', ShantiEyeTechRouter);
 app.use('/api/v1/phoenix-fitness', PhoenixFitnessRouter);
 app.use("/api/v1/api-logs", ApiLogsRouter);
+app.use("/api/v1/invictus-enquiries", InvictusEnquiryRouter);
 
 // Base route
 app.get("/", (req, res) => {
