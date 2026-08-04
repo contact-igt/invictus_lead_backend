@@ -42,20 +42,27 @@ import { apiAuditLogger } from "./middlewares/apiAuditLogger.js";
 const app = express();
 
 // Set security HTTP headers
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
 app.set("trust proxy", 1);
 
 // API clients expect fresh JSON data; avoid conditional cache 304 responses.
 app.disable("etag");
 
-// const whitelist = (process.env.CORS_ALLOWED_ORIGINS || "http://localhost:4000")
-//   .split(",")
-//   .map((origin) => origin.trim())
-//   .filter(Boolean);
-
 const corsOptions = {
   origin: true,
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+    "Access-Control-Allow-Origin",
+  ],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204,
@@ -76,6 +83,7 @@ const apiLimiter = rateLimit({
 
 // Apply the API rate limiter
 app.use("/api/v1/", (req, res, next) => {
+  if (req.method === "OPTIONS") return next();
   if (req.path.startsWith("/pixeleye/webhook")) return next();
   return apiLimiter(req, res, next);
 });
