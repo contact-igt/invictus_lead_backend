@@ -55,13 +55,15 @@ app.disable("etag");
 
 const corsOptions = {
   origin: true,
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Cache-Control", "Pragma", "Expires", "ngrok-skip-browser-warning"],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204,
 };
 
 app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(apiAuditLogger);
@@ -171,10 +173,4 @@ await connect_mysql();
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT} [${line ?? "local"} mode]`);
 });
-
-
-
-
-
-
 
