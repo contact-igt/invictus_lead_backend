@@ -55,15 +55,13 @@ app.disable("etag");
 
 const corsOptions = {
   origin: true,
-  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "Cache-Control", "Pragma", "Expires", "ngrok-skip-browser-warning"],
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204,
 };
 
 app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(apiAuditLogger);
@@ -166,11 +164,17 @@ const { line, live, development, local } =
 const rawPort =
   line === "production" ? live : line === "development" ? development : local;
 
-const PORT = parseInt(process.env.PORT, 10) || parseInt(rawPort, 10) || 8000;
+const PORT = parseInt(rawPort, 10) || 8000;
 
 await connect_mysql();
 
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, () => {
   console.log(`Server running on port ${PORT} [${line ?? "local"} mode]`);
 });
+
+
+
+
+
+
 
