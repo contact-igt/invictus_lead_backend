@@ -4,24 +4,39 @@ import db from "../database/index.js";
 const SENSITIVE_KEY = /password|token|authorization|secret|api[_-]?key|signature/i;
 const MAX_PREVIEW_LENGTH = 8000;
 
-const redact = (value, depth = 0) => {
+const redact = (value, depth = 0, seen = new WeakSet()) => {
   if (depth > 5 || value == null) return value ?? null;
-  if (Array.isArray(value)) return value.slice(0, 50).map((item) => redact(item, depth + 1));
   if (typeof value !== "object") return value;
-  return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [
-      key,
-      SENSITIVE_KEY.test(key) ? "[REDACTED]" : redact(item, depth + 1),
-    ]),
-  );
+  if (seen.has(value)) return "[CIRCULAR]";
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    return value.slice(0, 50).map((item) => redact(item, depth + 1, seen));
+  }
+
+  try {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        SENSITIVE_KEY.test(key) ? "[REDACTED]" : redact(item, depth + 1, seen),
+      ]),
+    );
+  } catch {
+    return "[UNSERIALIZABLE]";
+  }
 };
 
 const toPreview = (value) => {
   if (value === undefined || value === null) return null;
-  const safeValue = redact(value);
-  const text = JSON.stringify(safeValue);
-  if (text.length <= MAX_PREVIEW_LENGTH) return safeValue;
-  return { truncated: true, preview: text.slice(0, MAX_PREVIEW_LENGTH) };
+  try {
+    const safeValue = redact(value);
+    const text = JSON.stringify(safeValue);
+    if (!text) return null;
+    if (text.length <= MAX_PREVIEW_LENGTH) return safeValue;
+    return { truncated: true, preview: text.slice(0, MAX_PREVIEW_LENGTH) };
+  } catch {
+    return { error: "Failed to serialize log payload" };
+  }
 };
 
 export const apiAuditLogger = (req, res, next) => {

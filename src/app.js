@@ -164,7 +164,7 @@ const { line, live, development, local } =
 const rawPort =
   line === "production" ? live : line === "development" ? development : local;
 
-const PORT = parseInt(rawPort, 10) || 8000;
+const PORT = parseInt(process.env.PORT, 10) || parseInt(rawPort, 10) || 8000;
 
 await connect_mysql();
 

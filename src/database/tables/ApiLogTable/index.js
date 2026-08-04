@@ -25,19 +25,11 @@ export const ApiLogTable = (Sequelize, sequelize) =>
         defaultValue: sequelize.literal("CURRENT_TIMESTAMP"),
         field: "created_at",
       },
-      updatedAt: {
-        type: "TIMESTAMP",
-        allowNull: false,
-        defaultValue: sequelize.literal("CURRENT_TIMESTAMP"),
-        field: "updated_at",
-      },
     },
     {
       tableName: tableName.API_LOGS,
       freezeTableName: true,
-      timestamps: true,
-      createdAt: "created_at",
-      updatedAt: false,
+      timestamps: false,
       indexes: [
         { fields: ["created_at"] },
         { fields: ["status_code"] },
