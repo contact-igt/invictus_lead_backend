@@ -6,8 +6,8 @@ const vlsAibeRegistrationSchema = Joi.object({
   email: Joi.string().email().lowercase().required(),
 
   amount: Joi.string().trim().optional().allow(null, ""),
-  programm_start_date: Joi.date().iso().required(),
-  programm_end_date: Joi.date().iso().required(),
+  programm_start_date: Joi.alternatives().try(Joi.date().iso(), Joi.string().trim()).optional().allow(null, ""),
+  programm_end_date: Joi.alternatives().try(Joi.date().iso(), Joi.string().trim()).optional().allow(null, ""),
 
   payment_status: Joi.string()
     .valid("paid", "failed", "attempted", "cancelled", "waitlist")
