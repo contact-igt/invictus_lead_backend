@@ -11,7 +11,7 @@ const propertyLawRegistrationSchema = Joi.object({
   years_of_practice: Joi.string().trim().optional().allow(null, ""),
 
   amount: Joi.number().optional().allow(null),
-  programm_date: Joi.alternatives().try(Joi.date().iso(), Joi.string().trim()).optional().allow(null, ""),
+  programm_date: Joi.string().trim().optional().allow(null, ""),
 
   razorpay_order_id: Joi.string().optional().allow(null, ""),
   razorpay_payment_id: Joi.string().optional().allow(null, ""),
