@@ -12,7 +12,7 @@ const baseVlsLawSchema = {
 export const vlsLawPracticeSchema = Joi.object({
   ...baseVlsLawSchema,
   amount: Joi.string().trim().optional().allow(null, ""),
-  programm_date: Joi.date().iso().required(),
+  programm_date: Joi.alternatives().try(Joi.date().iso(), Joi.string().trim()).optional().allow(null, ""),
   page_name: Joi.string()
     .valid("decoding-of-practice", "decoding-of-law-practice")
     .required(),
@@ -35,8 +35,8 @@ export const vlsLawAcademySchema = Joi.object({
 export const vlsLawAibeSchema = Joi.object({
   ...baseVlsLawSchema,
   amount: Joi.string().trim().optional().allow(null, ""),
-  programm_start_date: Joi.date().iso().required(),
-  programm_end_date: Joi.date().iso().required(),
+  programm_start_date: Joi.alternatives().try(Joi.date().iso(), Joi.string().trim()).optional().allow(null, ""),
+  programm_end_date: Joi.alternatives().try(Joi.date().iso(), Joi.string().trim()).optional().allow(null, ""),
   payment_status: Joi.string()
     .valid("paid", "failed", "attempted", "cancelled", "waitlist")
     .optional()
@@ -54,7 +54,7 @@ export const vlsLawPropertySchema = Joi.object({
   mobile: Joi.string().trim().required(),
   years_of_practice: Joi.string().trim().optional().allow(null, ""),
   amount: Joi.number().optional().allow(null),
-  programm_date: Joi.date().iso().optional().allow(null, ""),
+  programm_date: Joi.alternatives().try(Joi.date().iso(), Joi.string().trim()).optional().allow(null, ""),
   registered_date: Joi.date().iso().optional().allow(null, ""),
   payment_status: Joi.string()
     .valid("paid", "failed", "attempted", "cancelled", "waitlist")
@@ -79,7 +79,7 @@ export const vlsLawFamilySchema = Joi.object({
   mobile: Joi.string().trim().required(),
   years_of_practice: Joi.string().trim().optional().allow(null, ""),
   amount: Joi.number().optional().allow(null),
-  programm_date: Joi.date().iso().optional().allow(null, ""),
+  programm_date: Joi.alternatives().try(Joi.date().iso(), Joi.string().trim()).optional().allow(null, ""),
   registered_date: Joi.date().iso().optional().allow(null, ""),
   payment_status: Joi.string()
     .valid("paid", "failed", "attempted", "cancelled", "waitlist")

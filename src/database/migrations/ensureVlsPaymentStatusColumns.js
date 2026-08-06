@@ -24,8 +24,27 @@ export const ensureVlsPaymentStatusColumns = async () => {
         );
         console.log(`[Schema] Updated ${table}.payment_status to VARCHAR(50) NULL`);
       }
+
+      if (columns && columns.programm_date) {
+        await db.sequelize.query(
+          `ALTER TABLE \`${table}\` MODIFY COLUMN \`programm_date\` VARCHAR(100) NULL;`
+        );
+        console.log(`[Schema] Updated ${table}.programm_date to VARCHAR(100) NULL`);
+      }
+
+      if (columns && columns.programm_start_date) {
+        await db.sequelize.query(
+          `ALTER TABLE \`${table}\` MODIFY COLUMN \`programm_start_date\` VARCHAR(100) NULL;`
+        );
+      }
+
+      if (columns && columns.programm_end_date) {
+        await db.sequelize.query(
+          `ALTER TABLE \`${table}\` MODIFY COLUMN \`programm_end_date\` VARCHAR(100) NULL;`
+        );
+      }
     } catch (err) {
-      console.warn(`[Schema Warning] Could not alter payment_status on ${table}:`, err.message);
+      console.warn(`[Schema Warning] Could not alter columns on ${table}:`, err.message);
     }
   }
 

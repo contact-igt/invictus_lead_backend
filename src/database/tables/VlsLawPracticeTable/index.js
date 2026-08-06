@@ -40,8 +40,8 @@ export const vlslawpracticeTable = (Sequelize, sequelize) => {
     },
 
     programm_date: {
-      type: Sequelize.DATE,
-      allowNull: false,
+      type: Sequelize.STRING(100),
+      allowNull: true,
     },
 
     payment_status: {

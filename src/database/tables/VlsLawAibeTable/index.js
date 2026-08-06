@@ -40,13 +40,13 @@ export const vlslawaibeTable = (Sequelize, sequelize) => {
     },
 
     programm_start_date: {
-      type: Sequelize.DATE,
-      allowNull: false,
+      type: Sequelize.STRING(100),
+      allowNull: true,
     },
 
     programm_end_date: {
-      type: Sequelize.DATE,
-      allowNull: false,
+      type: Sequelize.STRING(100),
+      allowNull: true,
     },
 
     payment_status: {
