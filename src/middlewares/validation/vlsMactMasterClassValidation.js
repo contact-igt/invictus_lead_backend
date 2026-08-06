@@ -25,7 +25,7 @@ export const vlsMactMasterClassCreateSchema = Joi.object(editableFields).unknown
 export const vlsMactMasterClassPublicCreateSchema = Joi.object({
   ...editableFields,
   client_key: Joi.string().trim().lowercase().max(100).optional(),
-}).unknown(false);
+}).unknown(true);
 
 export const vlsMactMasterClassUpdateSchema = Joi.object({
   ...editableFields,
@@ -65,6 +65,7 @@ const validate = (source, schema) => (req, res, next) => {
   const { error, value } = schema.validate(req[source], {
     abortEarly: false,
     convert: true,
+    stripUnknown: true,
   });
 
   if (error) {
