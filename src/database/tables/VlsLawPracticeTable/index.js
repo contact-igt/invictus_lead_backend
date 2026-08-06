@@ -45,8 +45,8 @@ export const vlslawpracticeTable = (Sequelize, sequelize) => {
     },
 
     payment_status: {
-      type: Sequelize.ENUM("paid", "failed", "attempted", "cancelled"),
-      allowNull: false,
+      type: Sequelize.STRING(50),
+      allowNull: true,
     },
 
     captured: {

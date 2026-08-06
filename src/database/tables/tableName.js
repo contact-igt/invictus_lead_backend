@@ -8,6 +8,7 @@ export const tableName = {
   VLSLAWFAMILY: "vls_family_laws",
   VLS_MACT_MASTER_CLASS: "vls_mact_master_class_leads",
   VLS_CONSUMER_PROTECTION_LAW_MASTER_CLASS: "vls_consumer_protection_law_master_classes",
+  VLS_DOP_AI_ASSISTED: "vls_dop_ai_assisted",
   PIXELEYE: "pixel_eyes",
   PIXELEYE_WEBSITE_LEADS: "pixel_eye_website_leads",
   PIXELEYE_LEAD_STATE: "pixel_eye_lead_states",

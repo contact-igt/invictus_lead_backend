@@ -18,8 +18,10 @@ const propertyLawRegistrationSchema = Joi.object({
   razorpay_signature: Joi.string().optional().allow(null, ""),
 
   payment_status: Joi.string()
-    .valid("paid", "failed", "attempted", "cancelled")
-    .required(),
+    .valid("paid", "failed", "attempted", "cancelled", "waitlist")
+    .optional()
+    .default("attempted")
+    .allow(null, ""),
 
   page_name: Joi.string().trim().optional().allow(null, ""),
 
