@@ -34,6 +34,7 @@ export const registerVlsAibe = async (data, clientId) => {
     email,
     mobile,
     amount,
+    programm_date,
     programm_start_date,
     programm_end_date,
     payment_status,
@@ -49,9 +50,9 @@ export const registerVlsAibe = async (data, clientId) => {
     name,
     email,
     mobile,
-    amount: amount ?? null,
-    programm_start_date: programm_start_date ?? null,
-    programm_end_date: programm_end_date ?? null,
+    amount: amount !== undefined && amount !== null && amount !== "" ? String(amount) : null,
+    programm_start_date: programm_start_date || programm_date || null,
+    programm_end_date: programm_end_date || programm_date || null,
     registered_date: new Date(),
     ip_address: ip_address ?? null,
     utm_source: utm_source ?? null,
@@ -61,7 +62,7 @@ export const registerVlsAibe = async (data, clientId) => {
   if (razorpay_payment_id) payload.razorpay_payment_id = razorpay_payment_id;
   if (razorpay_signature) payload.razorpay_signature = razorpay_signature;
   if (payment_status !== undefined && payment_status !== null && payment_status !== "") payload.payment_status = payment_status;
-  if (typeof captured !== "undefined") payload.captured = captured;
+  if (typeof captured !== "undefined") payload.captured = captured === true || captured === "true";
 
   return await db.VlsLawAibe.create(payload);
 };
@@ -84,6 +85,7 @@ export const createVlsAibeByAdmin = async (data, tenant) => {
     email,
     mobile,
     amount,
+    programm_date,
     programm_start_date,
     programm_end_date,
     payment_status,
@@ -99,9 +101,9 @@ export const createVlsAibeByAdmin = async (data, tenant) => {
     name,
     email,
     mobile,
-    amount: amount ?? null,
-    programm_start_date: programm_start_date ?? null,
-    programm_end_date: programm_end_date ?? null,
+    amount: amount !== undefined && amount !== null && amount !== "" ? String(amount) : null,
+    programm_start_date: programm_start_date || programm_date || null,
+    programm_end_date: programm_end_date || programm_date || null,
     registered_date: new Date(),
     ip_address: ip_address ?? null,
     utm_source: utm_source ?? null,
@@ -111,7 +113,7 @@ export const createVlsAibeByAdmin = async (data, tenant) => {
   if (razorpay_payment_id) payload.razorpay_payment_id = razorpay_payment_id;
   if (razorpay_signature) payload.razorpay_signature = razorpay_signature;
   if (payment_status !== undefined && payment_status !== null && payment_status !== "") payload.payment_status = payment_status;
-  if (typeof captured !== "undefined") payload.captured = captured;
+  if (typeof captured !== "undefined") payload.captured = captured === true || captured === "true";
 
   return await db.VlsLawAibe.create(payload);
 };

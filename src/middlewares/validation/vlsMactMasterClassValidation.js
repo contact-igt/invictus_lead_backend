@@ -1,7 +1,7 @@
 import Joi from "joi";
 
 const optionalText = (max) => Joi.string().trim().max(max).allow(null, "").optional();
-const optionalDate = Joi.date().iso().allow(null, "").optional();
+const optionalDate = Joi.string().trim().max(100).allow(null, "").optional();
 
 const amountSchema = Joi.number().min(0).precision(2).allow(null, "").optional();
 const capturedSchema = Joi.boolean().allow(null, "").optional();

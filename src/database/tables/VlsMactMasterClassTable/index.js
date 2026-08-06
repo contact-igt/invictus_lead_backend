@@ -40,7 +40,7 @@ export const VlsMactMasterClassTable = (Sequelize, sequelize) => {
     },
 
     programm_date: {
-      type: Sequelize.DATE,
+      type: Sequelize.STRING(100),
       allowNull: true,
     },
 
