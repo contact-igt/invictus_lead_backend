@@ -37,7 +37,7 @@ export const vlsConsumerProtectionLawMasterClassCreateSchema = Joi.object(editab
 export const vlsConsumerProtectionLawMasterClassPublicCreateSchema = Joi.object({
   ...editableFields,
   client_key: Joi.string().trim().lowercase().max(100).optional(),
-}).unknown(false);
+}).unknown(true);
 
 export const vlsConsumerProtectionLawMasterClassUpdateSchema = Joi.object({
   ...editableFields,
@@ -77,6 +77,7 @@ const validate = (source, schema) => (req, res, next) => {
   const { error, value } = schema.validate(req[source], {
     abortEarly: false,
     convert: true,
+    stripUnknown: true,
   });
 
   if (error) {
