@@ -17,8 +17,10 @@ export const vlsLawPracticeSchema = Joi.object({
     .valid("decoding-of-practice", "decoding-of-law-practice")
     .required(),
   payment_status: Joi.string()
-    .valid("paid", "failed", "attempted", "cancelled", "authorized")
-    .required(),
+    .valid("paid", "failed", "attempted", "cancelled", "authorized", "waitlist")
+    .optional()
+    .default("attempted")
+    .allow(null, ""),
   captured: Joi.boolean().default(true),
   razorpay_order_id: Joi.string().optional().allow(null, ""),
   razorpay_payment_id: Joi.string().optional().allow(null, ""),
@@ -36,8 +38,9 @@ export const vlsLawAibeSchema = Joi.object({
   programm_start_date: Joi.date().iso().required(),
   programm_end_date: Joi.date().iso().required(),
   payment_status: Joi.string()
-    .valid("paid", "failed", "attempted", "cancelled")
+    .valid("paid", "failed", "attempted", "cancelled", "waitlist")
     .optional()
+    .default("attempted")
     .allow(null, ""),
   captured: Joi.boolean().default(true),
   razorpay_order_id: Joi.string().optional().allow(null, ""),
@@ -54,8 +57,10 @@ export const vlsLawPropertySchema = Joi.object({
   programm_date: Joi.date().iso().optional().allow(null, ""),
   registered_date: Joi.date().iso().optional().allow(null, ""),
   payment_status: Joi.string()
-    .valid("paid", "failed", "attempted", "cancelled")
-    .required(),
+    .valid("paid", "failed", "attempted", "cancelled", "waitlist")
+    .optional()
+    .default("attempted")
+    .allow(null, ""),
   page_name: Joi.string().trim().optional().allow(null, ""),
   ip_address: Joi.string().optional().allow(null, ""),
   utm_source: Joi.string().optional().allow(null, ""),
@@ -77,8 +82,37 @@ export const vlsLawFamilySchema = Joi.object({
   programm_date: Joi.date().iso().optional().allow(null, ""),
   registered_date: Joi.date().iso().optional().allow(null, ""),
   payment_status: Joi.string()
-    .valid("paid", "failed", "attempted", "cancelled")
-    .required(),
+    .valid("paid", "failed", "attempted", "cancelled", "waitlist")
+    .optional()
+    .default("attempted")
+    .allow(null, ""),
+  page_name: Joi.string().trim().optional().allow(null, ""),
+  ip_address: Joi.string().optional().allow(null, ""),
+  utm_source: Joi.string().optional().allow(null, ""),
+  utm_medium: Joi.string().optional().allow(null, ""),
+  utm_campaign: Joi.string().optional().allow(null, ""),
+  utm_term: Joi.string().optional().allow(null, ""),
+  utm_content: Joi.string().optional().allow(null, ""),
+  razorpay_order_id: Joi.string().optional().allow(null, ""),
+  razorpay_payment_id: Joi.string().optional().allow(null, ""),
+  razorpay_signature: Joi.string().optional().allow(null, ""),
+  _client_key: Joi.string().optional().allow(null, ""),
+  client_key: Joi.string().optional().allow(null, ""),
+});
+
+export const vlsLawDopAiAssistedSchema = Joi.object({
+  name: Joi.string().trim().optional().allow(null, ""),
+  email: Joi.string().email().optional().allow(null, ""),
+  mobile: Joi.string().trim().required(),
+  programm_date: Joi.string().optional().allow(null, ""),
+  amount: Joi.alternatives().try(Joi.number(), Joi.string()).optional().allow(null, ""),
+  registered_date: Joi.date().iso().optional().allow(null, ""),
+  payment_status: Joi.string()
+    .valid("paid", "failed", "attempted", "cancelled", "waitlist")
+    .optional()
+    .default("attempted")
+    .allow(null, ""),
+  captured: Joi.alternatives().try(Joi.boolean(), Joi.string()).optional().allow(null, ""),
   page_name: Joi.string().trim().optional().allow(null, ""),
   ip_address: Joi.string().optional().allow(null, ""),
   utm_source: Joi.string().optional().allow(null, ""),
@@ -99,6 +133,7 @@ const schemas = {
   vlslaw_aibe: vlsLawAibeSchema,
   vlslaw_property: vlsLawPropertySchema,
   vlslaw_family: vlsLawFamilySchema,
+  vlslaw_dop_ai_assisted: vlsLawDopAiAssistedSchema,
 };
 
 const getSchemaForRequest = (schema, method) => {

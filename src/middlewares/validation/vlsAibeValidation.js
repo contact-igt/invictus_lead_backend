@@ -10,8 +10,9 @@ const vlsAibeRegistrationSchema = Joi.object({
   programm_end_date: Joi.date().iso().required(),
 
   payment_status: Joi.string()
-    .valid("paid", "failed", "attempted", "cancelled")
+    .valid("paid", "failed", "attempted", "cancelled", "waitlist")
     .optional()
+    .default("attempted")
     .allow(null, ""),
 
   captured: Joi.boolean().default(true),

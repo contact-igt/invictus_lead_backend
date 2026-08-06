@@ -1,7 +1,7 @@
 import { tableName } from "../tableName.js";
 
-export const vlslawaibeTable = (Sequelize, sequelize) => {
-  return sequelize.define(tableName?.VLSLAWAIBE, {
+export const vlsDopAiAssistedTable = (Sequelize, sequelize) => {
+  return sequelize.define(tableName.VLS_DOP_AI_ASSISTED, {
     client_id: {
       type: Sequelize.INTEGER,
       allowNull: false,
@@ -29,6 +29,11 @@ export const vlslawaibeTable = (Sequelize, sequelize) => {
       },
     },
 
+    programm_date: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+
     amount: {
       type: Sequelize.DECIMAL(10, 2),
       allowNull: true,
@@ -37,16 +42,22 @@ export const vlslawaibeTable = (Sequelize, sequelize) => {
     registered_date: {
       type: Sequelize.DATE,
       allowNull: false,
+      defaultValue: Sequelize.NOW,
     },
 
-    programm_start_date: {
-      type: Sequelize.DATE,
-      allowNull: false,
+    razorpay_order_id: {
+      type: Sequelize.STRING,
+      allowNull: true,
     },
 
-    programm_end_date: {
-      type: Sequelize.DATE,
-      allowNull: false,
+    razorpay_payment_id: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+
+    razorpay_signature: {
+      type: Sequelize.STRING,
+      allowNull: true,
     },
 
     payment_status: {
@@ -55,8 +66,13 @@ export const vlslawaibeTable = (Sequelize, sequelize) => {
     },
 
     captured: {
-      type: Sequelize.BOOLEAN,
-      defaultValue: true,
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+
+    page_name: {
+      type: Sequelize.STRING,
+      allowNull: true,
     },
 
     ip_address: {
@@ -65,6 +81,26 @@ export const vlslawaibeTable = (Sequelize, sequelize) => {
     },
 
     utm_source: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+
+    utm_medium: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+
+    utm_campaign: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+
+    utm_term: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+
+    utm_content: {
       type: Sequelize.STRING,
       allowNull: true,
     },

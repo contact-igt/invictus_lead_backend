@@ -21,6 +21,7 @@ import AntardrashtiNetralayaRouter from "./modules/antardrashtiNetralaya/antardr
 import RioRouter from "./modules/rio/rio.routes.js";
 import VlsMactMasterClassRouter from "./modules/vlsMactMasterClass/vlsMactMasterClass.routes.js";
 import VlsConsumerProtectionLawMasterClassRouter from "./modules/vlsConsumerProtectionLawMasterClass/vlsConsumerProtectionLawMasterClass.routes.js";
+import VlsDopAiAssistedRouter from "./modules/vls/vlsDopAiAssisted/vlsDopAiAssisted.routes.js";
 import { ensurePixelEyeLeadStateCurrentDayColumn } from "./database/migrations/ensurePixelEyeLeadStateCurrentDay.js";
 import { ensurePixelEyeLeadStateLeadIdColumn } from "./database/migrations/ensurePixelEyeLeadStateLeadId.js";
 import { ensurePixelEyeLeadStateCompletionSourceColumn } from "./database/migrations/ensurePixelEyeLeadStateCompletionSource.js";
@@ -32,6 +33,7 @@ import { ensurePixelEyeFollowUpCallComplianceTable } from "./database/migrations
 import { ensurePixelEyePhoneNormalization } from "./database/migrations/ensurePixelEyePhoneNormalization.js";
 import ensureAddFollowUpHistoryMetadataColumn from "./database/migrations/ensureAddFollowUpHistoryMetadataColumn.js";
 import { ensurePixelEyeLeadNotesColumn } from "./database/migrations/ensurePixelEyeLeadNotesColumn.js";
+import { ensureVlsPaymentStatusColumns } from "./database/migrations/ensureVlsPaymentStatusColumns.js";
 
 import ShantiEyeTechRouter from './modules/shantiEyeTech/shantiEyeTech.routes.js';
 import PhoenixFitnessRouter from './modules/phoenixFitness/phoenixFitness.routes.js';
@@ -104,6 +106,7 @@ const connect_mysql = async () => {
     await ensurePixelEyePhoneNormalization();
     await ensurePixelEyeLeadNotesColumn();
     await ensureAddFollowUpHistoryMetadataColumn();
+    await ensureVlsPaymentStatusColumns();
     console.log("Database synchronized for Multi-Tenant architecture");
     startPixelEyeScheduler();
     startPixelEyeFollowUpComplianceScheduler();
@@ -126,6 +129,7 @@ app.use("/api/v1/family-law", FamilyLawRouter);
 app.use("/api/v1/vls-aibe", VlsAibeRouter);
 app.use("/api/v1/vls-mact-master-class", VlsMactMasterClassRouter);
 app.use("/api/v1/vls-consumer-protection-law-master-class", VlsConsumerProtectionLawMasterClassRouter);
+app.use("/api/v1/vls-dop-ai-assisted", VlsDopAiAssistedRouter);
 app.use("/api/v1/aarav-eye-care", AaravEyeCareRouter);
 app.use("/api/v1/antardrashti-netralaya", AntardrashtiNetralayaRouter);
 app.use("/api/v1/rio", RioRouter);

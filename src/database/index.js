@@ -19,6 +19,7 @@ import { AntardrashtiNetralayaTable } from "./tables/AntardrashtiNetralayaTable/
 import { RioTable } from "./tables/RioTable/index.js";
 import { VlsMactMasterClassTable } from "./tables/VlsMactMasterClassTable/index.js";
 import { VlsConsumerProtectionLawMasterClassTable } from "./tables/VlsConsumerProtectionLawMasterClassTable/index.js";
+import { vlsDopAiAssistedTable } from "./tables/VlsDopAiAssistedTable/index.js";
 
 import { ShantiEyeTechTable } from './tables/ShantiEyeTechTable/index.js';
 import { PhoenixFitnessTable } from './tables/PhoenixFitnessTable/index.js';
@@ -69,6 +70,7 @@ db.VlsPropertyLaw = vlsPropertyLawTable(Sequelize, sequelize);
 db.VlsFamilyLaw = vlsFamilyLawTable(Sequelize, sequelize);
 db.VlsMactMasterClass = VlsMactMasterClassTable(Sequelize, sequelize);
 db.VlsConsumerProtectionLawMasterClass = VlsConsumerProtectionLawMasterClassTable(Sequelize, sequelize);
+db.VlsDopAiAssisted = vlsDopAiAssistedTable(Sequelize, sequelize);
 db.ShantiEyeTech = ShantiEyeTechTable(Sequelize, sequelize);
 db.PhoenixFitness = PhoenixFitnessTable(Sequelize, sequelize);
 db.ApiLog = ApiLogTable(Sequelize, sequelize);
@@ -90,6 +92,7 @@ addClientId(db.VlsPropertyLaw);
 addClientId(db.VlsFamilyLaw);
 addClientId(db.VlsMactMasterClass);
 addClientId(db.VlsConsumerProtectionLawMasterClass);
+addClientId(db.VlsDopAiAssisted);
 addClientId(db.PixelEye);
 addClientId(db.PixelEyeLeadState);
 addClientId(db.AaravEyeCare);

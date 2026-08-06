@@ -1,17 +1,12 @@
 import Joi from "joi";
 
-const familyLawRegistrationSchema = Joi.object({
-  name: Joi.string().trim().required(),
-  email: Joi.string().email().lowercase().required(),
+const vlsDopAiAssistedRegistrationSchema = Joi.object({
+  name: Joi.string().trim().optional().allow(null, ""),
+  email: Joi.string().email().lowercase().optional().allow(null, ""),
   mobile: Joi.string().trim().required(),
 
-  // Accept camelCase from landing page
-  yearsOfPractice: Joi.string().trim().optional().allow(null, ""),
-  // Accept snake_case too (admin/test clients)
-  years_of_practice: Joi.string().trim().optional().allow(null, ""),
-
-  amount: Joi.number().optional().allow(null),
-  programm_date: Joi.date().iso().optional().allow(null, ""),
+  programm_date: Joi.string().optional().allow(null, ""),
+  amount: Joi.alternatives().try(Joi.number(), Joi.string()).optional().allow(null, ""),
 
   razorpay_order_id: Joi.string().optional().allow(null, ""),
   razorpay_payment_id: Joi.string().optional().allow(null, ""),
@@ -23,8 +18,8 @@ const familyLawRegistrationSchema = Joi.object({
     .default("attempted")
     .allow(null, ""),
 
+  captured: Joi.alternatives().try(Joi.boolean(), Joi.string()).optional().allow(null, ""),
   page_name: Joi.string().trim().optional().allow(null, ""),
-
   ip_address: Joi.string().optional().allow(null, ""),
 
   utm_source: Joi.string().optional().allow(null, ""),
@@ -33,13 +28,12 @@ const familyLawRegistrationSchema = Joi.object({
   utm_term: Joi.string().optional().allow(null, ""),
   utm_content: Joi.string().optional().allow(null, ""),
 
-  // Admin panel passes _client_key so super-admin can resolve client_id
   _client_key: Joi.string().optional().allow(null, ""),
   client_key: Joi.string().optional().allow(null, ""),
 });
 
-export const validateFamilyLawRegistration = (req, res, next) => {
-  const { error, value } = familyLawRegistrationSchema.validate(req.body, {
+export const validateVlsDopAiAssistedRegistration = (req, res, next) => {
+  const { error, value } = vlsDopAiAssistedRegistrationSchema.validate(req.body, {
     abortEarly: false,
     stripUnknown: true,
   });
