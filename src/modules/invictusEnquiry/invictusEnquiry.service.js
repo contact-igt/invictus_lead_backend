@@ -270,22 +270,33 @@ export const listCareersApplications = async (query = {}) => {
   const roleSlugFilter = query.role_slug || query.role || "";
 
   const where = {};
+  const andConditions = [];
+
   if (status) where.status = status;
 
   if (roleSlugFilter && roleSlugFilter.toLowerCase() !== "all") {
     const targetSlug = slugifyRole(roleSlugFilter);
-    where.role_slug = targetSlug;
+    andConditions.push({
+      [Op.or]: [
+        { role_slug: targetSlug },
+        { role: roleSlugFilter },
+      ],
+    });
   }
 
   if (search) {
-    const searchConditions = [
-      { full_name: { [Op.like]: `%${search}%` } },
-      { email: { [Op.like]: `%${search}%` } },
-      { phone: { [Op.like]: `%${search}%` } },
-      { application_reference: { [Op.like]: `%${search}%` } },
-    ];
+    andConditions.push({
+      [Op.or]: [
+        { full_name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
+        { phone: { [Op.like]: `%${search}%` } },
+        { application_reference: { [Op.like]: `%${search}%` } },
+      ],
+    });
+  }
 
-    where[Op.or] = searchConditions;
+  if (andConditions.length > 0) {
+    where[Op.and] = andConditions;
   }
 
   const { rows, count } = await db.InvictusCareersApplication.findAndCountAll({
@@ -332,20 +343,33 @@ export const exportCareersApplicationsCSV = async (query = {}) => {
   const roleSlugFilter = query.role_slug || query.role || "";
 
   const where = {};
+  const andConditions = [];
+
   if (status) where.status = status;
 
   if (roleSlugFilter && roleSlugFilter.toLowerCase() !== "all") {
     const targetSlug = slugifyRole(roleSlugFilter);
-    where.role_slug = targetSlug;
+    andConditions.push({
+      [Op.or]: [
+        { role_slug: targetSlug },
+        { role: roleSlugFilter },
+      ],
+    });
   }
 
   if (search) {
-    where[Op.or] = [
-      { full_name: { [Op.like]: `%${search}%` } },
-      { email: { [Op.like]: `%${search}%` } },
-      { phone: { [Op.like]: `%${search}%` } },
-      { application_reference: { [Op.like]: `%${search}%` } },
-    ];
+    andConditions.push({
+      [Op.or]: [
+        { full_name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
+        { phone: { [Op.like]: `%${search}%` } },
+        { application_reference: { [Op.like]: `%${search}%` } },
+      ],
+    });
+  }
+
+  if (andConditions.length > 0) {
+    where[Op.and] = andConditions;
   }
 
   const applications = await db.InvictusCareersApplication.findAll({
