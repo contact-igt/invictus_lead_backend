@@ -46,6 +46,14 @@ export const InvictusGeneralEnquiryTable = (Sequelize, sequelize) => {
         type: Sequelize.ENUM("New", "Contacted", "In Progress", "Closed"),
         defaultValue: "New",
       },
+      city: {
+        type: Sequelize.STRING,
+        allowNull: true,
+      },
+      state: {
+        type: Sequelize.STRING,
+        allowNull: true,
+      },
       notes: {
         type: Sequelize.TEXT,
         allowNull: true,
@@ -60,6 +68,12 @@ export const InvictusGeneralEnquiryTable = (Sequelize, sequelize) => {
         },
         {
           fields: ["status"],
+        },
+        {
+          fields: ["city"],
+        },
+        {
+          fields: ["state"],
         },
       ],
     }

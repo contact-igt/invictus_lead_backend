@@ -45,6 +45,10 @@ export const InvictusCareersApplicationTable = (Sequelize, sequelize) => {
         type: Sequelize.STRING,
         allowNull: false,
       },
+      state: {
+        type: Sequelize.STRING,
+        allowNull: true,
+      },
       notice_period: {
         type: Sequelize.STRING,
         allowNull: false,
@@ -118,6 +122,12 @@ export const InvictusCareersApplicationTable = (Sequelize, sequelize) => {
         },
         {
           fields: ["status"],
+        },
+        {
+          fields: ["current_city"],
+        },
+        {
+          fields: ["state"],
         },
         {
           fields: ["application_reference"],

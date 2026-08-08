@@ -3,15 +3,22 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const backendClientKeyUrl = new URL("../utils/clientKey.js", import.meta.url);
+const adminClientKeyUrl = new URL(
+  "../../../invictus_lead_admin/src/utils/clientKey.ts",
+  import.meta.url,
+);
 const frontendClientKeyUrl = new URL(
   "../../../frontend/src/utils/clientKey.ts",
   import.meta.url,
 );
 
-const [backendSource, frontendSource] = await Promise.all([
-  readFile(fileURLToPath(backendClientKeyUrl), "utf8"),
-  readFile(fileURLToPath(frontendClientKeyUrl), "utf8"),
-]);
+let frontendSource;
+try {
+  frontendSource = await readFile(fileURLToPath(adminClientKeyUrl), "utf8");
+} catch (_) {
+  frontendSource = await readFile(fileURLToPath(frontendClientKeyUrl), "utf8");
+}
+const backendSource = await readFile(fileURLToPath(backendClientKeyUrl), "utf8");
 
 const extractStringArray = (source, constantName) => {
   const match = source.match(

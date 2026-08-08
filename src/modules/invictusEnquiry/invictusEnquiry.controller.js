@@ -1,9 +1,11 @@
 import {
   createGeneralEnquiryPublic,
   listGeneralEnquiries,
+  getGeneralLocations,
   updateGeneralEnquiry,
   createCareersApplicationPublic,
   listCareersApplications,
+  getCareersLocations,
   updateCareersApplication,
   exportCareersApplicationsCSV,
   deleteGeneralEnquiry,
@@ -53,6 +55,18 @@ export const getGeneralEnquiries = async (req, res, next) => {
   }
 };
 
+export const getGeneralEnquiryLocations = async (req, res, next) => {
+  try {
+    const data = await getGeneralLocations();
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const patchGeneralEnquiry = async (req, res, next) => {
   try {
     const data = await updateGeneralEnquiry(req.params.id, req.body);
@@ -72,6 +86,18 @@ export const getCareersApplications = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       ...result,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getCareersApplicationLocations = async (req, res, next) => {
+  try {
+    const data = await getCareersLocations();
+    return res.status(200).json({
+      success: true,
+      data,
     });
   } catch (error) {
     return next(error);

@@ -3,8 +3,10 @@ import {
   postGeneralEnquiryPublic,
   postCareersApplicationPublic,
   getGeneralEnquiries,
+  getGeneralEnquiryLocations,
   patchGeneralEnquiry,
   getCareersApplications,
+  getCareersApplicationLocations,
   patchCareersApplication,
   exportCareersApplications,
   removeGeneralEnquiry,
@@ -20,10 +22,12 @@ router.post("/careers/public", postCareersApplicationPublic);
 
 // Admin management routes (requires valid login)
 router.get("/general", authenticateToken, getGeneralEnquiries);
+router.get("/general/locations", authenticateToken, getGeneralEnquiryLocations);
 router.patch("/general/:id", authenticateToken, patchGeneralEnquiry);
 router.delete("/general/:id", authenticateToken, removeGeneralEnquiry);
 
 router.get("/careers", authenticateToken, getCareersApplications);
+router.get("/careers/locations", authenticateToken, getCareersApplicationLocations);
 router.get("/careers/export", authenticateToken, exportCareersApplications);
 router.patch("/careers/:id", authenticateToken, patchCareersApplication);
 router.delete("/careers/:id", authenticateToken, removeCareersApplication);
