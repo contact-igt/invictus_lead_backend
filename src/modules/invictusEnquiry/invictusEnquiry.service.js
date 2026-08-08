@@ -37,7 +37,7 @@ const isValidUrl = (urlStr) => {
 // --- GENERAL ENQUIRIES SERVICES ---
 
 export const createGeneralEnquiryPublic = async (payload, clientIp = null) => {
-  const { name, mobile, email, industry, applied_for } = payload;
+  const { name, mobile, email, industry, applied_for, city, state } = payload;
 
   if (!name || !mobile || !email || !industry) {
     const error = new Error("Name, mobile, email, and industry are required fields.");
@@ -63,6 +63,8 @@ export const createGeneralEnquiryPublic = async (payload, clientIp = null) => {
     email: email.trim().toLowerCase(),
     industry: industry.trim(),
     applied_for: applied_for || "General Inquiry",
+    city: city ? city.trim() : null,
+    state: state ? state.trim() : null,
     ip_address: clientIp || payload.ip_address || null,
     status: "New",
   });
@@ -73,25 +75,70 @@ export const listGeneralEnquiries = async (query = {}) => {
   const limit = parseInt(query.limit || 10, 10);
   const offset = (page - 1) * limit;
   const search = query.search ? query.search.trim() : "";
-  const status = query.status ? query.status.trim() : "";
+  const status = query.status && !["all", "all statuses"].includes(query.status.trim().toLowerCase()) ? query.status.trim() : "";
+  const city = query.city && !["all", "all cities"].includes(query.city.trim().toLowerCase()) ? query.city.trim() : "";
+  const state = query.state && !["all", "all states"].includes(query.state.trim().toLowerCase()) ? query.state.trim() : "";
+  const sortBy = query.sortBy ? query.sortBy.trim() : "submitted_at";
+  const sortOrder = query.sortOrder && query.sortOrder.toUpperCase() === "ASC" ? "ASC" : "DESC";
 
   const where = {};
-  if (status) where.status = status;
+  const andConditions = [];
+
+  if (status) {
+    andConditions.push({ status });
+  }
+
+  if (city) {
+    andConditions.push({
+      [Op.or]: [
+        { city: city },
+        { city: { [Op.like]: `%${city}%` } },
+      ],
+    });
+  }
+
+  if (state) {
+    andConditions.push({
+      [Op.or]: [
+        { state: state },
+        { state: { [Op.like]: `%${state}%` } },
+        { city: { [Op.like]: `%${state}%` } },
+      ],
+    });
+  }
 
   if (search) {
-    where[Op.or] = [
-      { name: { [Op.like]: `%${search}%` } },
-      { email: { [Op.like]: `%${search}%` } },
-      { mobile: { [Op.like]: `%${search}%` } },
-      { industry: { [Op.like]: `%${search}%` } },
-    ];
+    andConditions.push({
+      [Op.or]: [
+        { name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
+        { mobile: { [Op.like]: `%${search}%` } },
+        { industry: { [Op.like]: `%${search}%` } },
+        { city: { [Op.like]: `%${search}%` } },
+        { state: { [Op.like]: `%${search}%` } },
+      ],
+    });
   }
+
+  if (andConditions.length > 0) {
+    where[Op.and] = andConditions;
+  }
+
+  const allowedSortColumns = {
+    name: "name",
+    city: "city",
+    state: "state",
+    status: "status",
+    submitted_at: "submitted_at",
+    createdAt: "createdAt",
+  };
+  const sortColumn = allowedSortColumns[sortBy] || "submitted_at";
 
   const { rows, count } = await db.InvictusGeneralEnquiry.findAndCountAll({
     where,
     limit,
     offset,
-    order: [["submitted_at", "DESC"]],
+    order: [[sortColumn, sortOrder]],
   });
 
   return {
@@ -100,6 +147,34 @@ export const listGeneralEnquiries = async (query = {}) => {
     page,
     totalPages: Math.ceil(count / limit),
   };
+};
+
+export const getGeneralLocations = async () => {
+  const rows = await db.InvictusGeneralEnquiry.findAll({
+    attributes: ["city", "state"],
+    raw: true,
+  });
+
+  const rawCities = [];
+  const rawStates = [];
+
+  rows.forEach((r) => {
+    if (r.city && typeof r.city === "string" && r.city.trim() !== "") {
+      const parts = r.city.split(",").map((s) => s.trim()).filter(Boolean);
+      if (parts.length > 0) rawCities.push(parts[0]);
+      if (parts.length > 1 && (!r.state || r.state.trim() === "")) {
+        rawStates.push(parts[1]);
+      }
+    }
+    if (r.state && typeof r.state === "string" && r.state.trim() !== "") {
+      rawStates.push(r.state.trim());
+    }
+  });
+
+  const cities = Array.from(new Set(rawCities)).sort((a, b) => a.localeCompare(b));
+  const states = Array.from(new Set(rawStates)).sort((a, b) => a.localeCompare(b));
+
+  return { cities, states };
 };
 
 export const updateGeneralEnquiry = async (id, payload) => {
@@ -133,6 +208,7 @@ export const createCareersApplicationPublic = async (payload) => {
     phone,
     email,
     current_city,
+    state,
     notice_period,
     experience,
     portfolio_or_showreel,
@@ -246,6 +322,7 @@ export const createCareersApplicationPublic = async (payload) => {
     phone: phone.trim(),
     email: email.trim().toLowerCase(),
     current_city: current_city.trim(),
+    state: state ? state.trim() : null,
     notice_period: notice_period.trim(),
     experience,
     portfolio_or_showreel: portfolio_or_showreel.trim(),
@@ -266,20 +343,46 @@ export const listCareersApplications = async (query = {}) => {
   const limit = parseInt(query.limit || 10, 10);
   const offset = (page - 1) * limit;
   const search = query.search ? query.search.trim() : "";
-  const status = query.status ? query.status.trim() : "";
+  const status = query.status && !["all", "all statuses"].includes(query.status.trim().toLowerCase()) ? query.status.trim() : "";
   const roleSlugFilter = query.role_slug || query.role || "";
+  const city = query.city && !["all", "all cities"].includes(query.city.trim().toLowerCase()) ? query.city.trim() : "";
+  const state = query.state && !["all", "all states"].includes(query.state.trim().toLowerCase()) ? query.state.trim() : "";
+  const sortBy = query.sortBy ? query.sortBy.trim() : "createdAt";
+  const sortOrder = query.sortOrder && query.sortOrder.toUpperCase() === "ASC" ? "ASC" : "DESC";
 
   const where = {};
   const andConditions = [];
 
-  if (status) where.status = status;
+  if (status) {
+    andConditions.push({ status });
+  }
 
-  if (roleSlugFilter && roleSlugFilter.toLowerCase() !== "all") {
+  if (city) {
+    andConditions.push({
+      [Op.or]: [
+        { current_city: city },
+        { current_city: { [Op.like]: `%${city}%` } },
+      ],
+    });
+  }
+
+  if (state) {
+    andConditions.push({
+      [Op.or]: [
+        { state: state },
+        { state: { [Op.like]: `%${state}%` } },
+        { current_city: { [Op.like]: `%${state}%` } },
+      ],
+    });
+  }
+
+  if (roleSlugFilter && !["all", "all roles"].includes(roleSlugFilter.toLowerCase())) {
     const targetSlug = slugifyRole(roleSlugFilter);
     andConditions.push({
       [Op.or]: [
         { role_slug: targetSlug },
         { role: roleSlugFilter },
+        { role: { [Op.like]: `%${roleSlugFilter}%` } },
       ],
     });
   }
@@ -291,6 +394,9 @@ export const listCareersApplications = async (query = {}) => {
         { email: { [Op.like]: `%${search}%` } },
         { phone: { [Op.like]: `%${search}%` } },
         { application_reference: { [Op.like]: `%${search}%` } },
+        { current_city: { [Op.like]: `%${search}%` } },
+        { state: { [Op.like]: `%${search}%` } },
+        { role: { [Op.like]: `%${search}%` } },
       ],
     });
   }
@@ -299,11 +405,22 @@ export const listCareersApplications = async (query = {}) => {
     where[Op.and] = andConditions;
   }
 
+  const allowedSortColumns = {
+    full_name: "full_name",
+    name: "full_name",
+    current_city: "current_city",
+    city: "current_city",
+    state: "state",
+    status: "status",
+    createdAt: "createdAt",
+  };
+  const sortColumn = allowedSortColumns[sortBy] || "createdAt";
+
   const { rows, count } = await db.InvictusCareersApplication.findAndCountAll({
     where,
     limit,
     offset,
-    order: [["createdAt", "DESC"]],
+    order: [[sortColumn, sortOrder]],
   });
 
   return {
@@ -312,6 +429,34 @@ export const listCareersApplications = async (query = {}) => {
     page,
     totalPages: Math.ceil(count / limit),
   };
+};
+
+export const getCareersLocations = async () => {
+  const rows = await db.InvictusCareersApplication.findAll({
+    attributes: ["current_city", "state"],
+    raw: true,
+  });
+
+  const rawCities = [];
+  const rawStates = [];
+
+  rows.forEach((r) => {
+    if (r.current_city && typeof r.current_city === "string" && r.current_city.trim() !== "") {
+      const parts = r.current_city.split(",").map((s) => s.trim()).filter(Boolean);
+      if (parts.length > 0) rawCities.push(parts[0]);
+      if (parts.length > 1 && (!r.state || r.state.trim() === "")) {
+        rawStates.push(parts[1]);
+      }
+    }
+    if (r.state && typeof r.state === "string" && r.state.trim() !== "") {
+      rawStates.push(r.state.trim());
+    }
+  });
+
+  const cities = Array.from(new Set(rawCities)).sort((a, b) => a.localeCompare(b));
+  const states = Array.from(new Set(rawStates)).sort((a, b) => a.localeCompare(b));
+
+  return { cities, states };
 };
 
 export const updateCareersApplication = async (id, payload) => {

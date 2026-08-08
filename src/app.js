@@ -34,6 +34,7 @@ import { ensurePixelEyePhoneNormalization } from "./database/migrations/ensurePi
 import ensureAddFollowUpHistoryMetadataColumn from "./database/migrations/ensureAddFollowUpHistoryMetadataColumn.js";
 import { ensurePixelEyeLeadNotesColumn } from "./database/migrations/ensurePixelEyeLeadNotesColumn.js";
 import { ensureVlsPaymentStatusColumns } from "./database/migrations/ensureVlsPaymentStatusColumns.js";
+import { ensureInvictusEnquiryColumns } from "./database/migrations/ensureInvictusEnquiryColumns.js";
 
 import ShantiEyeTechRouter from './modules/shantiEyeTech/shantiEyeTech.routes.js';
 import PhoenixFitnessRouter from './modules/phoenixFitness/phoenixFitness.routes.js';
@@ -94,6 +95,7 @@ app.use("/api/v1", (req, res, next) => {
 
 const connect_mysql = async () => {
   try {
+    await ensureInvictusEnquiryColumns();
     await db.sequelize.sync();
     await ensurePixelEyeLeadStateCurrentDayColumn();
     await ensurePixelEyeLeadStateLeadIdColumn();
