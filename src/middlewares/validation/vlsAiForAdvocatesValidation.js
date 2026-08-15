@@ -11,7 +11,7 @@ const vlsAiForAdvocatesRegistrationSchema = Joi.object({
   // Accept snake_case too (admin/test clients)
   years_of_practice: Joi.string().trim().optional().allow(null, ""),
 
-  amount: Joi.number().optional().allow(null),
+  amount: Joi.number().optional().allow(null, ""),
   programm_date: Joi.string().trim().optional().allow(null, ""),
 
   razorpay_order_id: Joi.string().optional().allow(null, ""),
