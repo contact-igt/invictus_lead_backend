@@ -23,6 +23,7 @@ import VlsMactMasterClassRouter from "./modules/vlsMactMasterClass/vlsMactMaster
 import VlsConsumerProtectionLawMasterClassRouter from "./modules/vlsConsumerProtectionLawMasterClass/vlsConsumerProtectionLawMasterClass.routes.js";
 import VlsDopAiAssistedRouter from "./modules/vls/vlsDopAiAssisted/vlsDopAiAssisted.routes.js";
 import VlsAiForAdvocatesRouter from "./modules/vls/vlsAiForAdvocates/vlsAiForAdvocates.routes.js";
+import VlsTaxationLawRouter from "./modules/vlsTaxationLaw/vlsTaxationLaw.routes.js";
 import { ensurePixelEyeLeadStateCurrentDayColumn } from "./database/migrations/ensurePixelEyeLeadStateCurrentDay.js";
 import { ensurePixelEyeLeadStateLeadIdColumn } from "./database/migrations/ensurePixelEyeLeadStateLeadId.js";
 import { ensurePixelEyeLeadStateCompletionSourceColumn } from "./database/migrations/ensurePixelEyeLeadStateCompletionSource.js";
@@ -134,6 +135,7 @@ app.use("/api/v1/vls-mact-master-class", VlsMactMasterClassRouter);
 app.use("/api/v1/vls-consumer-protection-law-master-class", VlsConsumerProtectionLawMasterClassRouter);
 app.use("/api/v1/vls-dop-ai-assisted", VlsDopAiAssistedRouter);
 app.use("/api/v1/vls-ai-for-advocates", VlsAiForAdvocatesRouter);
+app.use("/api/v1/vls-taxation-law", VlsTaxationLawRouter);
 app.use("/api/v1/aarav-eye-care", AaravEyeCareRouter);
 app.use("/api/v1/antardrashti-netralaya", AntardrashtiNetralayaRouter);
 app.use("/api/v1/rio", RioRouter);
