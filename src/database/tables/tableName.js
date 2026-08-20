@@ -10,6 +10,7 @@ export const tableName = {
   VLS_CONSUMER_PROTECTION_LAW_MASTER_CLASS: "vls_consumer_protection_law_master_classes",
   VLS_DOP_AI_ASSISTED: "vls_dop_ai_assisted",
   VLS_AI_FOR_ADVOCATES: "vls_ai_for_advocates",
+  VLS_TAXATION_LAW: "vls_taxation_law_leads",
   PIXELEYE: "pixel_eyes",
   PIXELEYE_WEBSITE_LEADS: "pixel_eye_website_leads",
   PIXELEYE_LEAD_STATE: "pixel_eye_lead_states",
