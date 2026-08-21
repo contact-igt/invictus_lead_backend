@@ -9,24 +9,6 @@ const baseVlsLawSchema = {
   registered_date: Joi.date().iso().required(),
 };
 
-export const vlsLawPracticeSchema = Joi.object({
-  ...baseVlsLawSchema,
-  amount: Joi.string().trim().optional().allow(null, ""),
-  programm_date: Joi.string().trim().optional().allow(null, ""),
-  page_name: Joi.string()
-    .valid("decoding-of-practice", "decoding-of-law-practice")
-    .required(),
-  payment_status: Joi.string()
-    .valid("paid", "failed", "attempted", "cancelled", "authorized", "waitlist")
-    .optional()
-    .default("attempted")
-    .allow(null, ""),
-  captured: Joi.boolean().default(true),
-  razorpay_order_id: Joi.string().optional().allow(null, ""),
-  razorpay_payment_id: Joi.string().optional().allow(null, ""),
-  razorpay_signature: Joi.string().optional().allow(null, ""),
-});
-
 export const vlsLawAcademySchema = Joi.object({
   ...baseVlsLawSchema,
   message: Joi.string().trim().optional().allow(null, ""),
@@ -128,7 +110,6 @@ export const vlsLawDopAiAssistedSchema = Joi.object({
 });
 
 const schemas = {
-  vlslaw_practice: vlsLawPracticeSchema,
   vlslaw_academy: vlsLawAcademySchema,
   vlslaw_aibe: vlsLawAibeSchema,
   vlslaw_property: vlsLawPropertySchema,
