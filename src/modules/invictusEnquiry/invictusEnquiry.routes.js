@@ -7,6 +7,7 @@ import {
   patchGeneralEnquiry,
   getCareersApplications,
   getCareersApplicationLocations,
+  getCareersApplicationFilters,
   patchCareersApplication,
   exportCareersApplications,
   removeGeneralEnquiry,
@@ -28,6 +29,7 @@ router.delete("/general/:id", authenticateToken, removeGeneralEnquiry);
 
 router.get("/careers", authenticateToken, getCareersApplications);
 router.get("/careers/locations", authenticateToken, getCareersApplicationLocations);
+router.get("/careers/filters", authenticateToken, getCareersApplicationFilters);
 router.get("/careers/export", authenticateToken, exportCareersApplications);
 router.patch("/careers/:id", authenticateToken, patchCareersApplication);
 router.delete("/careers/:id", authenticateToken, removeCareersApplication);

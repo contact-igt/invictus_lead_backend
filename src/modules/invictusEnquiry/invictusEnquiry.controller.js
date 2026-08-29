@@ -6,6 +6,7 @@ import {
   createCareersApplicationPublic,
   listCareersApplications,
   getCareersLocations,
+  getCareersFilters,
   updateCareersApplication,
   exportCareersApplicationsCSV,
   deleteGeneralEnquiry,
@@ -95,6 +96,18 @@ export const getCareersApplications = async (req, res, next) => {
 export const getCareersApplicationLocations = async (req, res, next) => {
   try {
     const data = await getCareersLocations();
+    return res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getCareersApplicationFilters = async (req, res, next) => {
+  try {
+    const data = await getCareersFilters({ state: req.query.state });
     return res.status(200).json({
       success: true,
       data,

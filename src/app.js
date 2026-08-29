@@ -43,6 +43,7 @@ import ShantiEyeTechRouter from './modules/shantiEyeTech/shantiEyeTech.routes.js
 import PhoenixFitnessRouter from './modules/phoenixFitness/phoenixFitness.routes.js';
 import ApiLogsRouter from "./modules/apiLogs/apiLogs.routes.js";
 import InvictusEnquiryRouter from "./modules/invictusEnquiry/invictusEnquiry.routes.js";
+import { startInvictusSheetSyncScheduler } from "./modules/invictusEnquiry/invictusSheetSync.service.js";
 import { apiAuditLogger } from "./middlewares/apiAuditLogger.js";
 
 const app = express();
@@ -115,6 +116,7 @@ const connect_mysql = async () => {
     console.log("Database synchronized for Multi-Tenant architecture");
     startPixelEyeScheduler();
     startPixelEyeFollowUpComplianceScheduler();
+    startInvictusSheetSyncScheduler();
   } catch (error) {
     console.error("Failed to synchronize database:", error);
     process.exit(1);

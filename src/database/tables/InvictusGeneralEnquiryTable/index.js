@@ -58,6 +58,29 @@ export const InvictusGeneralEnquiryTable = (Sequelize, sequelize) => {
         type: Sequelize.TEXT,
         allowNull: true,
       },
+      sheet_sync_status: {
+        type: Sequelize.STRING(16),
+        allowNull: false,
+        defaultValue: "pending",
+        validate: { isIn: [["pending", "synced", "failed"]] },
+      },
+      sheet_sync_attempts: {
+        type: Sequelize.INTEGER.UNSIGNED,
+        allowNull: false,
+        defaultValue: 0,
+      },
+      sheet_sync_last_error: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+      },
+      sheet_synced_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
+      sheet_sync_next_attempt_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
     },
     {
       timestamps: true,
@@ -74,6 +97,10 @@ export const InvictusGeneralEnquiryTable = (Sequelize, sequelize) => {
         },
         {
           fields: ["state"],
+        },
+        {
+          name: "invictus_general_sheet_sync_idx",
+          fields: ["sheet_sync_status", "sheet_sync_next_attempt_at"],
         },
       ],
     }

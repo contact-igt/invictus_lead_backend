@@ -1,5 +1,46 @@
 import db from "../../database/index.js";
 import { Op } from "sequelize";
+import {
+  normalizeLocationValue,
+  isValidLocationValue,
+  canonicalizeCity,
+  canonicalizeState,
+  stateForCity,
+} from "../../utils/locationText.js";
+import { TtlCache } from "../../utils/ttlCache.js";
+import {
+  buildCareersFilterResult,
+  queryColumnCounts,
+  queryDistinctStateCounts,
+  queryCityCounts,
+} from "../../utils/filterOptions.js";
+import { resolveLocation } from "../../services/locationResolver.js";
+import { attemptSheetSync } from "./invictusSheetSync.service.js";
+
+// Filter option lists change rarely; cache each list separately for a few minutes.
+//   careers:states | careers:roles | careers:statuses | careers:cities:<state>
+const CAREERS_FILTERS_TTL_MS = 7 * 60 * 1000;
+const careersFiltersCache = new TtlCache(CAREERS_FILTERS_TTL_MS);
+
+/** Drop cached careers filter options — call on every create / update / delete. */
+export const invalidateCareersFiltersCache = () => careersFiltersCache.clear();
+
+/**
+ * Resolve an incoming location into canonical `{ current_city, state }`.
+ * `providedState` (if any, and valid) is the last-resort state when the
+ * resolver can't determine one.
+ */
+const resolveCareersLocation = async (rawCity, providedState) => {
+  const resolved = await resolveLocation(rawCity);
+  const current_city =
+    resolved.city || canonicalizeCity(rawCity) || String(rawCity || "").trim();
+  const state =
+    resolved.state ||
+    canonicalizeState(providedState) ||
+    (isValidLocationValue(providedState) ? normalizeLocationValue(providedState) : "") ||
+    stateForCity(current_city);
+  return { current_city, state: state || null };
+};
 
 // Server-side reference generator (IGT- + 6 random alphanumeric characters)
 const generateApplicationReference = () => {
@@ -57,7 +98,7 @@ export const createGeneralEnquiryPublic = async (payload, clientIp = null) => {
     throw error;
   }
 
-  return await db.InvictusGeneralEnquiry.create({
+  const created = await db.InvictusGeneralEnquiry.create({
     name: name.trim(),
     mobile: mobile.trim(),
     email: email.trim().toLowerCase(),
@@ -68,6 +109,9 @@ export const createGeneralEnquiryPublic = async (payload, clientIp = null) => {
     ip_address: clientIp || payload.ip_address || null,
     status: "New",
   });
+
+  await attemptSheetSync("general", created);
+  return created;
 };
 
 export const listGeneralEnquiries = async (query = {}) => {
@@ -314,15 +358,18 @@ export const createCareersApplicationPublic = async (payload) => {
     screening_flags.push("LONG_JUDGEMENT_ANSWER");
   }
 
-  return await db.InvictusCareersApplication.create({
+  // Resolve the single free-text location into canonical city + state.
+  const location = await resolveCareersLocation(current_city, state);
+
+  const created = await db.InvictusCareersApplication.create({
     application_reference,
     role: role.trim(),
     role_slug,
     full_name: full_name.trim(),
     phone: phone.trim(),
     email: email.trim().toLowerCase(),
-    current_city: current_city.trim(),
-    state: state ? state.trim() : null,
+    current_city: location.current_city,
+    state: location.state,
     notice_period: notice_period.trim(),
     experience,
     portfolio_or_showreel: portfolio_or_showreel.trim(),
@@ -336,6 +383,10 @@ export const createCareersApplicationPublic = async (payload) => {
     screening_flags,
     status: "New",
   });
+
+  invalidateCareersFiltersCache();
+  await attemptSheetSync("career", created);
+  return created;
 };
 
 export const listCareersApplications = async (query = {}) => {
@@ -345,8 +396,11 @@ export const listCareersApplications = async (query = {}) => {
   const search = query.search ? query.search.trim() : "";
   const status = query.status && !["all", "all statuses"].includes(query.status.trim().toLowerCase()) ? query.status.trim() : "";
   const roleSlugFilter = query.role_slug || query.role || "";
-  const city = query.city && !["all", "all cities"].includes(query.city.trim().toLowerCase()) ? query.city.trim() : "";
-  const state = query.state && !["all", "all states"].includes(query.state.trim().toLowerCase()) ? query.state.trim() : "";
+  const isAllSentinel = (v, ...labels) =>
+    !v || labels.includes(String(v).trim().toLowerCase());
+  // Normalize incoming filter values so they match the normalized values stored in the DB.
+  const city = isAllSentinel(query.city, "all", "all cities") ? "" : normalizeLocationValue(query.city);
+  const state = isAllSentinel(query.state, "all", "all states") ? "" : normalizeLocationValue(query.state);
   const sortBy = query.sortBy ? query.sortBy.trim() : "createdAt";
   const sortOrder = query.sortOrder && query.sortOrder.toUpperCase() === "ASC" ? "ASC" : "DESC";
 
@@ -357,23 +411,15 @@ export const listCareersApplications = async (query = {}) => {
     andConditions.push({ status });
   }
 
-  if (city) {
-    andConditions.push({
-      [Op.or]: [
-        { current_city: city },
-        { current_city: { [Op.like]: `%${city}%` } },
-      ],
-    });
+  // Strict, canonical matching — city/state are stored normalized, so a State
+  // filter must never fall back to searching current_city (no fuzzy filtering).
+  // MySQL's default collation makes `=` case-insensitive.
+  if (state) {
+    andConditions.push({ state });
   }
 
-  if (state) {
-    andConditions.push({
-      [Op.or]: [
-        { state: state },
-        { state: { [Op.like]: `%${state}%` } },
-        { current_city: { [Op.like]: `%${state}%` } },
-      ],
-    });
+  if (city) {
+    andConditions.push({ current_city: city });
   }
 
   if (roleSlugFilter && !["all", "all roles"].includes(roleSlugFilter.toLowerCase())) {
@@ -431,32 +477,67 @@ export const listCareersApplications = async (query = {}) => {
   };
 };
 
+const cacheGet = async (key, loader) => {
+  const hit = careersFiltersCache.get(key);
+  if (hit !== undefined) return hit;
+  const value = await loader();
+  careersFiltersCache.set(key, value);
+  return value;
+};
+
+/**
+ * Careers filter options.
+ *
+ * - `states`, `roles`, `statuses` are always the full distinct lists (with counts).
+ * - `cities`:
+ *     no `state`      -> the full distinct city list (admin may filter by city directly)
+ *     `state` given   -> only that state's cities (dependent narrowing)
+ * - Each list is cached separately (`careers:states`, `careers:cities:__all__`,
+ *   `careers:cities:<state>`, …) and all are invalidated together on
+ *   create / update / delete.
+ * - All aggregation happens in SQL (GROUP BY); rows are never loaded to dedupe.
+ */
+export const getCareersFilters = async ({ state } = {}) => {
+  const normalizedState = isValidLocationValue(state) ? normalizeLocationValue(state) : "";
+  const model = db.InvictusCareersApplication;
+
+  const cityCacheKey = normalizedState ? `careers:cities:${normalizedState}` : "careers:cities:__all__";
+
+  const [stateRows, roleRows, statusRows, cityRows] = await Promise.all([
+    cacheGet("careers:states", () => queryDistinctStateCounts(model)),
+    cacheGet("careers:roles", () => queryColumnCounts(model, "role")),
+    cacheGet("careers:statuses", () => queryColumnCounts(model, "status")),
+    cacheGet(cityCacheKey, () => queryCityCounts(model, "current_city", normalizedState || undefined)),
+  ]);
+
+  return buildCareersFilterResult({ state: normalizedState, stateRows, cityRows, roleRows, statusRows });
+};
+
+/**
+ * Backward-compatible shape ({ cities, states, roles } as string arrays)
+ * for legacy callers still hitting /careers/locations. Unlike the new
+ * /filters endpoint, this returns the full (unscoped) city list.
+ */
 export const getCareersLocations = async () => {
-  const rows = await db.InvictusCareersApplication.findAll({
-    attributes: ["current_city", "state"],
-    raw: true,
-  });
-
-  const rawCities = [];
-  const rawStates = [];
-
-  rows.forEach((r) => {
-    if (r.current_city && typeof r.current_city === "string" && r.current_city.trim() !== "") {
-      const parts = r.current_city.split(",").map((s) => s.trim()).filter(Boolean);
-      if (parts.length > 0) rawCities.push(parts[0]);
-      if (parts.length > 1 && (!r.state || r.state.trim() === "")) {
-        rawStates.push(parts[1]);
-      }
-    }
-    if (r.state && typeof r.state === "string" && r.state.trim() !== "") {
-      rawStates.push(r.state.trim());
-    }
-  });
-
-  const cities = Array.from(new Set(rawCities)).sort((a, b) => a.localeCompare(b));
-  const states = Array.from(new Set(rawStates)).sort((a, b) => a.localeCompare(b));
-
-  return { cities, states };
+  const model = db.InvictusCareersApplication;
+  const [stateRows, cityRows, roleRows] = await Promise.all([
+    cacheGet("careers:states", () => queryDistinctStateCounts(model)),
+    cacheGet("careers:cities:__all__", () => queryCityCounts(model, "current_city")),
+    cacheGet("careers:roles", () => queryColumnCounts(model, "role")),
+  ]);
+  const pick = (rows, key) =>
+    Array.from(
+      new Set(
+        rows
+          .map((r) => normalizeLocationValue(r[key]))
+          .filter(Boolean),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+  return {
+    states: pick(stateRows, "state"),
+    cities: pick(cityRows, "city"),
+    roles: pick(roleRows, "role"),
+  };
 };
 
 export const updateCareersApplication = async (id, payload) => {
@@ -467,7 +548,7 @@ export const updateCareersApplication = async (id, payload) => {
     throw error;
   }
 
-  const { status, notes } = payload;
+  const { status, notes, current_city } = payload;
   const validStatuses = ["New", "Shortlisted", "Under Review", "Rejected", "Hired"];
   if (status && !validStatuses.includes(status)) {
     const error = new Error(`Invalid status. Allowed values: ${validStatuses.join(", ")}`);
@@ -477,20 +558,42 @@ export const updateCareersApplication = async (id, payload) => {
 
   if (status) application.status = status;
   if (notes !== undefined) application.notes = notes;
+
+  // Re-resolve location only when the admin actually changes current_city
+  // (not on status / notes edits) — avoids needless geocoding calls.
+  if (current_city !== undefined) {
+    const incoming = String(current_city || "").trim();
+    if (incoming && canonicalizeCity(incoming) !== application.current_city) {
+      const location = await resolveCareersLocation(incoming, payload.state);
+      application.current_city = location.current_city;
+      application.state = location.state;
+    }
+  }
+
   await application.save();
+  invalidateCareersFiltersCache();
   return application;
 };
 
 // Export Careers Applications as CSV
 export const exportCareersApplicationsCSV = async (query = {}) => {
   const search = query.search ? query.search.trim() : "";
-  const status = query.status ? query.status.trim() : "";
+  const status =
+    query.status && !["all", "all statuses"].includes(query.status.trim().toLowerCase())
+      ? query.status.trim()
+      : "";
   const roleSlugFilter = query.role_slug || query.role || "";
+  // Same canonical, strict city/state matching as the list endpoint.
+  const isAllSentinel = (v, ...labels) => !v || labels.includes(String(v).trim().toLowerCase());
+  const city = isAllSentinel(query.city, "all", "all cities") ? "" : normalizeLocationValue(query.city);
+  const state = isAllSentinel(query.state, "all", "all states") ? "" : normalizeLocationValue(query.state);
 
   const where = {};
   const andConditions = [];
 
   if (status) where.status = status;
+  if (state) andConditions.push({ state });
+  if (city) andConditions.push({ current_city: city });
 
   if (roleSlugFilter && roleSlugFilter.toLowerCase() !== "all") {
     const targetSlug = slugifyRole(roleSlugFilter);
@@ -594,5 +697,6 @@ export const deleteCareersApplication = async (id) => {
     throw error;
   }
   await application.destroy();
+  invalidateCareersFiltersCache();
   return { success: true, message: "Careers application record deleted successfully." };
 };
