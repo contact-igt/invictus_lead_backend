@@ -17,15 +17,15 @@ filter on the admin screen works, end to end.
 
 | Goal | How |
 |---|---|
-| Applicant enters ONE location; we store canonical `city` + `state` | `resolveLocation()` — alias map → comma parse → Geoapify (India-only) → fallback |
+| Applicant enters free-text city + state; we store a canonical verified pair when possible | `resolveLocation()` — alias map → Geoapify city search (India-only) → confidence check → fallback |
 | Geocoding must never block an application | every resolver path returns a usable object; failures fall back to normalized text + `state = null` |
 | Geoapify key stays server-side | only read in `src/config/geoapify.config.js` / `locationResolver.js`; never sent to the browser |
-| Admin filter reflects **real applicant data**, not a hardcoded India list | `states` = `DISTINCT state`; `cities` = `DISTINCT current_city WHERE state = ?` |
+| Admin filter reflects **verified applicant data**, not a hardcoded India list | state/city queries require `location_verified = true` |
 | City works standalone, narrows under State | `/careers/filters` (no `?state=`) returns the **full** city list; `?state=` returns only that state's cities. Picking a State resets + re-scopes City. |
 | No garbage / duplicate values | canonicalized on write + `backfill:locations` for history |
-| Fast | per-list SQL `GROUP BY`, cached 7 min, composite `(state, current_city)` index, geocode results cached 24 h |
+| Fast | per-list SQL `GROUP BY`, cached 7 min, composite `(location_verified, state, current_city)` index; only verified geocode results cached 24 h |
 | Reusable | `<LocationFilter cityRequiresState />` component; generic `filterOptions.js` helpers |
-| Admin actions never call Geoapify | resolver runs only on create + on an actual `current_city` change during update |
+| Admin actions avoid unnecessary Geoapify calls | resolver runs on create and when an update changes city or state; status/notes-only updates skip it |
 
 ---
 
@@ -37,11 +37,13 @@ filter on the admin screen works, end to end.
 |---|---|---|
 | `current_city` | STRING `NOT NULL` | canonical city |
 | `state` | STRING nullable | canonical Indian state / UT, or `NULL` |
+| `location_verified` | BOOLEAN `NOT NULL` | `true` only for an accepted Geoapify city result or a city in the offline map |
 
 Indexes: `current_city`, `state`, and composite
-**`invictus_careers_state_city_idx (state, current_city)`** — declared on the
-model and ensured at boot for existing DBs by
+**`invictus_careers_verified_state_city_idx (location_verified, state, current_city)`** — declared on the model and ensured at boot for existing DBs by
 `src/database/migrations/ensureInvictusEnquiryColumns.js`.
+The same boot migration adds `location_verified` with a safe `false` default,
+then marks only existing rows resolved by the offline city map as verified.
 
 ---
 
@@ -77,8 +79,8 @@ key just means the resolver always uses its fallback. Endpoint / timeout:
 
 ## 5. Location resolver — `src/services/locationResolver.js`
 
-`resolveLocation(rawLocation)` →
-`{ city, state, country, countryCode, source: "geoapify" | "fallback" }`
+`resolveLocation(rawLocation, rawState)` →
+`{ city, state, country, countryCode, source: "geoapify" | "fallback", verified }`
 
 ```
 normalizeLocationValue(raw)                       ── "" ? → { city:"", state:null, fallback }
@@ -86,23 +88,23 @@ normalizeLocationValue(raw)                       ── "" ? → { city:"", sta
 parseCommaInput()   "Chennai, Tamil Nadu" / "Tamil Nadu, Chennai"
         │           → cityGuess (canonicalizeCity), stateGuess (canonicalizeState)
         │
-24h in-process cache  key = location:<lowercased normalized>   ── hit → return
+24h in-process cache  key = location:<lowercased normalized>   ── verified hit → return
         │
 getGeoapifyConfig().enabled === false  ── → fallback { cityGuess, stateGuess||null }
         │
 fetch  GET /v1/geocode/search?text=<cityGuess[, stateGuess]>
-              &filter=countrycode:in&limit=1&format=json&apiKey=***
+              &filter=countrycode:in&type=city&limit=1&format=json&apiKey=***
        AbortSignal.timeout(4s)
         │
-   !res.ok  |  no results  |  country_code !== "in"  |  no city  ── → fallback
+   !res.ok | no results | non-India | non-city | confidence < 0.7 ── → unverified fallback
         │
    extractCity(r) = r.city || r.town || r.municipality || r.county
                     || r.village || r.suburb        ← locality → parent city
         │
    { city: canonicalizeCity(extractCity), state: canonicalizeState(r.state) || stateGuess || null,
-     country, countryCode:"in", source:"geoapify" }
+     country, countryCode:"in", source:"geoapify", verified:true }
         │
-   cache.set(key) ; return
+   verified ? cache.set(key) : do not cache ; return
 ```
 
 Any `throw` (timeout / HTTP error / bad JSON / network) is caught, logged as
@@ -116,15 +118,15 @@ Any `throw` (timeout / HTTP error / bad JSON / network) is caught, logged as
 `resolveCareersLocation(rawCity, providedState)` wraps the resolver:
 
 ```
-current_city = resolved.city  || canonicalizeCity(rawCity) || rawCity.trim()
+current_city = resolved.city  || canonicalizeCity(rawCity)
 state        = resolved.state || canonicalizeState(providedState)
-                              || (isValidLocationValue(providedState) ? normalize(providedState) : null)
+                              || stateForCity(current_city)
+location_verified = resolved.verified === true
 ```
 
-- **`createCareersApplicationPublic`** — always calls `resolveCareersLocation(current_city, state)`; stores the canonical pair; `invalidateCareersFiltersCache()`.
-- **`updateCareersApplication`** — re-resolves **only** when `payload.current_city`
-  is present *and* `canonicalizeCity(incoming) !== application.current_city`.
-  Status / notes edits never trigger geocoding.
+- **`createCareersApplicationPublic`** — rejects numeric/symbol-only cities, then calls `resolveCareersLocation(current_city, state)`; Geoapify receives both fields, the canonical pair is stored, and `invalidateCareersFiltersCache()` is called.
+- **`updateCareersApplication`** — re-resolves when either `payload.current_city`
+  or `payload.state` actually changes. Status / notes edits never trigger geocoding.
 
 Backward compatible: a caller still sending `{ current_city, state }` works —
 the resolved city wins, and the provided state is the last-resort fallback
@@ -150,14 +152,14 @@ Auth-protected. Controller `getCareersApplicationFilters` → `getCareersFilters
 
 | List | Query | Cache key |
 |---|---|---|
-| states | `SELECT state, COUNT(id) … WHERE state<>'' GROUP BY state` | `careers:states` |
+| states | `SELECT state, COUNT(id) … WHERE location_verified=1 AND state<>'' GROUP BY state` | `careers:states` |
 | roles | `GROUP BY role` | `careers:roles` |
 | statuses | `GROUP BY status` | `careers:statuses` |
-| cities | no state → `… WHERE current_city<>'' GROUP BY current_city`; with state → `… WHERE state = :state AND current_city<>'' GROUP BY current_city` | `careers:cities:__all__` / `careers:cities:<State>` |
+| cities | always `location_verified=1`; optionally adds `state = :state`; groups by `current_city` | `careers:cities:__all__` / `careers:cities:<State>` |
 
-`buildCareersFilterResult()` (pure, unit-tested) just shapes whatever
-`cityRows` the caller fetched — the caller (`getCareersFilters`) picks the
-full-list or state-scoped query.
+`buildCareersFilterResult()` (pure, unit-tested) normalizes location options
+and excludes invalid legacy values such as numeric-only cities. The caller
+(`getCareersFilters`) picks the full-list or state-scoped query.
 
 `GET /careers/locations` (legacy) still works and returns the **full** city list
 as plain string arrays.
@@ -244,6 +246,7 @@ existing rows:
 - canonicalizes `current_city` (`bangalore` → `Bengaluru`, `Erode, Tamilnadu` → `Erode`)
 - **fills `state` for rows that never had one**, inferred from the city map
 - normalizes existing state values; nulls invalid ones
+- marks offline-map matches verified; unresolved rows remain stored but hidden from filters
 - prints cities it could not resolve (genuine junk like `city`, `test`) for manual review
 
 **It does not call Geoapify** — no bulk geocoding on deploy. Run it once after
@@ -272,11 +275,11 @@ HTTP 500, empty results, non-India result, geocoding disabled, missing key.
 ```
 PUBLIC FORM  current_city: "Bangalore"
   POST /careers/public
-    → resolveLocation("Bangalore")
+    → resolveLocation("Bangalore", providedState)
         alias → "Bengaluru"
         Geoapify (if enabled) → city "Bengaluru", state "Karnataka"
-        (disabled/failed → fallback: city "Bengaluru", state null)
-    → INSERT current_city="Bengaluru", state="Karnataka"
+        (disabled/failed → fallback: city "Bengaluru", state "Karnataka")
+    → INSERT current_city="Bengaluru", state="Karnataka", location_verified=true
     → invalidateCareersFiltersCache()
 
 ADMIN  Careers Applications

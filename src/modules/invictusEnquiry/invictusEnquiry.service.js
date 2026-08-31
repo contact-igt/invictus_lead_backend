@@ -31,15 +31,14 @@ export const invalidateCareersFiltersCache = () => careersFiltersCache.clear();
  * resolver can't determine one.
  */
 const resolveCareersLocation = async (rawCity, providedState) => {
-  const resolved = await resolveLocation(rawCity);
-  const current_city =
-    resolved.city || canonicalizeCity(rawCity) || String(rawCity || "").trim();
+  const fallbackCity = canonicalizeCity(rawCity);
+  const resolved = await resolveLocation(fallbackCity, providedState);
+  const current_city = resolved.city || fallbackCity;
   const state =
     resolved.state ||
     canonicalizeState(providedState) ||
-    (isValidLocationValue(providedState) ? normalizeLocationValue(providedState) : "") ||
     stateForCity(current_city);
-  return { current_city, state: state || null };
+  return { current_city, state: state || null, location_verified: resolved.verified === true };
 };
 
 // Server-side reference generator (IGT- + 6 random alphanumeric characters)
@@ -272,6 +271,12 @@ export const createCareersApplicationPublic = async (payload) => {
     throw error;
   }
 
+  if (typeof current_city !== "string" || !isValidLocationValue(current_city)) {
+    const error = new Error("Current city must contain a valid city name, not only numbers or symbols.");
+    error.status = 400;
+    throw error;
+  }
+
   if (full_name.trim().length < 2) {
     const error = new Error("Full name must be at least 2 characters.");
     error.status = 400;
@@ -370,6 +375,7 @@ export const createCareersApplicationPublic = async (payload) => {
     email: email.trim().toLowerCase(),
     current_city: location.current_city,
     state: location.state,
+    location_verified: location.location_verified,
     notice_period: notice_period.trim(),
     experience,
     portfolio_or_showreel: portfolio_or_showreel.trim(),
@@ -500,14 +506,15 @@ const cacheGet = async (key, loader) => {
 export const getCareersFilters = async ({ state } = {}) => {
   const normalizedState = isValidLocationValue(state) ? normalizeLocationValue(state) : "";
   const model = db.InvictusCareersApplication;
+  const verifiedOnly = { location_verified: true };
 
   const cityCacheKey = normalizedState ? `careers:cities:${normalizedState}` : "careers:cities:__all__";
 
   const [stateRows, roleRows, statusRows, cityRows] = await Promise.all([
-    cacheGet("careers:states", () => queryDistinctStateCounts(model)),
+    cacheGet("careers:states", () => queryDistinctStateCounts(model, verifiedOnly)),
     cacheGet("careers:roles", () => queryColumnCounts(model, "role")),
     cacheGet("careers:statuses", () => queryColumnCounts(model, "status")),
-    cacheGet(cityCacheKey, () => queryCityCounts(model, "current_city", normalizedState || undefined)),
+    cacheGet(cityCacheKey, () => queryCityCounts(model, "current_city", normalizedState || undefined, verifiedOnly)),
   ]);
 
   return buildCareersFilterResult({ state: normalizedState, stateRows, cityRows, roleRows, statusRows });
@@ -520,9 +527,10 @@ export const getCareersFilters = async ({ state } = {}) => {
  */
 export const getCareersLocations = async () => {
   const model = db.InvictusCareersApplication;
+  const verifiedOnly = { location_verified: true };
   const [stateRows, cityRows, roleRows] = await Promise.all([
-    cacheGet("careers:states", () => queryDistinctStateCounts(model)),
-    cacheGet("careers:cities:__all__", () => queryCityCounts(model, "current_city")),
+    cacheGet("careers:states", () => queryDistinctStateCounts(model, verifiedOnly)),
+    cacheGet("careers:cities:__all__", () => queryCityCounts(model, "current_city", undefined, verifiedOnly)),
     cacheGet("careers:roles", () => queryColumnCounts(model, "role")),
   ]);
   const pick = (rows, key) =>
@@ -559,14 +567,23 @@ export const updateCareersApplication = async (id, payload) => {
   if (status) application.status = status;
   if (notes !== undefined) application.notes = notes;
 
-  // Re-resolve location only when the admin actually changes current_city
-  // (not on status / notes edits) — avoids needless geocoding calls.
-  if (current_city !== undefined) {
-    const incoming = String(current_city || "").trim();
-    if (incoming && canonicalizeCity(incoming) !== application.current_city) {
-      const location = await resolveCareersLocation(incoming, payload.state);
+  // Re-resolve when either supplied location part actually changes. Status /
+  // notes edits omit both fields and therefore never trigger geocoding.
+  if (current_city !== undefined || payload.state !== undefined) {
+    const incoming = current_city === undefined ? application.current_city : current_city;
+    if (typeof incoming !== "string" || !isValidLocationValue(incoming)) {
+      const error = new Error("Current city must contain a valid city name, not only numbers or symbols.");
+      error.status = 400;
+      throw error;
+    }
+    const incomingState = payload.state === undefined ? application.state : payload.state;
+    const cityChanged = canonicalizeCity(incoming) !== application.current_city;
+    const stateChanged = normalizeLocationValue(incomingState) !== normalizeLocationValue(application.state);
+    if (cityChanged || stateChanged) {
+      const location = await resolveCareersLocation(incoming.trim(), incomingState);
       application.current_city = location.current_city;
       application.state = location.state;
+      application.location_verified = location.location_verified;
     }
   }
 
