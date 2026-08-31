@@ -35,8 +35,9 @@ export const normalizeLocationValue = (raw) => {
   const collapsed = String(raw).trim().replace(/\s+/g, " ");
   if (!collapsed) return "";
   if (INVALID_TOKENS.has(collapsed.toLowerCase())) return "";
-  // Reject values with no letters at all (e.g. "123", "----").
-  if (!/[a-z]/i.test(collapsed)) return "";
+  // Reject values with no letters at all (e.g. "123", "----") while
+  // allowing applicants to enter city names in Indian scripts.
+  if (!/\p{L}/u.test(collapsed)) return "";
 
   return collapsed
     .toLowerCase()

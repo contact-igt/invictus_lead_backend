@@ -49,6 +49,11 @@ export const InvictusCareersApplicationTable = (Sequelize, sequelize) => {
         type: Sequelize.STRING,
         allowNull: true,
       },
+      location_verified: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
       notice_period: {
         type: Sequelize.STRING,
         allowNull: false,
@@ -160,6 +165,10 @@ export const InvictusCareersApplicationTable = (Sequelize, sequelize) => {
           // Speeds up the State -> City dependent filter aggregation.
           name: "invictus_careers_state_city_idx",
           fields: ["state", "current_city"],
+        },
+        {
+          name: "invictus_careers_verified_state_city_idx",
+          fields: ["location_verified", "state", "current_city"],
         },
         {
           fields: ["application_reference"],

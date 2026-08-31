@@ -49,10 +49,12 @@ export const assembleLocationFilters = (pairs, opts = {}) => {
 };
 
 /** Collapse grouped rows for a single column into sorted `{name,count}` options. */
-export const assembleColumnOptions = (rows, key) => {
+export const assembleColumnOptions = (rows, key, normalize = false) => {
   const counts = new Map();
   for (const row of rows) {
-    const name = String(row[key] ?? "").trim();
+    const name = normalize
+      ? normalizeLocationValue(row[key])
+      : String(row[key] ?? "").trim();
     if (!name) continue;
     counts.set(name, (counts.get(name) || 0) + (Number(row.count) || 0));
   }
@@ -84,10 +86,10 @@ export const queryColumnCounts = (model, column) =>
   });
 
 /** Distinct non-empty `state` values with per-state application counts. */
-export const queryDistinctStateCounts = (model) =>
+export const queryDistinctStateCounts = (model, extraWhere = {}) =>
   model.findAll({
     attributes: ["state", [fn("COUNT", col("id")), "count"]],
-    where: { state: NON_EMPTY },
+    where: { state: NON_EMPTY, ...extraWhere },
     group: ["state"],
     order: [["state", "ASC"]],
     raw: true,
@@ -97,12 +99,13 @@ export const queryDistinctStateCounts = (model) =>
  * Distinct non-empty city values (with counts).
  * Pass `state` to scope to one state; omit it for the full city list.
  */
-export const queryCityCounts = (model, cityColumn, state) =>
+export const queryCityCounts = (model, cityColumn, state, extraWhere = {}) =>
   model.findAll({
     attributes: [[col(cityColumn), "city"], [fn("COUNT", col("id")), "count"]],
     where: {
       [cityColumn]: NON_EMPTY,
       ...(state ? { state } : {}),
+      ...extraWhere,
     },
     group: [cityColumn],
     order: [[col(cityColumn), "ASC"]],
@@ -123,8 +126,8 @@ export const buildCareersFilterResult = ({ state, stateRows, cityRows, roleRows,
   const normalizedState = normalizeLocationValue(state);
   return {
     state: normalizedState || null,
-    states: assembleColumnOptions(stateRows || [], "state"),
-    cities: assembleColumnOptions(cityRows || [], "city"),
+    states: assembleColumnOptions(stateRows || [], "state", true),
+    cities: assembleColumnOptions(cityRows || [], "city", true),
     roles: assembleColumnOptions(roleRows || [], "role"),
     statuses: assembleColumnOptions(statusRows || [], "status"),
   };

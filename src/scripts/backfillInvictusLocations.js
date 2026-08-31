@@ -22,8 +22,9 @@ const DRY_RUN = process.argv.includes("--dry-run");
  * @param {string} cityField  physical city column name
  */
 const backfillTable = async (label, model, cityField) => {
+  const tracksVerification = Object.prototype.hasOwnProperty.call(model.rawAttributes, "location_verified");
   const rows = await model.findAll({
-    attributes: ["id", cityField, "state"],
+    attributes: ["id", cityField, "state", ...(tracksVerification ? ["location_verified"] : [])],
     raw: true,
   });
 
@@ -31,6 +32,7 @@ const backfillTable = async (label, model, cityField) => {
   let stateUpdated = 0;
   let stateFilled = 0;
   let stateCleared = 0;
+  let verificationUpdated = 0;
   const unresolvedCities = new Set();
 
   for (const row of rows) {
@@ -66,6 +68,13 @@ const backfillTable = async (label, model, cityField) => {
       stateFilled += 1;
     }
 
+    // Offline backfill may upgrade known cities, but must never downgrade a
+    // city that was already verified by Geoapify.
+    if (tracksVerification && off.verified && !row.location_verified) {
+      patch.location_verified = true;
+      verificationUpdated += 1;
+    }
+
     if (Object.keys(patch).length && !DRY_RUN) {
       await model.update(patch, { where: { id: row.id } });
     }
@@ -74,6 +83,7 @@ const backfillTable = async (label, model, cityField) => {
   console.log(
     `[${label}] rows=${rows.length} cityUpdated=${cityUpdated} ` +
       `stateNormalized=${stateUpdated} stateInferred=${stateFilled} stateCleared=${stateCleared}` +
+      (tracksVerification ? ` locationVerificationUpdated=${verificationUpdated}` : "") +
       (DRY_RUN ? "  (dry-run, nothing written)" : ""),
   );
   if (unresolvedCities.size) {

@@ -12,7 +12,8 @@
  *
  * A geocoding outage, missing API key, timeout or junk response must NEVER
  * prevent an application from being created — every path returns a usable
- * object. Results are cached in-process for a day (city↔state mapping is stable).
+ * object. Verified results are cached in-process for a day; unresolved
+ * fallbacks are retried on the next request.
  */
 import { getGeoapifyConfig } from "../config/geoapify.config.js";
 import { TtlCache } from "../utils/ttlCache.js";
@@ -24,6 +25,7 @@ import {
 } from "../utils/locationText.js";
 
 const LOCATION_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const MIN_CITY_CONFIDENCE = 0.7;
 const locationCache = new TtlCache(LOCATION_CACHE_TTL_MS);
 
 /** Test seam — lets the test suite clear the memoized results. */
@@ -61,13 +63,15 @@ const extractCity = (r = {}) =>
 
 const buildFallback = (cityGuess, stateGuess, normalized) => {
   const city = cityGuess || canonicalizeCity(normalized);
+  const knownState = stateForCity(city);
   return {
     city,
-    // Even without Geoapify we can often infer the state from a known city.
-    state: stateGuess || stateForCity(city) || null,
+    // The deterministic city map wins over possibly mismatched user input.
+    state: knownState || stateGuess || null,
     country: "India",
     countryCode: "in",
     source: "fallback",
+    verified: Boolean(knownState),
   };
 };
 
@@ -78,7 +82,7 @@ const buildFallback = (cityGuess, stateGuess, normalized) => {
 export const resolveLocationOffline = (rawLocation) => {
   const normalized = normalizeLocationValue(rawLocation);
   if (!normalized) {
-    return { city: "", state: null, country: "India", countryCode: "in", source: "fallback" };
+    return { city: "", state: null, country: "India", countryCode: "in", source: "fallback", verified: false };
   }
   const { cityGuess, stateGuess } = parseCommaInput(normalized);
   return buildFallback(cityGuess, stateGuess, normalized);
@@ -88,6 +92,7 @@ const geocodeWithGeoapify = async (text, cfg) => {
   const url = new URL(cfg.baseUrl);
   url.searchParams.set("text", text);
   url.searchParams.set("filter", `countrycode:${cfg.countryCode}`);
+  url.searchParams.set("type", "city");
   url.searchParams.set("limit", "1");
   url.searchParams.set("format", "json");
   url.searchParams.set("apiKey", cfg.apiKey);
@@ -110,15 +115,21 @@ const geocodeWithGeoapify = async (text, cfg) => {
 };
 
 /**
- * @param {string} rawLocation single free-text location value
+ * @param {string} rawLocation single free-text city/location value
+ * @param {string} [rawState] optional separately submitted state
  * @returns {Promise<{ city: string, state: string|null, country: string,
- *                      countryCode: string, source: "geoapify"|"fallback" }>}
+ *                      countryCode: string, source: "geoapify"|"fallback",
+ *                      verified: boolean }>}
  */
-export const resolveLocation = async (rawLocation) => {
-  const normalized = normalizeLocationValue(rawLocation);
-  if (!normalized) {
-    return { city: "", state: null, country: "India", countryCode: "in", source: "fallback" };
+export const resolveLocation = async (rawLocation, rawState) => {
+  const normalizedLocation = normalizeLocationValue(rawLocation);
+  if (!normalizedLocation) {
+    return { city: "", state: null, country: "India", countryCode: "in", source: "fallback", verified: false };
   }
+  const normalizedState = normalizeLocationValue(rawState);
+  const normalized = normalizedState && !normalizedLocation.includes(",")
+    ? `${normalizedLocation}, ${normalizedState}`
+    : normalizedLocation;
 
   const cacheKey = `location:${normalized.toLowerCase()}`;
   const cached = locationCache.get(cacheKey);
@@ -132,22 +143,28 @@ export const resolveLocation = async (rawLocation) => {
     result = buildFallback(cityGuess, stateGuess, normalized);
   } else {
     try {
-      const query = stateGuess ? `${cityGuess || normalized}, ${stateGuess}` : cityGuess || normalized;
+      const query = stateGuess
+        ? `${cityGuess || normalized}, ${stateGuess}`
+        : normalized.includes(",") ? normalized : cityGuess || normalized;
       const r = await geocodeWithGeoapify(query, cfg);
 
       const countryCode = String(r.country_code || "").toLowerCase();
       const resolvedCity = canonicalizeCity(extractCity(r));
       const resolvedState = canonicalizeState(r.state);
+      const confidence = Number(r.rank?.confidence_city_level ?? r.rank?.confidence ?? 0);
+      const isVerifiedCity = r.result_type === "city" && confidence >= MIN_CITY_CONFIDENCE;
+      const verifiedState = resolvedState || stateForCity(resolvedCity) || stateGuess;
 
-      if (countryCode !== "in" || !resolvedCity) {
+      if (countryCode !== "in" || !resolvedCity || !isVerifiedCity || !verifiedState) {
         result = buildFallback(cityGuess, stateGuess, normalized);
       } else {
         result = {
           city: resolvedCity,
-          state: resolvedState || stateGuess || stateForCity(resolvedCity) || null,
+          state: verifiedState,
           country: r.country || "India",
           countryCode: "in",
           source: "geoapify",
+          verified: true,
         };
       }
     } catch (err) {
@@ -157,7 +174,7 @@ export const resolveLocation = async (rawLocation) => {
     }
   }
 
-  locationCache.set(cacheKey, result);
+  if (result.verified) locationCache.set(cacheKey, result);
   return result;
 };
 
