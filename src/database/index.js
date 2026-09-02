@@ -26,6 +26,15 @@ import { VlsTaxationLawTable } from "./tables/VlsTaxationLawTable/index.js";
 import { ShantiEyeTechTable } from './tables/ShantiEyeTechTable/index.js';
 import { PhoenixFitnessTable } from './tables/PhoenixFitnessTable/index.js';
 import { ApiLogTable } from "./tables/ApiLogTable/index.js";
+import { BirthwaveDoctorTable } from "./tables/BirthwaveDoctorTable/index.js";
+import { BirthwaveLeadTable } from "./tables/BirthwaveLeadTable/index.js";
+import { BirthwaveAppointmentTable } from "./tables/BirthwaveAppointmentTable/index.js";
+import { BirthwaveLeadActivityTable } from "./tables/BirthwaveLeadActivityTable/index.js";
+import { BirthwaveWebsiteLeadTable } from "./tables/BirthwaveWebsiteLeadTable/index.js";
+import { CrmCustomFieldTable } from "./tables/CrmCustomFieldTable/index.js";
+import { CrmCallTable } from "./tables/CrmCallTable/index.js";
+import { CrmIntegrationTable } from "./tables/CrmIntegrationTable/index.js";
+import { CrmFieldMappingTable } from "./tables/CrmFieldMappingTable/index.js";
 import { InvictusGeneralEnquiryTable } from "./tables/InvictusGeneralEnquiryTable/index.js";
 import { InvictusCareersApplicationTable } from "./tables/InvictusCareersApplicationTable/index.js";
 import { DATABASE_TIME_ZONE_OFFSET } from "../config/timezone.config.js";
@@ -80,6 +89,15 @@ db.PhoenixFitness = PhoenixFitnessTable(Sequelize, sequelize);
 db.ApiLog = ApiLogTable(Sequelize, sequelize);
 db.InvictusGeneralEnquiry = InvictusGeneralEnquiryTable(Sequelize, sequelize);
 db.InvictusCareersApplication = InvictusCareersApplicationTable(Sequelize, sequelize);
+db.BirthwaveDoctor = BirthwaveDoctorTable(Sequelize, sequelize);
+db.BirthwaveLead = BirthwaveLeadTable(Sequelize, sequelize);
+db.BirthwaveAppointment = BirthwaveAppointmentTable(Sequelize, sequelize);
+db.BirthwaveLeadActivity = BirthwaveLeadActivityTable(Sequelize, sequelize);
+db.BirthwaveWebsiteLead = BirthwaveWebsiteLeadTable(Sequelize, sequelize);
+db.CrmCustomField = CrmCustomFieldTable(Sequelize, sequelize);
+db.CrmCall = CrmCallTable(Sequelize, sequelize);
+db.CrmIntegration = CrmIntegrationTable(Sequelize, sequelize);
+db.CrmFieldMapping = CrmFieldMappingTable(Sequelize, sequelize);
 
 const addClientId = (model) => {
   model.belongsTo(db.Client, { foreignKey: "client_id", as: "client" });
@@ -108,6 +126,44 @@ addClientId(db.PixelEyeWebsiteLead);
 
 addClientId(db.ShantiEyeTech);
 addClientId(db.PhoenixFitness);
+
+addClientId(db.BirthwaveDoctor);
+addClientId(db.BirthwaveLead);
+addClientId(db.BirthwaveAppointment);
+addClientId(db.BirthwaveLeadActivity);
+addClientId(db.BirthwaveWebsiteLead);
+addClientId(db.CrmCustomField);
+addClientId(db.CrmCall);
+addClientId(db.CrmIntegration);
+addClientId(db.CrmFieldMapping);
+
+// Birthwave relational graph
+db.BirthwaveLead.belongsTo(db.BirthwaveDoctor, {
+  foreignKey: "assigned_doctor_id",
+  as: "assignedDoctor",
+});
+db.BirthwaveDoctor.hasMany(db.BirthwaveLead, { foreignKey: "assigned_doctor_id" });
+
+db.BirthwaveAppointment.belongsTo(db.BirthwaveLead, {
+  foreignKey: "lead_id",
+  as: "lead",
+});
+db.BirthwaveLead.hasMany(db.BirthwaveAppointment, { foreignKey: "lead_id" });
+
+db.BirthwaveAppointment.belongsTo(db.BirthwaveDoctor, {
+  foreignKey: "doctor_id",
+  as: "doctor",
+});
+db.BirthwaveDoctor.hasMany(db.BirthwaveAppointment, { foreignKey: "doctor_id" });
+
+db.BirthwaveLeadActivity.belongsTo(db.BirthwaveLead, {
+  foreignKey: "lead_id",
+  as: "lead",
+});
+db.BirthwaveLead.hasMany(db.BirthwaveLeadActivity, { foreignKey: "lead_id" });
+
+db.CrmCall.belongsTo(db.BirthwaveLead, { foreignKey: "lead_id", as: "lead" });
+db.BirthwaveLead.hasMany(db.CrmCall, { foreignKey: "lead_id" });
 
 export default db;
 

@@ -43,6 +43,10 @@ import ShantiEyeTechRouter from './modules/shantiEyeTech/shantiEyeTech.routes.js
 import PhoenixFitnessRouter from './modules/phoenixFitness/phoenixFitness.routes.js';
 import ApiLogsRouter from "./modules/apiLogs/apiLogs.routes.js";
 import InvictusEnquiryRouter from "./modules/invictusEnquiry/invictusEnquiry.routes.js";
+import BirthwaveRouter from "./modules/birthwave/birthwave.routes.js";
+import BirthwavePublicRouter from "./modules/birthwave/birthwavePublic.routes.js";
+import CrmRouter from "./modules/birthwave/crm.routes.js";
+import { startBirthwaveSheetSyncScheduler } from "./modules/birthwave/birthwaveSheetSync.service.js";
 import { startInvictusSheetSyncScheduler } from "./modules/invictusEnquiry/invictusSheetSync.service.js";
 import { apiAuditLogger } from "./middlewares/apiAuditLogger.js";
 
@@ -117,6 +121,7 @@ const connect_mysql = async () => {
     startPixelEyeScheduler();
     startPixelEyeFollowUpComplianceScheduler();
     startInvictusSheetSyncScheduler();
+    startBirthwaveSheetSyncScheduler();
   } catch (error) {
     console.error("Failed to synchronize database:", error);
     process.exit(1);
@@ -148,6 +153,9 @@ app.use('/api/v1/shanti-eye-tech', ShantiEyeTechRouter);
 app.use('/api/v1/phoenix-fitness', PhoenixFitnessRouter);
 app.use("/api/v1/api-logs", ApiLogsRouter);
 app.use("/api/v1/invictus-enquiries", InvictusEnquiryRouter);
+app.use("/api/v1/birthwave-public", BirthwavePublicRouter);
+app.use("/api/v1/birthwave", BirthwaveRouter);
+app.use("/api/v1/crm", CrmRouter);
 
 // Base route
 app.get("/", (req, res) => {

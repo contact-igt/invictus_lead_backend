@@ -23,6 +23,15 @@ export const tableName = {
   SHANTI_EYE_TECH: 'shanti_eye_tech_leads',
   PHOENIX_FITNESS: 'phoenix_fitness_leads',
   API_LOGS: 'api_logs',
+  BIRTHWAVE_DOCTORS: 'birthwave_doctors',
+  BIRTHWAVE_LEADS: 'birthwave_leads',
+  BIRTHWAVE_APPOINTMENTS: 'birthwave_appointments',
+  BIRTHWAVE_LEAD_ACTIVITIES: 'birthwave_lead_activities',
+  BIRTHWAVE_WEBSITE_LEADS: 'birthwave_website_leads',
+  CRM_CUSTOM_FIELDS: 'crm_custom_fields',
+  CRM_CALLS: 'crm_calls',
+  CRM_INTEGRATIONS: 'crm_integrations',
+  CRM_FIELD_MAPPINGS: 'crm_field_mappings',
 };
 
 

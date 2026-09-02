@@ -7,6 +7,7 @@
     "start:dev": "nodemon src/app.js",
     "seed:superadmin": "node src/scripts/seedSuperAdmin.js",
     "seed:pixelEye": "node src/scripts/seedpixeleye.js",
+    "seed:birthwave": "node src/scripts/seedBirthwave.js",
     "backfill:locations": "node src/scripts/backfillInvictusLocations.js",
     "db:drop": "node src/scripts/dropTables.js",
     "db:truncate": "node src/scripts/truncateTables.js",
