@@ -50,7 +50,36 @@ export const updateClient = async (id, data) => {
 };
 
 export const deleteClient = async (id) => {
-  const deleted = await db.Client.destroy({ where: { id } });
-  if (!deleted) throw new Error("Client not found");
+  const client = await db.Client.findOne({ where: { id } });
+  if (!client) throw new Error("Client not found");
+
+  // Every tenant-scoped table (leads, doctors, appointments, CRM config, sheet
+  // enquiries, …) has a `client_id` FK to `clients.id`, so a bare delete fails
+  // for any client that has data. Remove those rows first, in one transaction.
+  const scopedModels = Object.values(db).filter(
+    (model) =>
+      model &&
+      typeof model.destroy === "function" &&
+      model !== db.Client &&
+      model.rawAttributes &&
+      model.rawAttributes.client_id,
+  );
+
+  await db.sequelize.transaction(async (transaction) => {
+    // Child tables can reference each other (e.g. appointments -> leads), so
+    // drop FK enforcement for the span of the cleanup rather than solving the
+    // deletion order.
+    await db.sequelize.query("SET FOREIGN_KEY_CHECKS = 0", { transaction });
+    try {
+      for (const model of scopedModels) {
+        // eslint-disable-next-line no-await-in-loop
+        await model.destroy({ where: { client_id: id }, transaction, force: true });
+      }
+      await db.Client.destroy({ where: { id }, transaction });
+    } finally {
+      await db.sequelize.query("SET FOREIGN_KEY_CHECKS = 1", { transaction });
+    }
+  });
+
   return true;
 };
