@@ -34,6 +34,7 @@ export const buildRepliIntegrationMetadata = (n, extra = {}) => ({
   agent_id: n.agentId,
   answers: n.answers || {},
   collected_data: n.answers || {},
+  response_details: n.rawMetadata || {},
   completion_state: n.completionState ?? null,
   instagram_username: n.instagramUsername ?? null,
   telegram_username: n.telegramUsername ?? null,
@@ -48,12 +49,15 @@ export const buildRepliIntegrationMetadata = (n, extra = {}) => ({
 });
 
 export const mergeRepliIntegrationMetadata = (prev, next) => {
-  const base = prev && typeof prev === "object" ? prev : {};
-  return {
-    ...base,
-    ...next,
-    answers: { ...(base.answers || {}), ...(next.answers || {}) },
-  };
+  const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  const merged = { ...(isObject(prev) ? prev : {}) };
+  for (const [key, value] of Object.entries(next || {})) {
+    if (["__proto__", "constructor", "prototype"].includes(key)) continue;
+    merged[key] = isObject(value)
+      ? mergeRepliIntegrationMetadata(merged[key], value)
+      : value;
+  }
+  return merged;
 };
 
 /**

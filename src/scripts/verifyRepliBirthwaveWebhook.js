@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import db from "../database/index.js";
 import { verifyRepliSignature } from "../modules/integrations/repli/verifyRepliWebhook.js";
 import { normalizeRepliBirthwaveLead } from "../modules/integrations/repli/normalizeRepliBirthwaveLead.js";
 import {
   REPLI_BIRTHWAVE_LEAD_EVENTS,
   REPLI_PING_EVENT,
+  processRepliBirthwaveWebhook,
 } from "../modules/integrations/repli/repliWebhook.service.js";
 
 /**
@@ -15,8 +17,42 @@ import {
  */
 
 const SECRET = "test_endpoint_secret_123";
+assert.ok(db.IntegrationWebhookEvent, "webhook audit model is registered");
+assert.equal(db.IntegrationWebhookEvent.getTableName(), "integration_webhook_events");
 const sign = (raw) =>
   crypto.createHmac("sha256", SECRET).update(raw).digest("hex");
+
+// Exercise signed ping processing without connecting to MySQL.
+const originalFindOne = db.IntegrationWebhookEvent.findOne;
+const originalFindOrCreate = db.IntegrationWebhookEvent.findOrCreate;
+const originalEnabled = process.env.REPLI_BIRTHWAVE_WEBHOOK_ENABLED;
+const originalSecret = process.env.REPLI_BIRTHWAVE_WEBHOOK_SECRET;
+try {
+  process.env.REPLI_BIRTHWAVE_WEBHOOK_ENABLED = "true";
+  process.env.REPLI_BIRTHWAVE_WEBHOOK_SECRET = SECRET;
+  db.IntegrationWebhookEvent.findOne = async () => null;
+  let audited = false;
+  db.IntegrationWebhookEvent.findOrCreate = async ({ defaults }) => {
+    assert.equal(defaults.event_type, "test.ping");
+    assert.equal(defaults.status, "IGNORED");
+    audited = true;
+    return [{}, true];
+  };
+  const ping = Buffer.from('{ "event": "test.ping" }');
+  const result = await processRepliBirthwaveWebhook({
+    rawBody: ping,
+    headers: { "x-repli-signature": sign(ping) },
+  });
+  assert.deepEqual(result, { status: 200, payload: { success: true, pong: true } });
+  assert.ok(audited, "ping records an audit entry");
+} finally {
+  db.IntegrationWebhookEvent.findOne = originalFindOne;
+  db.IntegrationWebhookEvent.findOrCreate = originalFindOrCreate;
+  if (originalEnabled === undefined) delete process.env.REPLI_BIRTHWAVE_WEBHOOK_ENABLED;
+  else process.env.REPLI_BIRTHWAVE_WEBHOOK_ENABLED = originalEnabled;
+  if (originalSecret === undefined) delete process.env.REPLI_BIRTHWAVE_WEBHOOK_SECRET;
+  else process.env.REPLI_BIRTHWAVE_WEBHOOK_SECRET = originalSecret;
+}
 
 // ── Signature verification ────────────────────────────────────────────────
 const body = JSON.stringify({ event: "lead.created", lead: { phone: "9876543210" } });

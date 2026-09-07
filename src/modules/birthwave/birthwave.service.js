@@ -53,6 +53,7 @@ const serializeLead = (row) => {
     notes: row.notes ?? null,
     source_provider: row.source_provider ?? null,
     source_external_id: row.source_external_id ?? null,
+    integration_metadata: row.integration_metadata ?? null,
     custom_fields: row.custom_fields ?? {},
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -133,6 +134,7 @@ const buildLeadWhere = (tenant, query = {}) => {
 
   if (query.status) where.status = query.status;
   if (query.source) where.source = query.source;
+  if (query.source_provider) where.source_provider = query.source_provider;
   if (query.assigned_doctor_id) where.assigned_doctor_id = Number(query.assigned_doctor_id);
 
   if (query.start_date || query.end_date) {

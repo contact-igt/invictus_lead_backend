@@ -15,6 +15,7 @@ export const BIRTHWAVE_LEAD_SOURCES = [
   "whatsapp",
   "walk_in",
   "referral",
+  "instagram",
   "other",
 ];
 
@@ -29,7 +30,7 @@ export const BirthwaveLeadTable = (Sequelize, sequelize) =>
         references: { model: tableName.CLIENTS, key: "id" },
       },
       name: { type: Sequelize.STRING(150), allowNull: false },
-      phone: { type: Sequelize.STRING(30), allowNull: false },
+      phone: { type: Sequelize.STRING(30), allowNull: true },
       email: { type: Sequelize.STRING(200), allowNull: true },
       service: { type: Sequelize.STRING(255), allowNull: true },
       source: { type: Sequelize.STRING(50), allowNull: true },
@@ -40,6 +41,14 @@ export const BirthwaveLeadTable = (Sequelize, sequelize) =>
       source_provider: { type: Sequelize.STRING(50), allowNull: true },
       source_external_id: { type: Sequelize.STRING(191), allowNull: true },
       custom_fields: { type: Sequelize.JSON, allowNull: true },
+      integration_metadata: {
+        type: Sequelize.JSON,
+        allowNull: true,
+        get() {
+          const value = this.getDataValue("integration_metadata");
+          return typeof value === "string" ? JSON.parse(value) : value;
+        },
+      },
     },
     {
       tableName: tableName.BIRTHWAVE_LEADS,

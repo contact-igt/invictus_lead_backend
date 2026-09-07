@@ -23,6 +23,7 @@ export const tableName = {
   SHANTI_EYE_TECH: 'shanti_eye_tech_leads',
   PHOENIX_FITNESS: 'phoenix_fitness_leads',
   API_LOGS: 'api_logs',
+  INTEGRATION_WEBHOOK_EVENTS: 'integration_webhook_events',
   BIRTHWAVE_DOCTORS: 'birthwave_doctors',
   BIRTHWAVE_LEADS: 'birthwave_leads',
   BIRTHWAVE_APPOINTMENTS: 'birthwave_appointments',

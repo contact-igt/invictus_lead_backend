@@ -93,6 +93,7 @@ export const syncRepliBirthwaveLeads = async ({ limit } = {}) => {
           phone,
           transaction,
           metadataExtra: {
+            response_details: record,
             sync_source: "api",
             sync_type: "historical",
             synced_at: new Date().toISOString(),

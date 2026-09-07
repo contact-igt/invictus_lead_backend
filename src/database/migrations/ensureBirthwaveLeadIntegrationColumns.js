@@ -31,6 +31,13 @@ export const ensureBirthwaveLeadIntegrationColumns = async () => {
   let changed = false;
 
   const columns = await queryInterface.describeTable(TABLE);
+  if (columns.phone && !columns.phone.allowNull) {
+    await queryInterface.changeColumn(TABLE, "phone", {
+      type: db.Sequelize.STRING(30),
+      allowNull: true,
+    });
+    changed = true;
+  }
   for (const [columnName, definition] of Object.entries(COLUMNS)) {
     if (Object.prototype.hasOwnProperty.call(columns, columnName)) continue;
     await queryInterface.addColumn(TABLE, columnName, definition);

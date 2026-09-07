@@ -158,4 +158,34 @@ const n5 = normalizeRepliBirthwaveLead(
 );
 assert.equal(n5.name, "someuser", "name falls back to instagram_username");
 
+// Check persistence and the API response used by the Instagram screens.
+const { default: db } = await import("../database/index.js");
+const { listLeads, getLeadById } = await import("../modules/birthwave/birthwave.service.js");
+assert.equal(db.BirthwaveLead.rawAttributes.phone.allowNull, true);
+assert.ok(db.BirthwaveLead.rawAttributes.integration_metadata);
+const originalList = db.BirthwaveLead.findAndCountAll;
+const originalDetail = db.BirthwaveLead.findOne;
+const metadata = { instagram_username: "sample", collected_data: { Name: "Example" } };
+const model = db.BirthwaveLead.build({ name: "Example", phone: null });
+model.setDataValue("integration_metadata", JSON.stringify(metadata));
+assert.deepEqual(model.integration_metadata, metadata, "database JSON strings are decoded");
+const row = { id: 1, client_id: 7, name: "Example", phone: null, integration_metadata: metadata };
+try {
+  db.BirthwaveLead.findAndCountAll = async ({ where }) => {
+    assert.equal(where.client_id, 7);
+    assert.equal(where.source, "instagram");
+    assert.equal(where.source_provider, "REPLI");
+    return { rows: [row], count: 1 };
+  };
+  db.BirthwaveLead.findOne = async ({ where }) => {
+    assert.equal(where.client_id, 7);
+    return row;
+  };
+  const list = await listLeads({ id: 7 }, { source: "instagram", source_provider: "REPLI" });
+  assert.deepEqual(list.data[0].integration_metadata, metadata);
+  assert.deepEqual((await getLeadById({ id: 7 }, 1)).integration_metadata, metadata);
+} finally {
+  db.BirthwaveLead.findAndCountAll = originalList;
+  db.BirthwaveLead.findOne = originalDetail;
+}
 console.log("Repli → Birthwave historical sync primitives verified.");
