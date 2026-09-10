@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start:dev": "nodemon src/app.js",
+    "test:repli:ping": "node src/scripts/testRepliBirthwavePing.js",
     "seed:superadmin": "node src/scripts/seedSuperAdmin.js",
     "seed:pixelEye": "node src/scripts/seedpixeleye.js",
     "seed:birthwave": "node src/scripts/seedBirthwave.js",

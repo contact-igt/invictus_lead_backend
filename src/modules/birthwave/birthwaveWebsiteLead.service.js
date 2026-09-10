@@ -16,7 +16,7 @@ const httpError = (status, message) => {
 const str = (v, max = 255) =>
   typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null;
 
-const normalizePhone = (phone) => {
+export const normalizePhone = (phone) => {
   const digits = String(phone || "").replace(/\D/g, "");
   if (digits.length === 10) return `+91${digits}`;
   if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`;

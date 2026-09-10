@@ -25,6 +25,7 @@ import VlsConsumerProtectionLawMasterClassRouter from "./modules/vlsConsumerProt
 import VlsDopAiAssistedRouter from "./modules/vls/vlsDopAiAssisted/vlsDopAiAssisted.routes.js";
 import VlsAiForAdvocatesRouter from "./modules/vls/vlsAiForAdvocates/vlsAiForAdvocates.routes.js";
 import VlsTaxationLawRouter from "./modules/vlsTaxationLaw/vlsTaxationLaw.routes.js";
+import VlsBusinessLawRouter from "./modules/vlsBusinessLaw/vlsBusinessLaw.routes.js";
 import { ensurePixelEyeLeadStateCurrentDayColumn } from "./database/migrations/ensurePixelEyeLeadStateCurrentDay.js";
 import { ensurePixelEyeLeadStateLeadIdColumn } from "./database/migrations/ensurePixelEyeLeadStateLeadId.js";
 import { ensurePixelEyeLeadStateCompletionSourceColumn } from "./database/migrations/ensurePixelEyeLeadStateCompletionSource.js";
@@ -46,6 +47,9 @@ import InvictusEnquiryRouter from "./modules/invictusEnquiry/invictusEnquiry.rou
 import BirthwaveRouter from "./modules/birthwave/birthwave.routes.js";
 import BirthwavePublicRouter from "./modules/birthwave/birthwavePublic.routes.js";
 import CrmRouter from "./modules/birthwave/crm.routes.js";
+import RepliWebhookRouter from "./modules/integrations/repli/repliWebhook.routes.js";
+import { ensureBirthwaveLeadIntegrationColumns } from "./database/migrations/ensureBirthwaveLeadIntegrationColumns.js";
+import { ensureIntegrationWebhookEventsTable } from "./database/migrations/ensureIntegrationWebhookEventsTable.js";
 import { startBirthwaveSheetSyncScheduler } from "./modules/birthwave/birthwaveSheetSync.service.js";
 import { startInvictusSheetSyncScheduler } from "./modules/invictusEnquiry/invictusSheetSync.service.js";
 import { apiAuditLogger } from "./middlewares/apiAuditLogger.js";
@@ -73,6 +77,8 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+// Preserve the exact webhook bytes for HMAC verification before JSON parsing.
+app.use("/api/v1/integrations/repli/birthwave/webhook", express.raw({ type: "application/json" }));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(apiAuditLogger);
@@ -105,6 +111,8 @@ const connect_mysql = async () => {
   try {
     await ensureInvictusEnquiryColumns();
     await db.sequelize.sync();
+    await ensureBirthwaveLeadIntegrationColumns();
+    await ensureIntegrationWebhookEventsTable();
     await ensurePixelEyeLeadStateCurrentDayColumn();
     await ensurePixelEyeLeadStateLeadIdColumn();
     await ensurePixelEyeLeadStateCompletionSourceColumn();
@@ -145,6 +153,7 @@ app.use("/api/v1/vls-consumer-protection-law-master-class", VlsConsumerProtectio
 app.use("/api/v1/vls-dop-ai-assisted", VlsDopAiAssistedRouter);
 app.use("/api/v1/vls-ai-for-advocates", VlsAiForAdvocatesRouter);
 app.use("/api/v1/vls-taxation-law", VlsTaxationLawRouter);
+app.use("/api/v1/vls-business-law", VlsBusinessLawRouter);
 app.use("/api/v1/aarav-eye-care", AaravEyeCareRouter);
 app.use("/api/v1/antardrashti-netralaya", AntardrashtiNetralayaRouter);
 app.use("/api/v1/rio", RioRouter);
@@ -156,6 +165,7 @@ app.use("/api/v1/invictus-enquiries", InvictusEnquiryRouter);
 app.use("/api/v1/birthwave-public", BirthwavePublicRouter);
 app.use("/api/v1/birthwave", BirthwaveRouter);
 app.use("/api/v1/crm", CrmRouter);
+app.use("/api/v1/integrations/repli", RepliWebhookRouter);
 
 // Base route
 app.get("/", (req, res) => {

@@ -22,10 +22,12 @@ import { VlsConsumerProtectionLawMasterClassTable } from "./tables/VlsConsumerPr
 import { vlsDopAiAssistedTable } from "./tables/VlsDopAiAssistedTable/index.js";
 import { vlsAiForAdvocatesTable } from "./tables/VlsAiForAdvocatesTable/index.js";
 import { VlsTaxationLawTable } from "./tables/VlsTaxationLawTable/index.js";
+import { VlsBusinessLawTable } from "./tables/VlsBusinessLawTable/index.js";
 
 import { ShantiEyeTechTable } from './tables/ShantiEyeTechTable/index.js';
 import { PhoenixFitnessTable } from './tables/PhoenixFitnessTable/index.js';
 import { ApiLogTable } from "./tables/ApiLogTable/index.js";
+import { IntegrationWebhookEventTable } from "./tables/IntegrationWebhookEventTable/index.js";
 import { BirthwaveDoctorTable } from "./tables/BirthwaveDoctorTable/index.js";
 import { BirthwaveLeadTable } from "./tables/BirthwaveLeadTable/index.js";
 import { BirthwaveAppointmentTable } from "./tables/BirthwaveAppointmentTable/index.js";
@@ -84,9 +86,11 @@ db.VlsConsumerProtectionLawMasterClass = VlsConsumerProtectionLawMasterClassTabl
 db.VlsDopAiAssisted = vlsDopAiAssistedTable(Sequelize, sequelize);
 db.VlsAiForAdvocates = vlsAiForAdvocatesTable(Sequelize, sequelize);
 db.VlsTaxationLaw = VlsTaxationLawTable(Sequelize, sequelize);
+db.VlsBusinessLaw = VlsBusinessLawTable(Sequelize, sequelize);
 db.ShantiEyeTech = ShantiEyeTechTable(Sequelize, sequelize);
 db.PhoenixFitness = PhoenixFitnessTable(Sequelize, sequelize);
 db.ApiLog = ApiLogTable(Sequelize, sequelize);
+db.IntegrationWebhookEvent = IntegrationWebhookEventTable(Sequelize, sequelize);
 db.InvictusGeneralEnquiry = InvictusGeneralEnquiryTable(Sequelize, sequelize);
 db.InvictusCareersApplication = InvictusCareersApplicationTable(Sequelize, sequelize);
 db.BirthwaveDoctor = BirthwaveDoctorTable(Sequelize, sequelize);
@@ -117,6 +121,7 @@ addClientId(db.VlsConsumerProtectionLawMasterClass);
 addClientId(db.VlsDopAiAssisted);
 addClientId(db.VlsAiForAdvocates);
 addClientId(db.VlsTaxationLaw);
+addClientId(db.VlsBusinessLaw);
 addClientId(db.PixelEye);
 addClientId(db.PixelEyeLeadState);
 addClientId(db.AaravEyeCare);
