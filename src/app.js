@@ -51,6 +51,7 @@ import RepliWebhookRouter from "./modules/integrations/repli/repliWebhook.routes
 import { ensureBirthwaveLeadIntegrationColumns } from "./database/migrations/ensureBirthwaveLeadIntegrationColumns.js";
 import { ensureIntegrationWebhookEventsTable } from "./database/migrations/ensureIntegrationWebhookEventsTable.js";
 import { startBirthwaveSheetSyncScheduler } from "./modules/birthwave/birthwaveSheetSync.service.js";
+import { startBirthwaveAttentionScheduler } from "./modules/birthwave/birthwaveAttentionScheduler.js";
 import { startInvictusSheetSyncScheduler } from "./modules/invictusEnquiry/invictusSheetSync.service.js";
 import { apiAuditLogger } from "./middlewares/apiAuditLogger.js";
 
@@ -130,6 +131,7 @@ const connect_mysql = async () => {
     startPixelEyeFollowUpComplianceScheduler();
     startInvictusSheetSyncScheduler();
     startBirthwaveSheetSyncScheduler();
+    startBirthwaveAttentionScheduler();
   } catch (error) {
     console.error("Failed to synchronize database:", error);
     process.exit(1);

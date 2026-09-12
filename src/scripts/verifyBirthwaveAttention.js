@@ -1,0 +1,53 @@
+import assert from "node:assert/strict";
+import { Op } from "sequelize";
+import db from "../database/index.js";
+import { reconcileAttention, listAttention, updateAttention } from "../modules/birthwave/birthwaveAttention.service.js";
+
+if (!["local", "development"].includes(process.env.INVICTUS_SERVER_LINE || "local")) throw new Error("Attention verification is restricted to local/development databases");
+const clients = await db.Client.findAll({ order: [["id", "ASC"]], limit: 2, attributes: ["id"] });
+assert.ok(clients.length >= 2, "At least two local clients are required");
+const clientId = clients[0].id; const otherClientId = clients[1].id; const tenant = { id: clientId }; const suffix = Date.now();
+const leadIds = []; const taskIds = []; const attentionIds = []; let team; let manager; let telecaller;
+const createUser = async (label, role = "client") => db.Management.create({ client_id: clientId, title: "Mr", username: `phase7-${label}-${suffix}`, email: `phase7-${label}-${suffix}@example.test`, mobile: `91${String(suffix).slice(-8)}${label.length}`.slice(-10), password: "verification-only", role });
+const makeLead = async (data = {}) => { const row = await db.BirthwaveLead.create({ client_id: clientId, name: `Phase Seven Lead ${suffix}-${leadIds.length}`, phone: `+9193${String(suffix).slice(-8)}${String(leadIds.length).padStart(2, "0")}`, service: "VBAC", source: "website", status: "new_lead", custom_fields: {}, ...data }); leadIds.push(row.id); return row; };
+try {
+  manager = await createUser("manager"); telecaller = await createUser("caller");
+  team = await db.BirthwaveTeam.create({ client_id: clientId, name: `Phase Seven Team ${suffix}`, code: `phase7_${suffix}` });
+  await db.BirthwaveTeamMember.create({ client_id: clientId, team_id: team.id, management_id: manager.id, operational_role: "TEAM_MANAGER", status: "ACTIVE", assignment_enabled: true });
+  await db.BirthwaveTeamMember.create({ client_id: clientId, team_id: team.id, management_id: telecaller.id, operational_role: "TELECALLER", status: "ACTIVE", assignment_enabled: true });
+  const old = new Date(Date.now() - 20 * 60 * 1000);
+  const unassigned = await makeLead({ created_at: old });
+  const missingOwner = await makeLead({ status: "assigned", current_team_id: team.id, created_at: old });
+  const missingAction = await makeLead({ status: "assigned", current_team_id: team.id, current_owner_id: telecaller.id });
+  const overdue = await makeLead({ status: "assigned", current_team_id: team.id, current_owner_id: telecaller.id });
+  const task = await db.BirthwaveTask.create({ client_id: clientId, lead_id: overdue.id, team_id: team.id, owner_id: telecaller.id, task_type: "FOLLOW_UP", status: "PENDING", priority: "NORMAL", due_at: new Date(Date.now() - 30 * 60 * 1000), is_primary: true, attempt_number: 1 }); taskIds.push(task.id);
+  const failed = await makeLead({ created_at: old });
+  await db.BirthwaveLeadActivity.create({ client_id: clientId, lead_id: failed.id, event_type: "routing_failed", title: "Routing failed", description: "Verification failure", occurred_at: old });
+  const first = await reconcileAttention(tenant, { id: 0, role: "client" });
+  assert.ok(first.opened >= 5, "Expected core exception types to open");
+  const second = await reconcileAttention(tenant, { id: 0, role: "client" });
+  assert.ok(second.unchanged >= first.opened, "Reconciliation deduplicates active issues");
+  const listed = await listAttention(tenant, {}, { id: 0, role: "client" });
+  assert.ok(listed.data.some((row) => row.attention_type === "FOLLOW_UP_OVERDUE"));
+  const managerList = await listAttention(tenant, { team_id: team.id }, { id: manager.id, role: "telecaller" });
+  assert.ok(managerList.data.length > 0, "Team Manager can view authorized team exceptions");
+  await assert.rejects(() => listAttention(tenant, {}, { id: telecaller.id, role: "telecaller" }), (e) => e.status === 403);
+  const item = await db.BirthwaveAttentionItem.findOne({ where: { client_id: clientId, lead_id: unassigned.id, attention_type: "UNASSIGNED_LEAD" } }); attentionIds.push(item.id);
+  await updateAttention(tenant, item.id, "acknowledge", { id: manager.id, role: "telecaller" });
+  await db.BirthwaveLead.update({ current_team_id: team.id, current_owner_id: telecaller.id }, { where: { client_id: clientId, id: unassigned.id } });
+  const repaired = await reconcileAttention(tenant, { id: 0, role: "client" });
+  assert.ok(repaired.resolved >= 1, "Fixed issues are auto-resolved");
+  const other = await db.BirthwaveLead.create({ client_id: otherClientId, name: `Other ${suffix}`, phone: `+9194${String(suffix).slice(-8)}`, status: "new_lead" });
+  assert.equal((await listAttention({ id: otherClientId }, {}, { id: 0, role: "client" })).data.some((row) => row.lead_id === unassigned.id), false, "Attention remains tenant scoped");
+  await db.BirthwaveLead.destroy({ where: { client_id: otherClientId, id: other.id } });
+  console.log(JSON.stringify({ passed: true, checks: ["exception-detection", "deduplication", "manager-scope", "telecaller-denied", "acknowledge-resolve", "auto-resolution", "tenant-isolation"] }, null, 2));
+} finally {
+  if (attentionIds.length || leadIds.length || taskIds.length) await db.BirthwaveAttentionItem.destroy({ where: { client_id: clientId, [Op.or]: [{ lead_id: leadIds }, { task_id: taskIds }] } });
+  if (taskIds.length) await db.BirthwaveTask.destroy({ where: { client_id: clientId, id: taskIds } });
+  if (leadIds.length) await db.BirthwaveLeadActivity.destroy({ where: { client_id: clientId, lead_id: leadIds } });
+  if (leadIds.length) await db.BirthwaveLead.destroy({ where: { client_id: clientId, id: leadIds } });
+  if (team?.id) await db.BirthwaveTeamMember.destroy({ where: { client_id: clientId, team_id: team.id } });
+  if (team?.id) await db.BirthwaveTeam.destroy({ where: { client_id: clientId, id: team.id } });
+  if (manager?.id || telecaller?.id) await db.Management.destroy({ where: { client_id: clientId, id: [manager?.id, telecaller?.id].filter(Boolean) } });
+  await db.sequelize.close();
+}

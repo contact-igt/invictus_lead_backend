@@ -11,7 +11,8 @@ import {
   updateAppointment,
   getDashboard,
 } from "./birthwave.service.js";
-import { getLeadTimeline } from "./birthwaveActivity.service.js";
+import { addBirthwaveLeadNote, getLeadTimeline } from "./birthwaveActivity.service.js";
+import { getDispositionOptions, listLeadOutcomes } from "./birthwaveOutcome.service.js";
 import {
   createWebsiteLead,
   listWebsiteLeads,
@@ -26,7 +27,7 @@ import {
 
 export const getDashboardHandler = async (req, res, next) => {
   try {
-    const data = await getDashboard(req.tenant, req.query);
+    const data = await getDashboard(req.tenant, req.query, req.user);
     return res.status(200).json({ success: true, data });
   } catch (error) {
     return next(error);
@@ -64,7 +65,7 @@ export const updateDoctorHandler = async (req, res, next) => {
 // ── Leads ──
 export const getLeadsHandler = async (req, res, next) => {
   try {
-    const result = await listLeads(req.tenant, req.query);
+    const result = await listLeads(req.tenant, req.query, req.user);
     return res.status(200).json({ success: true, ...result });
   } catch (error) {
     return next(error);
@@ -73,7 +74,7 @@ export const getLeadsHandler = async (req, res, next) => {
 
 export const getLeadHandler = async (req, res, next) => {
   try {
-    const data = await getLeadById(req.tenant, req.params.id);
+    const data = await getLeadById(req.tenant, req.params.id, req.user);
     return res.status(200).json({ success: true, data });
   } catch (error) {
     return next(error);
@@ -82,7 +83,7 @@ export const getLeadHandler = async (req, res, next) => {
 
 export const getLeadTimelineHandler = async (req, res, next) => {
   try {
-    await getLeadById(req.tenant, req.params.id);
+    await getLeadById(req.tenant, req.params.id, req.user);
     const data = await getLeadTimeline(req.tenant.id, Number(req.params.id));
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -106,6 +107,32 @@ export const updateLeadHandler = async (req, res, next) => {
   } catch (error) {
     return next(error);
   }
+};
+
+export const addLeadNoteHandler = async (req, res, next) => {
+  try {
+    const lead = await getLeadById(req.tenant, req.params.id, req.user);
+    if (!['super-admin', 'admin', 'client'].includes(String(req.user?.role || '').toLowerCase()) && lead.current_owner_id !== Number(req.user?.id)) {
+      return res.status(403).json({ success: false, message: 'Telecallers can only add notes to their assigned Leads' });
+    }
+    const data = await addBirthwaveLeadNote({
+      clientId: req.tenant.id,
+      leadId: Number(req.params.id),
+      actor: req.user,
+      note: req.body.note,
+    });
+    return res.status(201).json({ success: true, message: "Note added", data });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getDispositionOptionsHandler = async (req, res, next) => {
+  try { return res.status(200).json({ success: true, data: getDispositionOptions() }); } catch (error) { return next(error); }
+};
+
+export const listLeadOutcomesHandler = async (req, res, next) => {
+  try { return res.status(200).json({ success: true, data: await listLeadOutcomes(req.tenant, req.params.id, req.user) }); } catch (error) { return next(error); }
 };
 
 // ── Appointments ──
@@ -151,9 +178,14 @@ export const postWebsiteLeadPublicHandler = async (req, res, next) => {
     // the proxy header / socket is only a fallback.
     const data = await createWebsiteLead(req.publicTenantId, {
       ...req.body,
+      _idempotency_key: req.headers["idempotency-key"] || req.headers["x-idempotency-key"] || null,
       ip_address: cleanIp(req.body.ip_address) || forwardedIp || socketIp || null,
     });
-    return res.status(201).json({ success: true, message: "Enquiry received", ...data });
+    return res.status(data.duplicate ? 200 : 201).json({
+      success: true,
+      message: data.duplicate ? "Enquiry already received" : "Enquiry received",
+      ...data,
+    });
   } catch (error) {
     return next(error);
   }

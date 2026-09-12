@@ -9,7 +9,11 @@ import {
  * Expects 'X-Client-Key' header or 'client_key' in body.
  */
 const resolvePublicTenantRequest = (expectedModuleKey) => async (req, res, next) => {
-  const clientKeyRaw = req.headers["x-client-key"] || req.body.client_key;
+  // BW-SVC-002: `req.body` is undefined on a request with no parsed body — a GET
+  // never matches express.json(), so reading `req.body.client_key` threw and the
+  // caller got a 500 instead of the intended 401. This middleware only guarded
+  // POST intake routes until GET /birthwave-public/services was added.
+  const clientKeyRaw = req.headers["x-client-key"] || req.body?.client_key;
 
   if (!clientKeyRaw) {
     return res.status(401).json({ 

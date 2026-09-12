@@ -2,6 +2,7 @@ import crypto from "crypto";
 import db from "../../../database/index.js";
 import { normalizePhone } from "../../birthwave/birthwaveWebsiteLead.service.js";
 import { logBirthwaveActivity } from "../../birthwave/birthwaveActivity.service.js";
+import { routeLeadByRules } from "../../birthwave/birthwaveAssignment.service.js";
 import { verifyRepliSignature } from "./verifyRepliWebhook.js";
 import { normalizeRepliBirthwaveLead } from "./normalizeRepliBirthwaveLead.js";
 import {
@@ -320,6 +321,14 @@ export const processRepliBirthwaveWebhook = async ({ rawBody, headers = {} }) =>
         .filter(Boolean)
         .join(" · "),
     });
+
+    if (result.action === "created") {
+      try {
+        await routeLeadByRules({ tenant: { id: result.clientId }, leadId: result.leadId, actor: { id: null, role: "client", username: "Repli Routing" } });
+      } catch (error) {
+        await logBirthwaveActivity({ clientId: result.clientId, leadId: result.leadId, eventType: "routing_failed", title: "Routing failed", description: error.message });
+      }
+    }
 
     return {
       status: 200,
