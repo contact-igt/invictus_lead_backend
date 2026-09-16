@@ -22,6 +22,7 @@ export const tableName = {
   AARAV_EYE_CARE: "aarav_eye_care_leads",
   ANTARDRASHTI_NETRALAYA: "antardrashti_netralaya_leads",
   RIO: "rio_leads",
+  RIO_VACCINE_CHART: "rio_vaccine_chart_leads",
   SHANTI_EYE_TECH: 'shanti_eye_tech_leads',
   PHOENIX_FITNESS: 'phoenix_fitness_leads',
   API_LOGS: 'api_logs',

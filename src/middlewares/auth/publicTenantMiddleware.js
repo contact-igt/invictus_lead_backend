@@ -1,3 +1,4 @@
+import { Sequelize } from "sequelize";
 import db from "../../database/index.js";
 import {
   extractClientModuleKey,
@@ -31,8 +32,15 @@ const resolvePublicTenantRequest = (expectedModuleKey) => async (req, res, next)
   }
   
   try {
+    // Case-insensitive match: client_key values are stored in mixed case
+    // (e.g. "Rio", "Phoenix_fitness") while normalizedKey is always
+    // lowercased above, and the DB column collation isn't reliably
+    // case-insensitive for every deployment.
     const client = await db.Client.findOne({
-      where: { client_key: normalizedKey },
+      where: Sequelize.where(
+        Sequelize.fn("LOWER", Sequelize.col("client_key")),
+        normalizedKey,
+      ),
       attributes: ["id", "name"]
     });
 

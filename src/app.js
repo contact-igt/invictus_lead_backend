@@ -19,6 +19,7 @@ import VlsAibeRouter from "./modules/vls/vlsAibe/vlsAibe.routes.js";
 import AaravEyeCareRouter from "./modules/aaravEyeCare/aaravEyeCare.routes.js";
 import AntardrashtiNetralayaRouter from "./modules/antardrashtiNetralaya/antardrashtiNetralaya.routes.js";
 import RioRouter from "./modules/rio/rio.routes.js";
+import RioVaccineChartRouter from "./modules/rioVaccineChart/rioVaccineChart.routes.js";
 import VlsMactMasterClassRouter from "./modules/vlsMactMasterClass/vlsMactMasterClass.routes.js";
 import VlsLawPracticeRouter from "./modules/vlsLawPractice/vlsLawPractice.routes.js";
 import VlsConsumerProtectionLawMasterClassRouter from "./modules/vlsConsumerProtectionLawMasterClass/vlsConsumerProtectionLawMasterClass.routes.js";
@@ -159,6 +160,7 @@ app.use("/api/v1/vls-business-law", VlsBusinessLawRouter);
 app.use("/api/v1/aarav-eye-care", AaravEyeCareRouter);
 app.use("/api/v1/antardrashti-netralaya", AntardrashtiNetralayaRouter);
 app.use("/api/v1/rio", RioRouter);
+app.use("/api/v1/rio-vaccine-chart", RioVaccineChartRouter);
 
 app.use('/api/v1/shanti-eye-tech', ShantiEyeTechRouter);
 app.use('/api/v1/phoenix-fitness', PhoenixFitnessRouter);

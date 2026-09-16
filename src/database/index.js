@@ -17,6 +17,7 @@ import { PixelEyeWebsiteLeadTable } from "./tables/PixelEyeWebsiteLeadTable/inde
 import { AaravEyeCareTable } from "./tables/AaravEyeCareTable/index.js";
 import { AntardrashtiNetralayaTable } from "./tables/AntardrashtiNetralayaTable/index.js";
 import { RioTable } from "./tables/RioTable/index.js";
+import { RioVaccineChartTable } from "./tables/RioVaccineChartTable/index.js";
 import { VlsMactMasterClassTable } from "./tables/VlsMactMasterClassTable/index.js";
 import { VlsConsumerProtectionLawMasterClassTable } from "./tables/VlsConsumerProtectionLawMasterClassTable/index.js";
 import { vlsDopAiAssistedTable } from "./tables/VlsDopAiAssistedTable/index.js";
@@ -89,6 +90,7 @@ db.PixelEyeWebsiteLead = PixelEyeWebsiteLeadTable(Sequelize, sequelize);
 db.AaravEyeCare = AaravEyeCareTable(Sequelize, sequelize);
 db.AntardrashtiNetralaya = AntardrashtiNetralayaTable(Sequelize, sequelize);
 db.Rio = RioTable(Sequelize, sequelize);
+db.RioVaccineChart = RioVaccineChartTable(Sequelize, sequelize);
 db.VlsPropertyLaw = vlsPropertyLawTable(Sequelize, sequelize);
 db.VlsFamilyLaw = vlsFamilyLawTable(Sequelize, sequelize);
 db.VlsMactMasterClass = VlsMactMasterClassTable(Sequelize, sequelize);
@@ -147,6 +149,7 @@ addClientId(db.PixelEyeLeadState);
 addClientId(db.AaravEyeCare);
 addClientId(db.AntardrashtiNetralaya);
 addClientId(db.Rio);
+addClientId(db.RioVaccineChart);
 addClientId(db.PixelEyeWebsiteLead);
 
 addClientId(db.ShantiEyeTech);
