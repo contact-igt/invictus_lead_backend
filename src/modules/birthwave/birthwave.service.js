@@ -9,7 +9,13 @@ import { logBirthwaveActivity } from "./birthwaveActivity.service.js";
 import {
   BIRTHWAVE_LEAD_STATUSES,
   BIRTHWAVE_LEAD_SOURCES,
+  LEGACY_STATUS_TO_STAGE,
 } from "../../database/tables/BirthwaveLeadTable/index.js";
+import { resolveOrCreateBirthwaveContact, serializeBirthwaveContact } from "./birthwaveContact.service.js";
+import { leadVisibilityWhere, assertCanViewLead, assertCanEditLead, isTenantAdmin } from "./birthwavePermissions.service.js";
+import { applyAppointmentStatusContinuationInTransaction, createAppointmentContinuationInTransaction } from "./birthwaveAppointmentContinuation.service.js";
+import { getOperationalDashboard } from "./birthwaveDashboard.service.js";
+import { resolveServiceForIntake } from "./birthwaveService.service.js";
 
 const httpError = (status, message) => {
   const error = new Error(message);
@@ -25,6 +31,16 @@ const clientScope = (tenant, extra = {}) => {
 
 const trimOrNull = (value) =>
   typeof value === "string" ? value.trim() || null : value ?? null;
+
+// BW-FIX-002: birthwave_leads.status is persisted using the full BIRTHWAVE_LEAD_STAGES
+// vocabulary, not the older 6-value legacy set — LOST/INVALID/CONTACTING/QUALIFIED/
+// INTERESTED have no legacy equivalent, so down-converting on write is lossy. This
+// accepts either legacy or stage input (the create/update Joi schema already allows
+// both) and always stores the canonical stage form. See
+// BIRTHWAVE_PRODUCTION_FIX_LEDGER.md, BW-FIX-002.
+const normalizeStoredLeadStatus = (value) => LEGACY_STATUS_TO_STAGE[value] || value || "NEW";
+const stageForStatus = (value) => LEGACY_STATUS_TO_STAGE[value] || value || "NEW";
+const ACTIVE_OPERATIONAL_STAGES = new Set(["ASSIGNED", "CONTACTING", "CONTACTED", "QUALIFIED", "INTERESTED", "APPOINTMENT_SCHEDULED", "ATTENDED"]);
 
 // ── Serializers ────────────────────────────────────────────────────────────
 const serializeDoctor = (row) => ({
@@ -42,10 +58,30 @@ const serializeLead = (row) => {
     name: row.name,
     phone: row.phone,
     email: row.email ?? null,
-    service: row.service ?? null,
+    contact_id: row.contact_id ?? null,
+    contact: row.contact ? serializeBirthwaveContact(row.contact) : null,
+    // BW-SVC-001: `service` is the display name, resolved from the service
+    // master when linked so a rename shows through immediately, and falling back
+    // to the legacy text for Leads whose value never mapped to a service.
+    service: row.serviceRef?.name ?? row.service ?? null,
+    service_id: row.service_id ?? null,
+    service_ref: row.serviceRef
+      ? {
+          id: row.serviceRef.id,
+          name: row.serviceRef.name,
+          slug: row.serviceRef.slug,
+          is_active: Boolean(row.serviceRef.is_active),
+        }
+      : null,
     source: row.source ?? null,
     status: row.status,
+    stage: stageForStatus(row.status),
     assigned_doctor_id: row.assigned_doctor_id ?? null,
+    current_team_id: row.current_team_id ?? null,
+    current_team: row.currentTeam ? { id: row.currentTeam.id, name: row.currentTeam.name, code: row.currentTeam.code } : null,
+    current_owner_id: row.current_owner_id ?? null,
+    current_owner: row.currentOwner ? { id: row.currentOwner.id, username: row.currentOwner.username, email: row.currentOwner.email } : null,
+    assignment_status: row.current_owner_id ? "ASSIGNED" : "UNASSIGNED",
     assignedDoctor: doctor
       ? { id: doctor.id, name: doctor.name, specialty: doctor.specialty ?? null }
       : null,
@@ -53,6 +89,8 @@ const serializeLead = (row) => {
     notes: row.notes ?? null,
     source_provider: row.source_provider ?? null,
     source_external_id: row.source_external_id ?? null,
+    source_key: row.integration_metadata?.source_page ??
+      (row.source_provider?.startsWith?.("birthwave_") ? row.source_provider : null),
     integration_metadata: row.integration_metadata ?? null,
     custom_fields: row.custom_fields ?? {},
     created_at: row.created_at,
@@ -76,6 +114,12 @@ const serializeAppointment = (row) => ({
 
 const leadInclude = () => [
   { model: db.BirthwaveDoctor, as: "assignedDoctor", required: false },
+  // BW-SVC-001: the service master row, so the API returns the CURRENT service
+  // name even after a rename, and still resolves services since deactivated.
+  { model: db.BirthwaveService, as: "serviceRef", required: false },
+  { model: db.BirthwaveContact, as: "contact", required: false },
+  { model: db.BirthwaveTeam, as: "currentTeam", required: false },
+  { model: db.Management, as: "currentOwner", required: false },
 ];
 
 const appointmentInclude = () => [
@@ -132,10 +176,17 @@ export const updateDoctor = async (tenant, id, data) => {
 const buildLeadWhere = (tenant, query = {}) => {
   const where = clientScope(tenant);
 
-  if (query.status) where.status = query.status;
+  if (query.status) where.status = normalizeStoredLeadStatus(query.status);
   if (query.source) where.source = query.source;
   if (query.source_provider) where.source_provider = query.source_provider;
+  // BW-SVC-001: canonical service filtering is by id, never by display text, so
+  // a renamed service keeps filtering correctly.
+  if (query.service_id) where.service_id = Number(query.service_id);
   if (query.assigned_doctor_id) where.assigned_doctor_id = Number(query.assigned_doctor_id);
+  if (query.team_id) where.current_team_id = Number(query.team_id);
+  if (query.owner_id) where.current_owner_id = Number(query.owner_id);
+  if (query.assignment_status === "UNASSIGNED") where.current_owner_id = null;
+  if (query.assignment_status === "ASSIGNED") where.current_owner_id = { [Op.ne]: null };
 
   if (query.start_date || query.end_date) {
     const { start, end } = getInclusiveDateRange(query.start_date, query.end_date);
@@ -169,13 +220,26 @@ const buildLeadWhere = (tenant, query = {}) => {
   return where;
 };
 
-export const listLeads = async (tenant, query = {}) => {
+export const listLeads = async (tenant, query = {}, actor = null) => {
   const page = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(200, Math.max(1, Number(query.limit) || 50));
   const offset = (page - 1) * limit;
 
+  const where = buildLeadWhere(tenant, query);
+  const visibility = await leadVisibilityWhere(tenant.id, actor);
+  const visibilityConditions = Object.entries(visibility).map(([field, value]) => ({ [field]: value }));
+  const existingAssignmentConditions = [];
+  for (const field of ["current_team_id", "current_owner_id"]) {
+    if (where[field] !== undefined) {
+      existingAssignmentConditions.push({ [field]: where[field] });
+      delete where[field];
+    }
+  }
+  if (visibilityConditions.length || existingAssignmentConditions.length) {
+    where[Op.and] = [...(where[Op.and] || []), ...visibilityConditions, ...existingAssignmentConditions];
+  }
   const { rows, count } = await db.BirthwaveLead.findAndCountAll({
-    where: buildLeadWhere(tenant, query),
+    where,
     include: leadInclude(),
     order: [
       ["created_at", "DESC"],
@@ -197,13 +261,55 @@ export const listLeads = async (tenant, query = {}) => {
   };
 };
 
-export const getLeadById = async (tenant, id) => {
+export const getLeadById = async (tenant, id, actor = null) => {
   const row = await db.BirthwaveLead.findOne({
     where: clientScope(tenant, { id }),
     include: leadInclude(),
   });
   if (!row) throw httpError(404, "Lead not found");
-  return serializeLead(row);
+  if (actor) await assertCanViewLead(tenant.id, row, actor);
+  const otherLeadVisibility = actor ? await leadVisibilityWhere(tenant.id, actor) : {};
+  const otherLeads = row.contact_id
+    ? await db.BirthwaveLead.findAll({
+        where: { client_id: tenant.id, contact_id: row.contact_id, id: { [Op.ne]: row.id }, ...otherLeadVisibility },
+        order: [["created_at", "DESC"], ["id", "DESC"]],
+        limit: 20,
+        attributes: ["id", "name", "service", "source", "status", "created_at"],
+      })
+    : [];
+  return {
+    ...serializeLead(row),
+    other_leads: otherLeads.map((other) => ({
+      id: other.id,
+      name: other.name,
+      service: other.service,
+      source: other.source,
+      status: other.status,
+      stage: stageForStatus(other.status),
+      created_at: other.created_at,
+    })),
+    assignments: await db.BirthwaveLeadAssignment.findAll({
+      where: { client_id: tenant.id, lead_id: row.id },
+      include: [
+        { model: db.BirthwaveTeam, as: "team", required: true },
+        { model: db.Management, as: "owner", required: true },
+        { model: db.Management, as: "assignedBy", required: false },
+      ],
+      order: [["assigned_at", "DESC"], ["id", "DESC"]],
+    }).then((items) => items.map((item) => ({
+      id: item.id,
+      team_id: item.team_id,
+      team: { id: item.team.id, name: item.team.name, code: item.team.code },
+      owner_id: item.owner_id,
+      owner: { id: item.owner.id, username: item.owner.username, email: item.owner.email },
+      assignment_type: item.assignment_type,
+      assigned_by: item.assigned_by,
+      reason: item.reason,
+      is_current: Boolean(item.is_current),
+      assigned_at: item.assigned_at,
+      ended_at: item.ended_at,
+    }))),
+  };
 };
 
 const LEAD_WRITABLE = [
@@ -214,7 +320,6 @@ const LEAD_WRITABLE = [
   "source",
   "status",
   "assigned_doctor_id",
-  "next_follow_up",
   "notes",
   "custom_fields",
 ];
@@ -225,8 +330,6 @@ const normalizeLeadPatch = (data) => {
     if (data[key] === undefined) continue;
     if (key === "assigned_doctor_id") {
       patch[key] = data[key] ? Number(data[key]) : null;
-    } else if (key === "next_follow_up") {
-      patch[key] = data[key] ? parseAppDateTime(data[key]) : null;
     } else if (key === "custom_fields") {
       patch[key] = data[key] && typeof data[key] === "object" ? data[key] : {};
     } else if (typeof data[key] === "string") {
@@ -236,6 +339,38 @@ const normalizeLeadPatch = (data) => {
     }
   }
   return patch;
+};
+
+/**
+ * BW-SVC-001: resolves a Lead's service into `{ service_id, service }`.
+ *
+ * `service_id` is canonical; `service` keeps the human-readable name so the
+ * legacy compatibility column stays populated and readable. Returns `{}` when
+ * the caller supplied nothing at all, so a patch that never mentions a service
+ * leaves the existing values untouched.
+ */
+const resolveLeadServiceLink = async (tenant, data, textFallback) => {
+  const clientId = clientScope(tenant).client_id;
+  const hasExplicit = data.service_id !== undefined || data.service_slug !== undefined;
+  const text = textFallback !== undefined ? textFallback : data.service;
+  if (!hasExplicit && (text === undefined || text === null)) return {};
+
+  if (hasExplicit && data.service_id === null) {
+    // Explicitly clearing the service.
+    return { service_id: null, service: null };
+  }
+
+  const { service } = await resolveServiceForIntake({
+    clientId,
+    serviceId: data.service_id,
+    slug: data.service_slug,
+    text,
+  });
+  if (service) return { service_id: service.id, service: service.name };
+
+  // Unrecognised free text: keep it in the compatibility column rather than
+  // guessing a service. service_id stays null and the value is reportable.
+  return { service_id: null, service: text ?? null };
 };
 
 const assertDoctorInClient = async (tenant, doctorId) => {
@@ -249,13 +384,27 @@ const assertDoctorInClient = async (tenant, doctorId) => {
 
 export const createLead = async (tenant, data, actor) => {
   const patch = normalizeLeadPatch(data);
+  if (stageForStatus(patch.status || "new_lead") !== "NEW") throw httpError(400, "New Leads must enter through the NEW routing state before assignment");
   await assertDoctorInClient(tenant, patch.assigned_doctor_id);
+  // BW-SVC-001: resolve the canonical service. An explicit service_id is
+  // validated against this tenant and must be active; free text still resolves
+  // by name/slug so older integrations keep working. The legacy `service` text
+  // is written alongside service_id and is not dropped.
+  const serviceLink = await resolveLeadServiceLink(tenant, data, patch.service);
+  const resolved = await resolveOrCreateBirthwaveContact({
+    clientId: clientScope(tenant).client_id,
+    name: patch.name,
+    phone: patch.phone,
+    email: patch.email,
+  });
 
   const row = await db.BirthwaveLead.create({
     client_id: clientScope(tenant).client_id,
-    status: "new_lead",
+    contact_id: resolved.contact?.id ?? null,
     custom_fields: {},
     ...patch,
+    ...serviceLink,
+    status: normalizeStoredLeadStatus(patch.status),
     source_provider: trimOrNull(data.source_provider),
     source_external_id: trimOrNull(data.source_external_id),
   });
@@ -269,15 +418,24 @@ export const createLead = async (tenant, data, actor) => {
     description: `${row.name} · ${row.phone}`,
   });
 
-  if (row.next_follow_up) {
+  if (resolved.contact) {
     await logBirthwaveActivity({
       clientId: row.client_id,
       leadId: row.id,
       actor,
-      eventType: "follow_up_scheduled",
-      title: "Follow-up scheduled",
-      newValue: row.next_follow_up,
+      eventType: "contact_resolved",
+      title: "Contact linked",
+      description: `Contact ${resolved.contact.id} resolved by ${resolved.matchMethod}`,
     });
+  }
+
+  // Routing is additive and rule-driven. With no matching rule the Lead
+  // remains NEW/UNASSIGNED; Task/Next Action behavior belongs to a later phase.
+  try {
+    const { routeLeadByRules } = await import("./birthwaveAssignment.service.js");
+    await routeLeadByRules({ tenant, leadId: row.id, actor });
+  } catch (error) {
+    await logBirthwaveActivity({ clientId: row.client_id, leadId: row.id, actor, eventType: "routing_failed", title: "Routing failed", description: error.message });
   }
 
   return getLeadById(tenant, row.id);
@@ -286,14 +444,39 @@ export const createLead = async (tenant, data, actor) => {
 export const updateLead = async (tenant, id, data, actor) => {
   const row = await db.BirthwaveLead.findOne({ where: clientScope(tenant, { id }) });
   if (!row) throw httpError(404, "Lead not found");
+  await assertCanEditLead(tenant.id, row, actor);
 
   const patch = normalizeLeadPatch(data);
   await assertDoctorInClient(tenant, patch.assigned_doctor_id);
+  // BW-SVC-001: a telecaller correcting the service after the first call is the
+  // documented "Not sure yet → real service" path, so updates resolve the same
+  // way creates do and keep service_id and the legacy text in step.
+  Object.assign(patch, await resolveLeadServiceLink(tenant, data, patch.service));
+
+  if (patch.status !== undefined) patch.status = normalizeStoredLeadStatus(patch.status);
+  const requestedStage = stageForStatus(patch.status ?? row.status);
+  if (patch.status !== undefined && ACTIVE_OPERATIONAL_STAGES.has(requestedStage)) {
+    if (!row.current_team_id || !row.current_owner_id) throw httpError(400, "An active operational Lead requires a Team and Owner");
+    const primaryTask = db.BirthwaveTask && await db.BirthwaveTask.findOne({
+      where: { client_id: row.client_id, lead_id: row.id, is_primary: true, status: { [Op.in]: ["PENDING", "IN_PROGRESS", "OVERDUE"] } },
+      attributes: ["id"],
+    });
+    if (!primaryTask) throw httpError(409, "An active operational Lead requires one Primary Next Action");
+  }
+  if (patch.name !== undefined || patch.phone !== undefined || patch.email !== undefined) {
+    const resolved = await resolveOrCreateBirthwaveContact({
+      clientId: row.client_id,
+      name: patch.name ?? row.name,
+      phone: patch.phone ?? row.phone,
+      email: patch.email ?? row.email,
+      allowUnidentified: true,
+    });
+    if (resolved.contact) patch.contact_id = resolved.contact.id;
+  }
 
   const before = {
     status: row.status,
     assigned_doctor_id: row.assigned_doctor_id,
-    next_follow_up: row.next_follow_up,
     custom_fields: row.custom_fields || {},
   };
 
@@ -323,21 +506,6 @@ export const updateLead = async (tenant, id, data, actor) => {
       title: "Doctor assignment changed",
       previousValue: before.assigned_doctor_id,
       newValue: patch.assigned_doctor_id,
-    });
-  }
-
-  if (
-    patch.next_follow_up !== undefined &&
-    String(patch.next_follow_up) !== String(before.next_follow_up)
-  ) {
-    await logBirthwaveActivity({
-      clientId: row.client_id,
-      leadId: row.id,
-      actor,
-      eventType: "follow_up_scheduled",
-      title: patch.next_follow_up ? "Follow-up rescheduled" : "Follow-up cleared",
-      previousValue: before.next_follow_up,
-      newValue: patch.next_follow_up,
     });
   }
 
@@ -418,71 +586,62 @@ const getAppointmentRow = async (tenant, id) => {
 
 export const createAppointment = async (tenant, data, actor) => {
   const clientId = clientScope(tenant).client_id;
-
-  const lead = await db.BirthwaveLead.findOne({
-    where: { client_id: clientId, id: Number(data.lead_id) },
-    attributes: ["id"],
-  });
-  if (!lead) throw httpError(400, "Lead does not belong to this client");
   await assertDoctorInClient(tenant, data.doctor_id ? Number(data.doctor_id) : null);
-
-  const row = await db.BirthwaveAppointment.create({
-    client_id: clientId,
-    lead_id: Number(data.lead_id),
-    doctor_id: data.doctor_id ? Number(data.doctor_id) : null,
-    service: trimOrNull(data.service),
-    scheduled_at: parseAppDateTime(data.scheduled_at),
-    status: data.status || "scheduled",
-    notes: trimOrNull(data.notes),
-  });
-
-  await logBirthwaveActivity({
-    clientId,
-    leadId: row.lead_id,
-    actor,
-    eventType: "appointment_created",
-    title: "Appointment created",
-    newValue: row.scheduled_at,
-  });
-
+  const transaction = await db.sequelize.transaction();
+  let row;
+  try {
+    const lead = await db.BirthwaveLead.findOne({ where: { client_id: clientId, id: Number(data.lead_id) }, lock: transaction.LOCK.UPDATE, transaction });
+    if (!lead) throw httpError(400, "Lead does not belong to this client");
+    row = await db.BirthwaveAppointment.create({
+      client_id: clientId,
+      lead_id: Number(data.lead_id),
+      doctor_id: data.doctor_id ? Number(data.doctor_id) : null,
+      service: trimOrNull(data.service),
+      scheduled_at: parseAppDateTime(data.scheduled_at),
+      status: data.status || "scheduled",
+      notes: trimOrNull(data.notes),
+    }, { transaction });
+    await logBirthwaveActivity({ clientId, leadId: row.lead_id, actor, eventType: "appointment_created", title: "Appointment created", newValue: row.scheduled_at, transaction });
+    if (row.status === "scheduled") await createAppointmentContinuationInTransaction({ clientId, lead, appointment: row, actor, transaction });
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
   return serializeAppointment(await getAppointmentRow(tenant, row.id));
 };
 
 export const updateAppointment = async (tenant, id, data, actor) => {
-  const row = await getAppointmentRow(tenant, id);
-  const patch = {};
-  if (data.doctor_id !== undefined) {
-    await assertDoctorInClient(tenant, data.doctor_id ? Number(data.doctor_id) : null);
-    patch.doctor_id = data.doctor_id ? Number(data.doctor_id) : null;
+  const clientId = clientScope(tenant).client_id;
+  if (data.doctor_id !== undefined) await assertDoctorInClient(tenant, data.doctor_id ? Number(data.doctor_id) : null);
+  const transaction = await db.sequelize.transaction();
+  try {
+    const row = await db.BirthwaveAppointment.findOne({ where: clientScope(tenant, { id }), transaction, lock: transaction.LOCK.UPDATE });
+    if (!row) throw httpError(404, "Appointment not found");
+    const lead = await db.BirthwaveLead.findOne({ where: clientScope(tenant, { id: row.lead_id }), transaction, lock: transaction.LOCK.UPDATE });
+    if (!lead) throw httpError(400, "Appointment Lead not found");
+    const patch = {};
+    if (data.doctor_id !== undefined) patch.doctor_id = data.doctor_id ? Number(data.doctor_id) : null;
+    if (data.service !== undefined) patch.service = trimOrNull(data.service);
+    if (data.scheduled_at !== undefined) patch.scheduled_at = parseAppDateTime(data.scheduled_at);
+    if (data.status !== undefined) patch.status = data.status;
+    if (data.notes !== undefined) patch.notes = trimOrNull(data.notes);
+    const previousStatus = row.status;
+    await row.update(patch, { transaction });
+    await applyAppointmentStatusContinuationInTransaction({ clientId, lead, appointment: row, previousStatus, actor, transaction, continuation: data.continuation || null });
+    await transaction.commit();
+    return serializeAppointment(await getAppointmentRow(tenant, row.id));
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
   }
-  if (data.service !== undefined) patch.service = trimOrNull(data.service);
-  if (data.scheduled_at !== undefined) patch.scheduled_at = parseAppDateTime(data.scheduled_at);
-  if (data.status !== undefined) patch.status = data.status;
-  if (data.notes !== undefined) patch.notes = trimOrNull(data.notes);
-
-  const previousStatus = row.status;
-  await row.update(patch);
-
-  if (patch.status && patch.status !== previousStatus) {
-    await logBirthwaveActivity({
-      clientId: row.client_id,
-      leadId: row.lead_id,
-      actor,
-      eventType: "appointment_created",
-      title: `Appointment ${patch.status.replace(/_/g, " ")}`,
-      previousValue: previousStatus,
-      newValue: patch.status,
-    });
-  }
-
-  return serializeAppointment(await getAppointmentRow(tenant, row.id));
 };
 
 // ── Dashboard ──────────────────────────────────────────────────────────────
 const percentage = (part, total) =>
   total > 0 ? Math.round((part / total) * 1000) / 10 : 0;
 
-export const getDashboard = async (tenant, query = {}) => {
+export const getDashboard = async (tenant, query = {}, actor = null) => {
   const clientId = clientScope(tenant).client_id;
   const { start, end } = getInclusiveDateRange(query.start_date, query.end_date);
   const source = query.source || null;
@@ -544,7 +703,7 @@ export const getDashboard = async (tenant, query = {}) => {
     db.BirthwaveAppointment.count({
       where: { ...apptRangeWhere, status: "no_show" },
     }),
-    db.BirthwaveLead.count({ where: { ...leadRangeWhere, status: "converted" } }),
+    db.BirthwaveLead.count({ where: { ...leadRangeWhere, status: "CONVERTED" } }), // BW-FIX-002: status is canonical-stage form
     db.BirthwaveLead.findAll({
       where: leadRangeWhere,
       attributes: [
@@ -580,13 +739,21 @@ export const getDashboard = async (tenant, query = {}) => {
       order: [["created_at", "DESC"], ["id", "DESC"]],
       limit: 8,
     }),
-    db.BirthwaveLead.findAll({
+    // BW-UI-002: the dashboard follow-up panel used to read
+    // birthwave_leads.next_follow_up, which only the manual Lead form ever
+    // writes — the task engine records a FOLLOW_UP task instead and never
+    // touches that column, so the panel was permanently empty (0 of 21 leads
+    // carry a value). Follow-ups are read from the canonical task store; the
+    // owning Lead's serialized next_follow_up is projected from the task's
+    // due_at below so the existing API/UI contract is unchanged.
+    db.BirthwaveTask.findAll({
       where: {
         client_id: clientId,
-        next_follow_up: { [Op.ne]: null },
+        task_type: "FOLLOW_UP",
+        status: { [Op.in]: ["PENDING", "IN_PROGRESS"] },
       },
-      include: leadInclude(),
-      order: [["next_follow_up", "ASC"]],
+      include: [{ model: db.BirthwaveLead, as: "lead", required: true, include: leadInclude() }],
+      order: [["due_at", "ASC"]],
       limit: 10,
     }),
     db.BirthwaveAppointment.findAll({
@@ -599,126 +766,30 @@ export const getDashboard = async (tenant, query = {}) => {
     }),
   ]);
 
-  // ── Website / landing-page enquiries count as leads on the dashboard ──────
-  const webRangeWhere = {
-    client_id: clientId,
-    ...(source ? { source } : {}),
-    ...(start || end
-      ? {
-          created_at: {
-            ...(start ? { [Op.gte]: start } : {}),
-            ...(end ? { [Op.lte]: end } : {}),
-          },
-        }
-      : {}),
-  };
-
-  const [
-    webTotal,
-    webToday,
-    webConverted,
-    webOverTimeRows,
-    webSourceRows,
-    webPipelineRows,
-    webRecentRows,
-  ] = await Promise.all([
-    db.BirthwaveWebsiteLead.count({ where: webRangeWhere }),
-    db.BirthwaveWebsiteLead.count({
-      where: {
-        client_id: clientId,
-        ...(source ? { source } : {}),
-        created_at: { [Op.gte]: todayStart, [Op.lte]: todayEnd },
-      },
-    }),
-    db.BirthwaveWebsiteLead.count({ where: { ...webRangeWhere, status: "Converted" } }),
-    db.BirthwaveWebsiteLead.findAll({
-      where: webRangeWhere,
-      attributes: [
-        [fn("DATE", col("created_at")), "date"],
-        [fn("COUNT", col("id")), "count"],
-      ],
-      group: [fn("DATE", col("created_at"))],
-      raw: true,
-    }),
-    db.BirthwaveWebsiteLead.findAll({
-      where: webRangeWhere,
-      attributes: ["source", [fn("COUNT", col("id")), "count"]],
-      group: ["source"],
-      raw: true,
-    }),
-    db.BirthwaveWebsiteLead.findAll({
-      where: webRangeWhere,
-      attributes: ["status", [fn("COUNT", col("id")), "count"]],
-      group: ["status"],
-      raw: true,
-    }),
-    db.BirthwaveWebsiteLead.findAll({
-      where: webRangeWhere,
-      order: [["created_at", "DESC"], ["id", "DESC"]],
-      limit: 8,
-    }),
-  ]);
-
-  // Website enquiry status -> CRM pipeline stage.
-  const WEB_STATUS_TO_STAGE = {
-    New: "new_lead",
-    Contacted: "contacted",
-    "In Progress": "consultation_booked",
-    Converted: "converted",
-  };
-  const webStageCounts = {};
-  for (const row of webPipelineRows) {
-    const stage = WEB_STATUS_TO_STAGE[row.status];
-    if (stage) webStageCounts[stage] = (webStageCounts[stage] || 0) + Number(row.count);
+  // BW-UI-001: the dashboard used to merge birthwave_website_leads aggregates
+  // into every lead figure below (total, today, over-time, sources, pipeline,
+  // recent). That was correct while a website submission produced ONLY a
+  // birthwave_website_leads row and had to be promoted to become a CRM Lead.
+  // Since the direct-to-Lead refactor, createWebsiteLead() writes the website
+  // staging row AND the birthwave_leads row in the same transaction, so every
+  // website enquiry now exists in birthwave_leads with source = "website" —
+  // merging the staging table on top double-counted all of them. birthwave_leads
+  // is the single source for every lead figure on this dashboard.
+  const overTimeMerged = new Map();
+  for (const r of leadsOverTimeRows) {
+    const d = typeof r.date === "string" ? r.date : new Date(r.date).toISOString().slice(0, 10);
+    overTimeMerged.set(d, (overTimeMerged.get(d) || 0) + Number(r.count));
   }
 
-  const overTimeMerged = new Map();
-  const addOverTime = (rows) => {
-    for (const r of rows) {
-      const d =
-        typeof r.date === "string" ? r.date : new Date(r.date).toISOString().slice(0, 10);
-      overTimeMerged.set(d, (overTimeMerged.get(d) || 0) + Number(r.count));
-    }
-  };
-  addOverTime(leadsOverTimeRows);
-  addOverTime(webOverTimeRows);
-
   const sourceMerged = new Map();
-  for (const r of [...leadSourceRows, ...webSourceRows]) {
+  for (const r of leadSourceRows) {
     if (!r.source) continue;
     sourceMerged.set(r.source, (sourceMerged.get(r.source) || 0) + Number(r.count));
   }
   const sourceTotal = [...sourceMerged.values()].reduce((a, b) => a + b, 0);
 
-  const combinedTotal = totalLeads + webTotal;
-  const combinedConverted = convertedLeads + webConverted;
-
-  const serializeWebsiteAsRecent = (row) => ({
-    id: row.id,
-    name: row.name,
-    phone: row.phone,
-    email: row.email ?? null,
-    service: row.service ?? null,
-    source: row.source ?? null,
-    status: row.status,
-    assigned_doctor_id: null,
-    assignedDoctor: null,
-    next_follow_up: null,
-    notes: row.message ?? null,
-    source_provider: row.source_key,
-    source_external_id: row.external_lead_id ?? null,
-    custom_fields: {},
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    kind: "website",
-    source_key: row.source_key,
-  });
-
-  const recentMerged = [
-    ...recentLeadRows.map((r) => ({ ...serializeLead(r), kind: "crm" })),
-    ...webRecentRows.map(serializeWebsiteAsRecent),
-  ]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  const recentMerged = recentLeadRows
+    .map((r) => ({ ...serializeLead(r), kind: "crm" }))
     .slice(0, 8);
 
   const doctorIds = doctorApptRows.map((r) => r.doctor_id).filter(Boolean);
@@ -736,12 +807,12 @@ export const getDashboard = async (tenant, query = {}) => {
   return {
     range: { start: query.start_date || null, end: query.end_date || null },
     kpis: {
-      total_leads: combinedTotal,
-      new_leads_today: newLeadsToday + webToday,
+      total_leads: totalLeads,
+      new_leads_today: newLeadsToday,
       appointments_booked: appointmentsBooked,
       confirmed_visits: confirmedVisits,
       no_shows: noShows,
-      conversion_rate: percentage(combinedConverted, combinedTotal),
+      conversion_rate: percentage(convertedLeads, totalLeads),
     },
     leads_over_time: [...overTimeMerged.entries()]
       .map(([date, count]) => ({ date, count }))
@@ -759,15 +830,24 @@ export const getDashboard = async (tenant, query = {}) => {
       specialty: doctorsById.get(r.doctor_id)?.specialty ?? null,
       appointmentCount: Number(r.count),
     })),
+    // BW-FIX-002: birthwave_leads.status is stored in canonical stage form; match
+    // pipelineRows against the stage equivalent of each legacy bucket label so
+    // counts don't silently go to zero. BW-UI-001 removed the birthwave_website_leads
+    // contribution that used to be added here — website enquiries are already
+    // counted once in pipelineRows as ordinary CRM Leads.
     pipeline: BIRTHWAVE_LEAD_STATUSES.map((status) => ({
       status,
-      count:
-        Number(pipelineRows.find((r) => r.status === status)?.count || 0) +
-        (webStageCounts[status] || 0),
+      count: Number(pipelineRows.find((r) => r.status === stageForStatus(status))?.count || 0),
     })),
     recent_leads: recentMerged,
-    follow_up_reminders: followUpRows.map(serializeLead),
+    // BW-UI-002: next_follow_up is projected from the FOLLOW_UP task's due_at
+    // rather than the stale birthwave_leads column, so the panel shows real
+    // engine-created follow-ups without changing the response shape.
+    follow_up_reminders: followUpRows
+      .filter((task) => task.lead)
+      .map((task) => ({ ...serializeLead(task.lead), next_follow_up: task.due_at })),
     today_schedule: todayScheduleRows.map(serializeAppointment),
+    operational: await getOperationalDashboard(tenant, query, actor),
   };
 };
 

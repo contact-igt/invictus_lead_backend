@@ -32,6 +32,12 @@ export const BirthwaveWebsiteLeadTable = (Sequelize, sequelize) =>
       },
       source_key: { type: Sequelize.STRING(40), allowNull: false },
       external_lead_id: { type: Sequelize.STRING(64), allowNull: true },
+      external_submission_id: { type: Sequelize.STRING(191), allowNull: true },
+      contact_id: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        references: { model: tableName.BIRTHWAVE_CONTACTS, key: "id" },
+      },
 
       // Core enquiry
       name: { type: Sequelize.STRING(150), allowNull: false },
@@ -93,6 +99,11 @@ export const BirthwaveWebsiteLeadTable = (Sequelize, sequelize) =>
         {
           name: "idx_bw_web_leads_sheet_sync",
           fields: ["sheet_sync_status", "sheet_sync_next_attempt_at"],
+        },
+        {
+          name: "uq_bw_web_leads_submission",
+          unique: true,
+          fields: ["client_id", "source_key", "external_submission_id"],
         },
       ],
     },

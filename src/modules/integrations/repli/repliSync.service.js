@@ -1,6 +1,7 @@
 import db from "../../../database/index.js";
 import { normalizePhone } from "../../birthwave/birthwaveWebsiteLead.service.js";
 import { logBirthwaveActivity } from "../../birthwave/birthwaveActivity.service.js";
+import { routeLeadByRules } from "../../birthwave/birthwaveAssignment.service.js";
 import { normalizeRepliBirthwaveLead } from "./normalizeRepliBirthwaveLead.js";
 import { adaptRepliApiLeadRecord } from "./repliApiLeadAdapter.js";
 import {
@@ -125,6 +126,11 @@ export const syncRepliBirthwaveLeads = async ({ limit } = {}) => {
           title: "Historical Instagram lead synced from Repli.",
           description: normalized.campaign ? `Campaign: ${normalized.campaign}` : null,
         });
+        try {
+          await routeLeadByRules({ tenant: { id: client.id }, leadId: lead.id, actor: { id: null, role: "client", username: "Repli Routing" } });
+        } catch (routingError) {
+          await logBirthwaveActivity({ clientId: client.id, leadId: lead.id, eventType: "routing_failed", title: "Routing failed", description: routingError.message });
+        }
       } else {
         summary.updated += 1;
       }

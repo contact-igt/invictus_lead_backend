@@ -1,5 +1,25 @@
 import db from "../../../database/index.js";
 import { normalizeClientKey } from "../../../utils/clientKey.js";
+import { resolveOrCreateBirthwaveContact } from "../../birthwave/birthwaveContact.service.js";
+import {
+  resolveServiceForIntake,
+  getSystemFallbackService,
+} from "../../birthwave/birthwaveService.service.js";
+
+/**
+ * BW-SVC-001: maps Repli's free-text service onto this tenant's service master.
+ *
+ * Never guesses. An exact name or slug match wins; anything else falls back to
+ * the protected "Not sure yet" service, which is the documented behaviour for an
+ * enquiry whose service is not yet established. Returns how it matched so the
+ * caller can record that on the Lead's integration metadata.
+ */
+const resolveRepliService = async (clientId, text, transaction) => {
+  const { service, matchedBy } = await resolveServiceForIntake({ clientId, text, transaction });
+  if (service) return { service, matchedBy };
+  const fallback = await getSystemFallbackService(clientId, transaction);
+  return { service: fallback, matchedBy: fallback ? "fallback" : null };
+};
 
 /**
  * Shared between the live Repli webhook and the historical `/leads` API sync
@@ -122,16 +142,38 @@ export const upsertBirthwaveRepliLead = async ({
   }
 
   const nextMeta = buildRepliIntegrationMetadata(normalized, metadataExtra);
+  const resolvedContact = await resolveOrCreateBirthwaveContact({
+    clientId: client.id,
+    name: normalized.name || REPLI_LEAD_PLACEHOLDER_NAME,
+    phone,
+    email: normalized.email,
+    transaction,
+    allowUnidentified: true,
+  });
   let action;
+
+  // BW-SVC-001: Repli sends arbitrary external text, which must never be stored
+  // as a canonical service. It is matched against this tenant's service master by
+  // name/slug; an unrecognised value is NOT guessed — it falls back to the
+  // protected "Not sure yet" service so the Lead still routes and a telecaller
+  // establishes the real service on the first call. The provider's original
+  // string is preserved in integration_metadata either way.
+  const repliService = await resolveRepliService(client.id, normalized.service, transaction);
+  if (normalized.service) {
+    nextMeta.provider_service_text = normalized.service;
+    nextMeta.service_match = repliService.matchedBy || "unmatched";
+  }
 
   if (!lead) {
     lead = await db.BirthwaveLead.create(
       {
         client_id: client.id,
+        contact_id: resolvedContact.contact?.id ?? null,
         name: normalized.name || REPLI_LEAD_PLACEHOLDER_NAME,
         phone: phone || null,
         email: normalized.email,
-        service: normalized.service || null,
+        service_id: repliService.service?.id ?? null,
+        service: repliService.service?.name ?? normalized.service ?? null,
         source: "instagram",
         status: "new_lead",
         source_provider: REPLI_PROVIDER,
@@ -151,6 +193,7 @@ export const upsertBirthwaveRepliLead = async ({
         nextMeta,
       ),
     };
+    if (resolvedContact.contact && !lead.contact_id) patch.contact_id = resolvedContact.contact.id;
     if (
       normalized.name &&
       (!lead.name || lead.name === REPLI_LEAD_PLACEHOLDER_NAME)
@@ -158,7 +201,14 @@ export const upsertBirthwaveRepliLead = async ({
       patch.name = normalized.name;
     }
     if (normalized.email && !lead.email) patch.email = normalized.email;
-    if (normalized.service && !lead.service) patch.service = normalized.service;
+    // Enrichment only fills a service that is still missing — never overwrites a
+    // service a telecaller has already established on the CRM side.
+    if (repliService.service && !lead.service_id) {
+      patch.service_id = repliService.service.id;
+      patch.service = repliService.service.name;
+    } else if (normalized.service && !lead.service) {
+      patch.service = normalized.service;
+    }
     // Fill a previously-missing phone (e.g. Repli's API returned no phone,
     // then a later webhook event supplied one). Never overwrite an existing one.
     if (phone && !lead.phone) patch.phone = phone;

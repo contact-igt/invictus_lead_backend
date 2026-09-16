@@ -1,3 +1,4 @@
+import { Sequelize } from "sequelize";
 import db from "../database/index.js";
 import { extractClientModuleKey, normalizeClientKey } from "./clientKey.js";
 
@@ -25,8 +26,12 @@ export const resolveClientId = async ({ tenant, requestedClientKey, expectedModu
   if (expectedModuleKey && extractClientModuleKey(clientKey) !== expectedModuleKey) {
     throw contextError(404, "Client context not found");
   }
+  // Case-insensitive match — see publicTenantMiddleware.js for why.
   const client = await db.Client.findOne({
-    where: { client_key: clientKey },
+    where: Sequelize.where(
+      Sequelize.fn("LOWER", Sequelize.col("client_key")),
+      clientKey,
+    ),
     attributes: ["id", "client_key"],
   });
   if (!client) throw contextError(404, "Client context not found");

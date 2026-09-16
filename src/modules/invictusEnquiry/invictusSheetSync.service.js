@@ -5,19 +5,21 @@ import db from "../../database/index.js";
 const SYNC_TIMEOUT_MS = 8_000;
 const MAX_RETRY_DELAY_MS = 60 * 60 * 1000;
 const RETRY_BATCH_SIZE = 50;
-const DEFAULT_WEBHOOK_URL =
+const DEFAULT_WEBHOOK_URL_FALLBACK =
   "https://script.google.com/macros/s/AKfycbxEccKBZ_qCJeCfYeDNuVpTrE94yyLEHAdBuS6AZwRaGhgMNGVWe35y-09U3_hl_kJ27w/exec";
-const TELECALLING_WEBHOOK_URL =
+const TELECALLING_WEBHOOK_URL_FALLBACK =
   "https://script.google.com/macros/s/AKfycbz7vYFkLog3qAL_6GY2IKj5wx-K5cX_vYFWfCkQUau6m5Q_NPKuU7EI8ipe73SpTceq/exec";
 
 const value = (input) => (input === undefined || input === null ? "" : String(input));
 const list = (input) => (Array.isArray(input) ? input.join(", ") : value(input));
 
 export const selectSheetWebhookUrl = (kind, record, env = process.env) => {
+  const defaultUrl = env.GOOGLE_SHEETS_DEFAULT_WEBHOOK_URL || DEFAULT_WEBHOOK_URL_FALLBACK;
+  const telecallingUrl = env.GOOGLE_SHEETS_TELECALLING_WEBHOOK_URL || TELECALLING_WEBHOOK_URL_FALLBACK;
   if (kind === "career" && record.role_slug === "telecalling-executive") {
-    return TELECALLING_WEBHOOK_URL;
+    return telecallingUrl;
   }
-  return DEFAULT_WEBHOOK_URL;
+  return defaultUrl;
 };
 
 export const buildSheetPayload = (kind, record) => {
