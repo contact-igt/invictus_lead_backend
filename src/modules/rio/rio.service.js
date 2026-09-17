@@ -5,6 +5,7 @@ import { getInclusiveDateRange, getMonthBounds, getTodayBounds } from "../../uti
 import { resolveClientId } from "../../utils/resolveClientContext.js";
 import { escapeCsvValue } from "../../utils/csv.js";
 import { withCreatedAtRange } from "../../utils/sequelizeFilters.js";
+import { attemptSheetSync } from "./rioSheetSync.service.js";
 
 const RIO_CLIENT_KEY = "rio";
 const IST_TIMEZONE = "Asia/Kolkata";
@@ -513,11 +514,18 @@ export const createRioLead = async (
   });
 };
 
-export const createRioPublicLead = async (data, clientId) =>
-  db.Rio.create({
+export const createRioPublicLead = async (data, clientId) => {
+  const record = await db.Rio.create({
     ...normalizePayload(data),
     client_id: clientId,
   });
+
+  // DB row is already committed; mirror into the Google Sheet next,
+  // best-effort and non-blocking — the retry scheduler picks up failures.
+  attemptSheetSync(record, "contact").catch(() => {});
+
+  return record;
+};
 
 export const updateRioLead = async (
   id,

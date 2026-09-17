@@ -2,6 +2,7 @@ import db from "../../database/index.js";
 import { getInclusiveDateRange } from "../../utils/dateTime.js";
 import { resolveClientId } from "../../utils/resolveClientContext.js";
 import { Op } from "sequelize";
+import { attemptSheetSync } from "../rio/rioSheetSync.service.js";
 
 const RIO_CLIENT_MODULE_KEY = "rio";
 
@@ -114,11 +115,18 @@ export const createVaccineChartLead = async (data, tenant, requestedClientKey) =
   });
 };
 
-export const createVaccineChartPublicLead = async (data, clientId) =>
-  db.RioVaccineChart.create({
+export const createVaccineChartPublicLead = async (data, clientId) => {
+  const record = await db.RioVaccineChart.create({
     ...normalizePayload(data),
     client_id: clientId,
   });
+
+  // DB row is already committed; mirror into the Google Sheet next,
+  // best-effort and non-blocking — the retry scheduler picks up failures.
+  attemptSheetSync(record, "vaccine_chart").catch(() => {});
+
+  return record;
+};
 
 export const updateVaccineChartLead = async (id, data, tenant, requestedClientKey) => {
   const record = await getVaccineChartLeadById(id, tenant, requestedClientKey);
