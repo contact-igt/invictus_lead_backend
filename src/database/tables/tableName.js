@@ -13,6 +13,8 @@ export const tableName = {
   VLS_AI_FOR_ADVOCATES: "vls_ai_for_advocates",
   VLS_TAXATION_LAW: "vls_taxation_law_leads",
   VLS_BUSINESS_LAW: "vls_business_law_leads",
+  VLS_CONTACT: "vls_contact_leads",
+  VLS_COURSE_DETAILS: "vls_course_leads",
   PIXELEYE: "pixel_eyes",
   PIXELEYE_WEBSITE_LEADS: "pixel_eye_website_leads",
   PIXELEYE_LEAD_STATE: "pixel_eye_lead_states",
