@@ -55,7 +55,9 @@ import RepliWebhookRouter from "./modules/integrations/repli/repliWebhook.routes
 import { ensureBirthwaveLeadIntegrationColumns } from "./database/migrations/ensureBirthwaveLeadIntegrationColumns.js";
 import { ensureIntegrationWebhookEventsTable } from "./database/migrations/ensureIntegrationWebhookEventsTable.js";
 import { ensureRioSheetSyncColumns } from "./database/migrations/ensureRioSheetSyncColumns.js";
+import { ensureAaravEyeCareSheetSyncColumns } from "./database/migrations/ensureAaravEyeCareSheetSyncColumns.js";
 import { startRioSheetSyncScheduler } from "./modules/rio/rioSheetSync.service.js";
+import { startAaravEyeCareSheetSyncScheduler } from "./modules/aaravEyeCare/aaravEyeCareSheetSync.service.js";
 import { startBirthwaveSheetSyncScheduler } from "./modules/birthwave/birthwaveSheetSync.service.js";
 import { startBirthwaveAttentionScheduler } from "./modules/birthwave/birthwaveAttentionScheduler.js";
 import { startInvictusSheetSyncScheduler } from "./modules/invictusEnquiry/invictusSheetSync.service.js";
@@ -118,6 +120,7 @@ const connect_mysql = async () => {
   try {
     await ensureInvictusEnquiryColumns();
     await ensureRioSheetSyncColumns();
+    await ensureAaravEyeCareSheetSyncColumns();
     await db.sequelize.sync();
     await ensureBirthwaveLeadIntegrationColumns();
     await ensureIntegrationWebhookEventsTable();
@@ -141,6 +144,7 @@ const connect_mysql = async () => {
     startBirthwaveAttentionScheduler();
     startRioSheetSyncScheduler();
     startVlsSheetSyncScheduler();
+    startAaravEyeCareSheetSyncScheduler();
   } catch (error) {
     console.error("Failed to synchronize database:", error);
     process.exit(1);

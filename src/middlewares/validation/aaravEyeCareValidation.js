@@ -39,6 +39,8 @@ export const aaravEyeCareCreateSchema = Joi.object({
   service: optionalService,
   ip_address: optionalText(45),
   utm_source: optionalText(255),
+  message: optionalText(1000),
+  source: optionalText(255),
 }).unknown(false);
 
 export const aaravEyeCarePublicCreateSchema = Joi.object({
@@ -47,6 +49,8 @@ export const aaravEyeCarePublicCreateSchema = Joi.object({
   service: optionalService,
   ip_address: optionalText(45),
   utm_source: optionalText(255),
+  message: optionalText(1000),
+  source: optionalText(255),
   client_key: Joi.string().trim().lowercase().max(100).optional(),
 }).unknown(false);
 
@@ -56,6 +60,8 @@ export const aaravEyeCareUpdateSchema = Joi.object({
   service: optionalService,
   ip_address: optionalText(45),
   utm_source: optionalText(255),
+  message: optionalText(1000),
+  source: optionalText(255),
 })
   .min(1)
   .unknown(false);
