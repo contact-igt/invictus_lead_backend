@@ -37,6 +37,36 @@ export const AaravEyeCareTable = (Sequelize, sequelize) => {
         type: Sequelize.STRING(255),
         allowNull: true,
       },
+      message: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+      },
+      source: {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+      },
+      sheet_sync_status: {
+        type: Sequelize.STRING(16),
+        allowNull: false,
+        defaultValue: "pending",
+      },
+      sheet_sync_attempts: {
+        type: Sequelize.INTEGER.UNSIGNED,
+        allowNull: false,
+        defaultValue: 0,
+      },
+      sheet_sync_last_error: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+      },
+      sheet_synced_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
+      sheet_sync_next_attempt_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
     },
     {
       tableName: tableName.AARAV_EYE_CARE,
@@ -54,6 +84,10 @@ export const AaravEyeCareTable = (Sequelize, sequelize) => {
         {
           name: "idx_aarav_eye_care_client_mobile",
           fields: ["client_id", "mobile_number"],
+        },
+        {
+          name: "idx_aarav_eye_care_sheet_sync",
+          fields: ["sheet_sync_status", "sheet_sync_next_attempt_at"],
         },
       ],
     },

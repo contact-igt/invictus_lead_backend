@@ -5,6 +5,7 @@ import { getInclusiveDateRange, getMonthBounds, getTodayBounds } from "../../uti
 import { resolveClientId } from "../../utils/resolveClientContext.js";
 import { escapeCsvValue } from "../../utils/csv.js";
 import { withCreatedAtRange } from "../../utils/sequelizeFilters.js";
+import { attemptAaravSheetSync } from "./aaravEyeCareSheetSync.service.js";
 
 const AARAV_EYE_CARE_CLIENT_KEY = "aarav_eye_care";
 const IST_TIMEZONE = "Asia/Kolkata";
@@ -14,6 +15,8 @@ const CSV_HEADERS = [
   "Name",
   "Mobile Number",
   "Service",
+  "Message",
+  "Source",
   "IP Address",
   "UTM Source",
   "Created At",
@@ -57,6 +60,8 @@ const normalizePayload = (data) => {
     "service",
     "ip_address",
     "utm_source",
+    "message",
+    "source",
   ]) {
     if (typeof payload[field] === "string") {
       payload[field] = payload[field].trim();
@@ -118,6 +123,10 @@ const buildLeadAttributes = () => [
   "name",
   "mobile_number",
   "service",
+  "message",
+  "source",
+  "sheet_sync_status",
+  "sheet_synced_at",
   "ip_address",
   "utm_source",
   "created_at",
@@ -190,6 +199,8 @@ const mapLeadToExportRow = (lead, index) => ({
   name: lead.name || "",
   mobile_number: lead.mobile_number || "",
   service: lead.service || "",
+  message: lead.message || "",
+  source: lead.source || "",
   ip_address: lead.ip_address || "",
   utm_source: lead.utm_source || "",
   created_at: formatExportTimestamp(lead.created_at),
@@ -206,6 +217,8 @@ const buildCsvBuffer = (rows) => {
         row.name,
         row.mobile_number,
         row.service,
+        row.message,
+        row.source,
         row.ip_address,
         row.utm_source,
         row.created_at,
@@ -485,11 +498,16 @@ export const getAaravEyeCareLeadById = async (
   return record;
 };
 
-export const createAaravEyeCarePublicLead = async (data, clientId) =>
-  db.AaravEyeCare.create({
+export const createAaravEyeCarePublicLead = async (data, clientId) => {
+  const record = await db.AaravEyeCare.create({
     ...normalizePayload(data),
     client_id: clientId,
   });
+
+  attemptAaravSheetSync(record).catch(() => {});
+
+  return record;
+};
 
 export const createAaravEyeCareLead = async (
   data,
@@ -498,10 +516,14 @@ export const createAaravEyeCareLead = async (
 ) => {
   const tenantWhere = await resolveTenantWhere(tenant, requestedClientKey);
 
-  return db.AaravEyeCare.create({
+  const record = await db.AaravEyeCare.create({
     ...normalizePayload(data),
     client_id: tenantWhere.client_id,
   });
+
+  attemptAaravSheetSync(record).catch(() => {});
+
+  return record;
 };
 
 export const updateAaravEyeCareLead = async (
