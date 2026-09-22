@@ -5,6 +5,7 @@ import { getInclusiveDateRange, getMonthBounds, getTodayBounds } from "../../uti
 import { resolveClientId } from "../../utils/resolveClientContext.js";
 import { escapeCsvValue } from "../../utils/csv.js";
 import { withCreatedAtRange } from "../../utils/sequelizeFilters.js";
+import { attemptPhoenixFitnessSheetSync } from "./phoenixFitnessSheetSync.service.js";
 
 const PHOENIX_FITNESS_CLIENT_KEY = "phoenix_fitness";
 const IST_TIMEZONE = "Asia/Kolkata";
@@ -333,11 +334,14 @@ export const getPhoenixFitnessLeadById = async (
   return record;
 };
 
-export const createPhoenixFitnessPublicLead = async (data, clientId) =>
-  db.PhoenixFitness.create({
+export const createPhoenixFitnessPublicLead = async (data, clientId) => {
+  const record = await db.PhoenixFitness.create({
     ...normalizePayload(data),
     client_id: clientId,
   });
+  attemptPhoenixFitnessSheetSync(record).catch(() => {});
+  return record;
+};
 
 export const createPhoenixFitnessLead = async (
   data,
@@ -345,10 +349,12 @@ export const createPhoenixFitnessLead = async (
   requestedClientKey,
 ) => {
   const tenantWhere = await resolveTenantWhere(tenant, requestedClientKey);
-  return db.PhoenixFitness.create({
+  const record = await db.PhoenixFitness.create({
     ...normalizePayload(data),
     client_id: tenantWhere.client_id,
   });
+  attemptPhoenixFitnessSheetSync(record).catch(() => {});
+  return record;
 };
 
 export const updatePhoenixFitnessLead = async (
