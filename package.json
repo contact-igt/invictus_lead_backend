@@ -34,6 +34,7 @@
     "test:careers-resolver": "node src/scripts/verifyCareersLocationResolver.js",
     "test:sheet-sync": "node src/scripts/verifyInvictusSheetSync.js",
     "test:aarav-sheet-sync": "node src/scripts/verifyAaravEyeCareSheetSync.js",
+    "test:phoenix-sheet-sync": "node src/scripts/verifyPhoenixFitnessSheetSync.js",
     "test:client-security": "node src/scripts/verifyClientModuleSecurity.js",
     "test:client-modules": "node src/scripts/verifyClientModuleParity.js",
     "test:core-security": "node src/scripts/verifyCoreSecurityUtilities.js",
