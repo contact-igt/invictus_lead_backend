@@ -39,7 +39,8 @@
     "test:client-modules": "node src/scripts/verifyClientModuleParity.js",
     "test:core-security": "node src/scripts/verifyCoreSecurityUtilities.js",
     "test:pixeleye-followup": "node src/scripts/verifyPixelEyeStatusPolicyUpdate.js",
-    "test:pixeleye-followup-outcome-metadata": "node src/scripts/verifyPixelEyeCallLogIdempotency.js"
+    "test:pixeleye-followup-outcome-metadata": "node src/scripts/verifyPixelEyeCallLogIdempotency.js",
+    "test:runo-birthwave": "node src/scripts/verifyRunoBirthwaveIntegration.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

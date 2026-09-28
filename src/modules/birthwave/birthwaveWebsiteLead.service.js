@@ -8,6 +8,7 @@ import { attemptSheetSync } from "./birthwaveSheetSync.service.js";
 import { logBirthwaveActivity } from "./birthwaveActivity.service.js";
 import { resolveOrCreateBirthwaveContact } from "./birthwaveContact.service.js";
 import { resolveServiceForIntake } from "./birthwaveService.service.js";
+import { dispatchBirthwaveRunoDelivery } from "../integrations/runo/runo.service.js";
 
 const httpError = (status, message) => {
   const error = new Error(message);
@@ -274,6 +275,14 @@ export const createWebsiteLead = async (clientId, payload = {}, options = {}) =>
   // Best-effort inline mirror to Google Sheet; the cron worker retries the
   // rest (up to 3 attempts total). Never gates the CRM commit above.
   if (!options.skipSheetSync) attemptSheetSync(row).catch(() => {});
+
+  // Independent downstream copy to Runo CRM (backend-to-backend). Runs only
+  // for genuinely new website/landing-page leads (duplicates returned above),
+  // is fire-and-forget, and never affects the lead, the sheet or the response.
+  // Seed/test callers that skip the sheet also skip Runo.
+  if (!(options.skipRuno ?? options.skipSheetSync)) {
+    dispatchBirthwaveRunoDelivery({ clientId, lead, formContext: { message: row.message } }).catch(() => {});
+  }
 
   return { id: row.id, lead_id: row.external_lead_id || String(row.id), birthwave_lead_id: lead.id, duplicate: false };
 };
