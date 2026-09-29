@@ -15,6 +15,28 @@ const DEFAULT_SHEET_URL =
 
 const value = (input) => (input === undefined || input === null ? "" : String(input));
 
+// A Date rendered with String()/toString() picks up whatever timezone the
+// Node process happens to run in (IST locally, UTC on some hosts, etc.),
+// producing an inconsistent, unparseable string per row in the Sheet. Always
+// render Birthwave timestamps in IST explicitly, matching the Rio/VLS sheets.
+const formatIstTimestamp = (input) => {
+  if (input === undefined || input === null || input === "") return "";
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) return value(input);
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  })
+    .format(date)
+    .replace(",", "");
+};
+
 export const resolveSheetWebhookUrl = (sourceKey, env = process.env) => {
   const override = env[`BIRTHWAVE_SHEET_URL_${String(sourceKey || "").toUpperCase()}`];
   return override || DEFAULT_SHEET_URL;
@@ -25,8 +47,8 @@ export const resolveSheetWebhookUrl = (sourceKey, env = process.env) => {
 export const buildSheetPayload = (record) => ({
   lead_id: value(record.external_lead_id || record.id),
   submission_id: value(record.external_lead_id || record.id),
-  created_at: value(record.created_at || record.createdAt),
-  submitted_at: value(record.created_at || record.createdAt),
+  created_at: formatIstTimestamp(record.created_at || record.createdAt),
+  submitted_at: formatIstTimestamp(record.created_at || record.createdAt),
   source_key: value(record.source_key),
 
   name: value(record.name),
