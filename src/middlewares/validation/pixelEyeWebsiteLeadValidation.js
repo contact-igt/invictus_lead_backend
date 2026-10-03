@@ -10,6 +10,19 @@ export const PIXEL_EYE_WEBSITE_LEAD_SERVICES = [
   "Pediatric",
 ];
 
+// Landing pages that mirror to their own Google Sheet (see pixelEyeSheetSync.service.js).
+export const PIXEL_EYE_WEBSITE_LEAD_SOURCE_KEYS = [
+  "cataract",
+  "lasik",
+  "keratoconus",
+  "squint",
+  "sanathnagar",
+  "retina",
+  "pediatric",
+  "registration",
+  "glaucoma",
+];
+
 const optionalText = (max) =>
   Joi.string().trim().max(max).allow(null, "").optional();
 
@@ -29,6 +42,7 @@ export const pixelEyeWebsiteLeadCreateSchema = Joi.object({
   service: optionalService,
   ip_address: optionalText(45),
   utm_source: optionalText(255),
+  source_key: Joi.string().trim().lowercase().valid(...PIXEL_EYE_WEBSITE_LEAD_SOURCE_KEYS).allow(null, "").optional(),
 }).unknown(false);
 
 export const pixelEyeWebsiteLeadPublicCreateSchema = pixelEyeWebsiteLeadCreateSchema.keys({

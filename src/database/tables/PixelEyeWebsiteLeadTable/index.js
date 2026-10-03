@@ -37,6 +37,14 @@ export const PixelEyeWebsiteLeadTable = (Sequelize, sequelize) => {
         type: Sequelize.STRING(255),
         allowNull: true,
       },
+      // Which landing page the lead came from (cataract, lasik, ...). Drives
+      // which Google Sheet the backend mirrors it to.
+      source_key: { type: Sequelize.STRING(64), allowNull: true },
+      sheet_sync_status: { type: Sequelize.STRING(16), allowNull: false, defaultValue: 'pending' },
+      sheet_sync_attempts: { type: Sequelize.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0 },
+      sheet_sync_last_error: { type: Sequelize.TEXT, allowNull: true },
+      sheet_synced_at: { type: Sequelize.DATE, allowNull: true },
+      sheet_sync_next_attempt_at: { type: Sequelize.DATE, allowNull: true },
     },
     {
       tableName: tableName.PIXELEYE_WEBSITE_LEADS,
@@ -60,6 +68,10 @@ export const PixelEyeWebsiteLeadTable = (Sequelize, sequelize) => {
         {
           name: "idx_pixel_eye_website_leads_client_mobile",
           fields: ["client_id", "mobile_number"],
+        },
+        {
+          name: 'idx_pixel_eye_website_leads_sheet_sync',
+          fields: ['sheet_sync_status', 'sheet_sync_next_attempt_at'],
         },
       ],
     },
