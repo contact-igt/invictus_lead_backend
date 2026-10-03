@@ -55,6 +55,8 @@ import RepliWebhookRouter from "./modules/integrations/repli/repliWebhook.routes
 import { ensureBirthwaveLeadIntegrationColumns } from "./database/migrations/ensureBirthwaveLeadIntegrationColumns.js";
 import { ensureIntegrationWebhookEventsTable } from "./database/migrations/ensureIntegrationWebhookEventsTable.js";
 import { ensureRioSheetSyncColumns } from "./database/migrations/ensureRioSheetSyncColumns.js";
+import { ensurePixelEyeWebsiteLeadSheetSyncColumns } from "./database/migrations/ensurePixelEyeWebsiteLeadSheetSyncColumns.js";
+import { startPixelEyeSheetSyncScheduler } from "./modules/pixelEyeWebsiteLeads/pixelEyeSheetSync.service.js";
 import { ensureAaravEyeCareSheetSyncColumns } from "./database/migrations/ensureAaravEyeCareSheetSyncColumns.js";
 import { ensurePhoenixFitnessSheetSyncColumns } from "./database/migrations/ensurePhoenixFitnessSheetSyncColumns.js";
 import { startRioSheetSyncScheduler } from "./modules/rio/rioSheetSync.service.js";
@@ -122,6 +124,7 @@ const connect_mysql = async () => {
   try {
     await ensureInvictusEnquiryColumns();
     await ensureRioSheetSyncColumns();
+    await ensurePixelEyeWebsiteLeadSheetSyncColumns();
     await ensureAaravEyeCareSheetSyncColumns();
     await ensurePhoenixFitnessSheetSyncColumns();
     await db.sequelize.sync();
@@ -146,6 +149,7 @@ const connect_mysql = async () => {
     startBirthwaveSheetSyncScheduler();
     startBirthwaveAttentionScheduler();
     startRioSheetSyncScheduler();
+    startPixelEyeSheetSyncScheduler();
     startVlsSheetSyncScheduler();
     startAaravEyeCareSheetSyncScheduler();
     startPhoenixFitnessSheetSyncScheduler();

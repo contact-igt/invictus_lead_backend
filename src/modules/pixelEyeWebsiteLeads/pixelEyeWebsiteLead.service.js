@@ -5,6 +5,7 @@ import { getInclusiveDateRange, getMonthBounds, getTodayBounds } from "../../uti
 import { resolveClientId } from "../../utils/resolveClientContext.js";
 import { escapeCsvValue } from "../../utils/csv.js";
 import { withCreatedAtRange } from "../../utils/sequelizeFilters.js";
+import { attemptSheetSync, resolveSourceKey } from "./pixelEyeSheetSync.service.js";
 
 const PIXEL_EYE_CLIENT_KEY = "pixeleye";
 const IST_TIMEZONE = "Asia/Kolkata";
@@ -70,7 +71,7 @@ const formatFileDateStamp = (value = new Date()) =>
 const normalizePayload = (data) => {
   const payload = { ...data };
 
-  for (const field of ["name", "mobile_number", "service", "ip_address", "utm_source"]) {
+  for (const field of ["name", "mobile_number", "service", "ip_address", "utm_source", "source_key"]) {
     if (typeof payload[field] === "string") {
       payload[field] = payload[field].trim();
     }
@@ -132,6 +133,7 @@ const buildLeadAttributes = () => [
   "service",
   "ip_address",
   "utm_source",
+  "source_key",
   "created_at",
   "updated_at",
 ];
@@ -421,11 +423,24 @@ export const createPixelEyeWebsiteLead = async (data, tenant, requestedClientKey
   });
 };
 
-export const createPixelEyeWebsiteLeadPublicRecord = async (data, clientId) =>
-  db.PixelEyeWebsiteLead.create({
-    ...normalizePayload(data),
+export const createPixelEyeWebsiteLeadPublicRecord = async (data, clientId) => {
+  const payload = normalizePayload(data);
+  const sourceKey = resolveSourceKey(payload);
+
+  // DB is the source of truth: the lead is committed first, then mirrored to
+  // that landing page's Google Sheet (best-effort, retried by the scheduler).
+  // A lead with no recognisable landing page has no sheet to mirror to.
+  const record = await db.PixelEyeWebsiteLead.create({
+    ...payload,
+    source_key: sourceKey,
     client_id: clientId,
+    sheet_sync_status: sourceKey ? "pending" : "skipped",
   });
+
+  if (sourceKey) attemptSheetSync(record).catch(() => {});
+
+  return record;
+};
 
 export const updatePixelEyeWebsiteLead = async (id, data, tenant, requestedClientKey) => {
   const record = await getPixelEyeWebsiteLeadById(id, tenant, requestedClientKey);
