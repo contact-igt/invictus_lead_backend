@@ -13,6 +13,7 @@ export const ensureVlsPaymentStatusColumns = async () => {
     tableName.VLS_CONSUMER_PROTECTION_LAW_MASTER_CLASS,
     tableName.VLS_DOP_AI_ASSISTED,
     tableName.VLS_BUSINESS_LAW,
+    tableName.VLS_ECONOMIC_LAWS,
   ].filter(Boolean);
 
   for (const table of vlsTables) {
