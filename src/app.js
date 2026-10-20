@@ -52,6 +52,7 @@ import InvictusEnquiryRouter from "./modules/invictusEnquiry/invictusEnquiry.rou
 import BirthwaveRouter from "./modules/birthwave/birthwave.routes.js";
 import BirthwavePublicRouter from "./modules/birthwave/birthwavePublic.routes.js";
 import CrmRouter from "./modules/birthwave/crm.routes.js";
+import BirthwaveClinicRegistrationRouter from "./modules/birthwave/birthwaveClinicRegistration.routes.js";
 import RepliWebhookRouter from "./modules/integrations/repli/repliWebhook.routes.js";
 import { ensureBirthwaveLeadIntegrationColumns } from "./database/migrations/ensureBirthwaveLeadIntegrationColumns.js";
 import { ensureIntegrationWebhookEventsTable } from "./database/migrations/ensureIntegrationWebhookEventsTable.js";
@@ -94,7 +95,16 @@ app.use(cors(corsOptions));
 // Preserve the exact webhook bytes for HMAC verification before JSON parsing.
 app.use("/api/v1/integrations/repli/birthwave/webhook", express.raw({ type: "application/json" }));
 app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+app.use(
+  express.json({
+    // The clinic-registration intake verifies an HMAC over the exact raw bytes.
+    verify: (req, res, buf) => {
+      if (req.originalUrl.startsWith("/api/v1/integrations/birthwave/clinic-registrations")) {
+        req.rawBody = buf;
+      }
+    },
+  }),
+);
 app.use(apiAuditLogger);
 
 // Rate limiting
@@ -108,6 +118,7 @@ const apiLimiter = rateLimit({
 // Apply the API rate limiter
 app.use("/api/v1/", (req, res, next) => {
   if (req.path.startsWith("/pixeleye/webhook")) return next();
+  if (req.path.startsWith("/integrations/birthwave/clinic-registrations")) return next();
   return apiLimiter(req, res, next);
 });
 
@@ -194,6 +205,7 @@ app.use("/api/v1/birthwave-public", BirthwavePublicRouter);
 app.use("/api/v1/birthwave", BirthwaveRouter);
 app.use("/api/v1/crm", CrmRouter);
 app.use("/api/v1/integrations/repli", RepliWebhookRouter);
+app.use("/api/v1/integrations/birthwave/clinic-registrations", BirthwaveClinicRegistrationRouter);
 
 // Base route
 app.get("/", (req, res) => {

@@ -35,6 +35,7 @@ export const BIRTHWAVE_LEAD_SOURCES = [
   "walk_in",
   "referral",
   "instagram",
+  "clinic_registration",
   "other",
 ];
 
