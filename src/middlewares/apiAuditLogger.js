@@ -73,8 +73,15 @@ export const apiAuditLogger = (req, res, next) => {
       user_role: req.user?.role || null,
       client_id: req.tenant?.id || req.user?.clientId || req.publicTenantId || null,
       ip_address: req.ip || null,
-      request_body: toPreview({ query: req.query, body: req.body }),
-      response_body: isDownload ? { omitted: "non-json response" } : toPreview(responsePayload),
+      // Routes carrying patient data opt out of body logging (res.locals.auditOmitBodies).
+      request_body: res.locals.auditOmitBodies
+        ? { omitted: "sensitive payload" }
+        : toPreview({ query: req.query, body: req.body }),
+      response_body: res.locals.auditOmitBodies
+        ? { omitted: "sensitive payload" }
+        : isDownload
+          ? { omitted: "non-json response" }
+          : toPreview(responsePayload),
       error_message: res.statusCode >= 400 ? errorMessage : null,
     }).catch((error) => {
       console.error("[api-audit] Failed to persist request log", error.message);
