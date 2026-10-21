@@ -15,6 +15,24 @@ const DEFAULT_SHEET_URL =
 
 const value = (input) => (input === undefined || input === null ? "" : String(input));
 
+const SHEET_SERVICE_CODES = {
+  "General Contact": "general-contact",
+  "Fertility & Preconception": "fertility-preconception",
+  "Vaginismus & Intimate Wellness": "vaginismus",
+  "Pregnancy & Antenatal Care": "pregnancy-antenatal-care",
+  "Normal Birth & Delivery Care": "normal-birth-delivery",
+  "VBAC (Vaginal Birth After Caesarean)": "vbac",
+  "Birth Preparation & Childbirth Education": "birth-preparation",
+  "Natural Birth": "natural-birth",
+  "Postpartum Recovery & Care": "postpartum-care",
+  "Lactation & Breastfeeding Support": "lactation",
+  "Newborn & Pediatric Care": "newborn-pediatric-care",
+  "Gynaecology & Women's Wellness": "gynaecology",
+  "Nutrition & Emotional Well-being": "nutrition-emotional-wellbeing",
+};
+
+const resolveSheetServiceCode = (record) => SHEET_SERVICE_CODES[value(record.service).trim()] || "unclassified";
+
 // A Date rendered with String()/toString() picks up whatever timezone the
 // Node process happens to run in (IST locally, UTC on some hosts, etc.),
 // producing an inconsistent, unparseable string per row in the Sheet. Always
@@ -44,7 +62,9 @@ export const resolveSheetWebhookUrl = (sourceKey, env = process.env) => {
 
 // Matches the `NormalizedLead` JSON body the Birthwave landing pages have
 // always POSTed to the Apps Script, so the existing deployment needs no change.
-export const buildSheetPayload = (record) => ({
+export const buildSheetPayload = (record, env = process.env) => ({
+  secret: value(env.BIRTHWAVE_SHEET_WEBHOOK_SECRET),
+  serviceCode: resolveSheetServiceCode(record),
   lead_id: value(record.external_lead_id || record.id),
   submission_id: value(record.external_lead_id || record.id),
   created_at: formatIstTimestamp(record.created_at || record.createdAt),
@@ -89,6 +109,9 @@ export const sendSheetRecord = async (
 ) => {
   const url = resolveSheetWebhookUrl(record.source_key, env);
   if (!url) throw new Error("Missing Google Sheets webhook configuration.");
+  if (!value(env.BIRTHWAVE_SHEET_WEBHOOK_SECRET).trim()) {
+    throw new Error("Missing BIRTHWAVE_SHEET_WEBHOOK_SECRET.");
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -97,7 +120,7 @@ export const sendSheetRecord = async (
     const response = await fetchImpl(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildSheetPayload(record)),
+      body: JSON.stringify(buildSheetPayload(record, env)),
       redirect: "follow",
       signal: controller.signal,
     });
