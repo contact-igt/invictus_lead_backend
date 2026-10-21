@@ -11,7 +11,7 @@ const RETRY_BATCH_SIZE = 50;
 // without any code change.
 const DEFAULT_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_WEBHOOK_URL ||
-  "https://script.google.com/macros/s/AKfycbxtksI07s7EEDCSY-XwWVJLgZA3S2sTiBZzf-SqL_oumJA4EcNJK6rVHR-_nvJo4UXj/exec";
+  "https://script.google.com/macros/s/AKfycbx7H4xQ0serxp62mxUXZ-kWmJ3FRqWsF0qjEMShe2t61f5HaHddh9pUvHu8tBJoCYuEgQ/exec";
 
 const value = (input) => (input === undefined || input === null ? "" : String(input));
 
