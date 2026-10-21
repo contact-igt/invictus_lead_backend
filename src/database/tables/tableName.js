@@ -35,6 +35,7 @@ export const tableName = {
   BIRTHWAVE_APPOINTMENTS: 'birthwave_appointments',
   BIRTHWAVE_LEAD_ACTIVITIES: 'birthwave_lead_activities',
   BIRTHWAVE_WEBSITE_LEADS: 'birthwave_website_leads',
+  NAMOKAR_WEBSITE_LEADS: 'namokar_website_leads',
   BIRTHWAVE_TEAMS: 'birthwave_teams',
   BIRTHWAVE_TEAM_MEMBERS: 'birthwave_team_members',
   BIRTHWAVE_LEAD_ASSIGNMENTS: 'birthwave_lead_assignments',

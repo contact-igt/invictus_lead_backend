@@ -12,6 +12,7 @@ export const SUPPORTED_CLIENT_MODULES = [
   'shanti_eye_tech',
   'phoenix_fitness',
   'birthwave',
+  'namokar',
   'invictus',
 ];
 

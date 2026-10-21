@@ -54,6 +54,7 @@ import BirthwavePublicRouter from "./modules/birthwave/birthwavePublic.routes.js
 import CrmRouter from "./modules/birthwave/crm.routes.js";
 import BirthwaveClinicRegistrationRouter from "./modules/birthwave/birthwaveClinicRegistration.routes.js";
 import RepliWebhookRouter from "./modules/integrations/repli/repliWebhook.routes.js";
+import NamokarRouter from "./modules/namokar/namokar.routes.js";
 import { ensureBirthwaveLeadIntegrationColumns } from "./database/migrations/ensureBirthwaveLeadIntegrationColumns.js";
 import { ensureIntegrationWebhookEventsTable } from "./database/migrations/ensureIntegrationWebhookEventsTable.js";
 import { ensureRioSheetSyncColumns } from "./database/migrations/ensureRioSheetSyncColumns.js";
@@ -203,6 +204,7 @@ app.use("/api/v1/api-logs", ApiLogsRouter);
 app.use("/api/v1/invictus-enquiries", InvictusEnquiryRouter);
 app.use("/api/v1/birthwave-public", BirthwavePublicRouter);
 app.use("/api/v1/birthwave", BirthwaveRouter);
+app.use("/api/v1/namokar", NamokarRouter);
 app.use("/api/v1/crm", CrmRouter);
 app.use("/api/v1/integrations/repli", RepliWebhookRouter);
 app.use("/api/v1/integrations/birthwave/clinic-registrations", BirthwaveClinicRegistrationRouter);
