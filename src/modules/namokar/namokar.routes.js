@@ -1,0 +1,11 @@
+import express from "express";
+import { authenticateToken, authorizeManagementRole } from "../../middlewares/auth/authMiddlewares.js";
+import { attachTenantContext } from "../../middlewares/auth/tenantMiddleware.js";
+import { scopeSuperAdminToClient } from "../../middlewares/auth/clientContextMiddleware.js";
+import { resolvePublicTenantForModule } from "../../middlewares/auth/publicTenantMiddleware.js";
+import { createNamokarLead, listNamokarLeads, retryNamokarLeadDelivery } from "./namokar.service.js";
+const router = express.Router();
+router.post("/website-leads", resolvePublicTenantForModule("namokar"), async (req,res,next) => { try { const { row, created } = await createNamokarLead(req.publicTenantId, req.body); res.status(created ? 201 : 200).json({ success: true, duplicate: !created, id: row.id }); } catch(e) { next(e); } });
+router.get("/website-leads", authenticateToken, attachTenantContext, scopeSuperAdminToClient("namokar"), async (req,res,next) => { try { res.json({ success: true, data: await listNamokarLeads(req.tenant.id) }); } catch(e) { next(e); } });
+router.post("/website-leads/:id/retry-delivery", authenticateToken, attachTenantContext, scopeSuperAdminToClient("namokar"), authorizeManagementRole, async (req,res,next) => { try { const id = Number(req.params.id); if (!Number.isInteger(id) || id < 1) return res.status(400).json({ message: "invalid_lead_id" }); res.json({ success: true, data: await retryNamokarLeadDelivery(req.tenant.id, id) }); } catch(e) { next(e); } });
+export default router;
