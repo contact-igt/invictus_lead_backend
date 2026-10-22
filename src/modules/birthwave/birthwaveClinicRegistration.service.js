@@ -61,6 +61,7 @@ const buildMetadata = (payload) => {
       reference: payload.reference,
       clinic_id: payload.clinicId || null,
       clinic_date: dateOnly(payload.clinicDate),
+      session: payload.session || null,
       registered_at: payload.registeredAt ? new Date(payload.registeredAt).toISOString() : null,
       date_of_birth: dateOnly(lead.dateOfBirth),
       gender: lead.gender || null,

@@ -16,6 +16,7 @@ export const intakeSchema = Joi.object({
   reference: Joi.string().trim().pattern(/^[A-Za-z0-9_-]{4,40}$/).required(),
   clinicId: Joi.string().trim().max(40).allow(null, "").optional(),
   clinicDate: Joi.date().iso().allow(null).optional(),
+  session: Joi.string().valid("morning", "evening").allow(null, "").optional(),
   registeredAt: Joi.date().iso().allow(null).optional(),
   lead: Joi.object({
     source: Joi.string().valid("clinic_registration").required(),
