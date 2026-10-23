@@ -8,6 +8,7 @@ import {
   getPixelEyeWebsiteLeads,
   updatePixelEyeWebsiteLeadRecord,
   registerPixelEyeWebsitePublicLead,
+  registerPixelEyeWebsiteAppointmentLead,
 } from "./pixelEyeWebsiteLead.controller.js";
 import { authenticateToken } from "../../middlewares/auth/authMiddlewares.js";
 import { attachTenantContext } from "../../middlewares/auth/tenantMiddleware.js";
@@ -20,6 +21,7 @@ import {
   validatePixelEyeWebsiteLeadList,
   validatePixelEyeWebsiteLeadUpdate,
   validatePixelEyeWebsiteLeadPublicCreate,
+  validatePixelEyeWebsiteAppointmentCreate,
 } from "../../middlewares/validation/pixelEyeWebsiteLeadValidation.js";
 
 const router = express.Router();
@@ -29,6 +31,13 @@ router.post(
   resolvePublicTenantForModule("pixeleye"),
   validatePixelEyeWebsiteLeadPublicCreate,
   registerPixelEyeWebsitePublicLead,
+);
+
+router.post(
+  "/appointment-register",
+  resolvePublicTenantForModule("pixeleye"),
+  validatePixelEyeWebsiteAppointmentCreate,
+  registerPixelEyeWebsiteAppointmentLead,
 );
 
 router.use(authenticateToken);
