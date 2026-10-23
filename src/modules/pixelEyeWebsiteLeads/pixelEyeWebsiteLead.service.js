@@ -475,6 +475,15 @@ const appointmentDedupeKey = ({ mobileE164, date, timeSlot }) =>
     .update(`${mobileE164}|${date}|${timeSlot}`)
     .digest("hex");
 
+const normalizeAppointmentDate = (value) => {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return "";
+    return value.toISOString().slice(0, 10);
+  }
+
+  return String(value || "").trim().slice(0, 10);
+};
+
 /**
  * Intake for the main PixelEye appointment form. Google Sheets remains the
  * website's operational destination; this persists an independent CRM copy.
@@ -482,7 +491,9 @@ const appointmentDedupeKey = ({ mobileE164, date, timeSlot }) =>
 export const createPixelEyeWebsiteAppointmentLead = async (payload, clientId) => {
   const data = payload?.data || {};
   const attribution = payload?.attribution || {};
-  const appointmentDate = String(data.date || "").slice(0, 10);
+  // Joi converts ISO input to a Date. Do not use String(Date).slice(...):
+  // that produces values such as "Sat Oct 24", which MySQL coerces wrongly.
+  const appointmentDate = normalizeAppointmentDate(data.date);
 
   if (!appointmentDate || appointmentDate < getAppDateKey()) {
     throw createHttpError(400, "Appointment date must be today or later");
