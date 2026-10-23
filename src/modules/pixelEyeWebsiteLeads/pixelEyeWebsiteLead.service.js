@@ -1,7 +1,8 @@
 import PDFDocument from "pdfkit";
+import crypto from "node:crypto";
 import { Op, fn, col } from "sequelize";
 import db from "../../database/index.js";
-import { getInclusiveDateRange, getMonthBounds, getTodayBounds } from "../../utils/dateTime.js";
+import { getAppDateKey, getInclusiveDateRange, getMonthBounds, getTodayBounds } from "../../utils/dateTime.js";
 import { resolveClientId } from "../../utils/resolveClientContext.js";
 import { escapeCsvValue } from "../../utils/csv.js";
 import { withCreatedAtRange } from "../../utils/sequelizeFilters.js";
@@ -134,6 +135,26 @@ const buildLeadAttributes = () => [
   "ip_address",
   "utm_source",
   "source_key",
+  "form_name",
+  "lead_type",
+  "lead_status",
+  "email",
+  "country_calling_code",
+  "mobile_e164",
+  "hospital_location",
+  "appointment_date",
+  "appointment_time_slot",
+  "symptom_or_condition",
+  "symptom_details",
+  "terms_accepted",
+  "whatsapp_updates_opt_in",
+  "marketing_contact_consent",
+  "source_page_url",
+  "referrer_url",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
   "created_at",
   "updated_at",
 ];
@@ -440,6 +461,87 @@ export const createPixelEyeWebsiteLeadPublicRecord = async (data, clientId) => {
   if (sourceKey) attemptSheetSync(record).catch(() => {});
 
   return record;
+};
+
+const normalizeAppointmentPhone = (countryCode, mobile) => {
+  const callingCode = String(countryCode || "").replace(/\D/g, "");
+  const localNumber = String(mobile || "").replace(/\D/g, "");
+  return `+${callingCode}${localNumber}`;
+};
+
+const appointmentDedupeKey = ({ mobileE164, date, timeSlot }) =>
+  crypto
+    .createHash("sha256")
+    .update(`${mobileE164}|${date}|${timeSlot}`)
+    .digest("hex");
+
+/**
+ * Intake for the main PixelEye appointment form. Google Sheets remains the
+ * website's operational destination; this persists an independent CRM copy.
+ */
+export const createPixelEyeWebsiteAppointmentLead = async (payload, clientId) => {
+  const data = payload?.data || {};
+  const attribution = payload?.attribution || {};
+  const appointmentDate = String(data.date || "").slice(0, 10);
+
+  if (!appointmentDate || appointmentDate < getAppDateKey()) {
+    throw createHttpError(400, "Appointment date must be today or later");
+  }
+
+  // Sanath Nagar opens at 10 AM; Kukatpally also offers the 9 AM slot.
+  if (data.location === "Sanath Nagar" && data.timeSlot === "09:00 AM - 10:00 AM") {
+    throw createHttpError(400, "Selected time slot is not available at Sanath Nagar");
+  }
+
+  const mobileE164 = normalizeAppointmentPhone(data.countryCode, data.mobile);
+  const dedupeKey = appointmentDedupeKey({
+    mobileE164,
+    date: appointmentDate,
+    timeSlot: data.timeSlot,
+  });
+
+  const existing = await db.PixelEyeWebsiteLead.findOne({
+    where: { client_id: clientId, dedupe_key: dedupeKey },
+  });
+
+  if (existing) {
+    return { record: existing, duplicate: true };
+  }
+
+  const record = await db.PixelEyeWebsiteLead.create({
+    client_id: clientId,
+    name: data.fullName.trim(),
+    mobile_number: String(data.mobile).trim(),
+    form_name: payload.form_name,
+    lead_type: payload.lead_type,
+    lead_status: "new",
+    email: data.email || null,
+    country_calling_code: data.countryCode,
+    mobile_e164: mobileE164,
+    hospital_location: data.location,
+    appointment_date: appointmentDate,
+    appointment_time_slot: data.timeSlot,
+    symptom_or_condition: data.symptoms,
+    symptom_details: data.symptomDetails || null,
+    terms_accepted: data.terms,
+    whatsapp_updates_opt_in: data.whatsapp,
+    marketing_contact_consent: data.consent,
+    ip_address: payload.ip_address || attribution.ip_address || null,
+    source_page_url: attribution.source_page_url || null,
+    referrer_url: attribution.referrer_url || null,
+    utm_source: attribution.utm_source || null,
+    utm_medium: attribution.utm_medium || null,
+    utm_campaign: attribution.utm_campaign || null,
+    utm_term: attribution.utm_term || null,
+    utm_content: attribution.utm_content || null,
+    dedupe_key: dedupeKey,
+    source_key: "main_website",
+    // The website continues to deliver to its existing Apps Script directly.
+    sheet_sync_status: "skipped",
+    raw_submission_json: payload,
+  });
+
+  return { record, duplicate: false };
 };
 
 export const updatePixelEyeWebsiteLead = async (id, data, tenant, requestedClientKey) => {

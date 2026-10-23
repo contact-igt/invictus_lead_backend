@@ -1,5 +1,6 @@
 ﻿import {
   createPixelEyeWebsiteLead,
+  createPixelEyeWebsiteAppointmentLead,
   createPixelEyeWebsiteLeadPublicRecord,
   deletePixelEyeWebsiteLead,
   exportPixelEyeWebsiteLeadReport,
@@ -16,6 +17,27 @@ export const registerPixelEyeWebsitePublicLead = async (req, res, next) => {
       success: true,
       message: "PixelEye Website Lead created successfully",
       data,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const registerPixelEyeWebsiteAppointmentLead = async (req, res, next) => {
+  try {
+    // Appointment payloads contain health-related free text and consent data.
+    res.locals.auditOmitBodies = true;
+    const { record, duplicate } = await createPixelEyeWebsiteAppointmentLead(
+      req.body,
+      req.publicTenantId,
+    );
+    return res.status(duplicate ? 200 : 201).json({
+      success: true,
+      duplicate,
+      message: duplicate
+        ? "Appointment lead already received"
+        : "Appointment lead created successfully",
+      data: record,
     });
   } catch (error) {
     return next(error);
