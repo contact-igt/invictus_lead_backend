@@ -64,6 +64,14 @@ export const ensurePixelEyeWebsiteLeadSheetSyncColumns = async () => {
       if (!has(name)) await queryInterface.addColumn(table, name, definition);
     }
 
+    // Rename the original main-site marker without touching service-specific
+    // landing-page sources.
+    await queryInterface.bulkUpdate(
+      table,
+      { source_key: "pixel_eye_hospital" },
+      { source_key: "main_website" },
+    );
+
     const dedupeIndex = "idx_pixel_eye_website_leads_client_dedupe";
     const updatedIndexes = await queryInterface.showIndex(table);
     if (!updatedIndexes.some((idx) => idx.name === dedupeIndex)) {

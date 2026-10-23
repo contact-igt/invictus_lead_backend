@@ -17,6 +17,10 @@ const CSV_HEADERS = [
   "Name",
   "Mobile Number",
   "Service",
+  "Symptom / Condition",
+  "Hospital Location",
+  "Appointment Date",
+  "Appointment Time Slot",
   "IP Address",
   "UTM Source",
   "Created At",
@@ -25,12 +29,16 @@ const CSV_HEADERS = [
 
 const PDF_COLUMNS = [
   { key: "serialNumber", label: "S.No", width: 40, align: "center" },
-  { key: "name", label: "Name", width: 130 },
-  { key: "mobile_number", label: "Mobile", width: 95 },
-  { key: "service", label: "Service", width: 120 },
-  { key: "ip_address", label: "IP Address", width: 98 },
-  { key: "utm_source", label: "UTM Source", width: 110 },
-  { key: "created_at", label: "Created At", width: 95 },
+  { key: "name", label: "Name", width: 100 },
+  { key: "mobile_number", label: "Mobile", width: 75 },
+  { key: "service", label: "Service", width: 65 },
+  { key: "symptom_or_condition", label: "Symptom / Condition", width: 110 },
+  { key: "hospital_location", label: "Hospital", width: 70 },
+  { key: "appointment_date", label: "Appt. Date", width: 65 },
+  { key: "appointment_time_slot", label: "Time Slot", width: 85 },
+  { key: "ip_address", label: "IP Address", width: 65 },
+  { key: "utm_source", label: "UTM Source", width: 70 },
+  { key: "created_at", label: "Created At", width: 55 },
 ];
 
 const createHttpError = (status, message) => {
@@ -95,7 +103,16 @@ const resolveTenantWhere = async (tenant, requestedClientKey, filters = {}) => {
 };
 
 const buildLeadFilters = (filters = {}) => {
-  const { search, service, utm_source, start_date, end_date } = filters;
+  const {
+    search,
+    service,
+    utm_source,
+    lead_source,
+    symptom_or_condition,
+    hospital_location,
+    start_date,
+    end_date,
+  } = filters;
   const queryFilters = {};
 
   if (search) {
@@ -103,12 +120,22 @@ const buildLeadFilters = (filters = {}) => {
       { name: { [Op.like]: `%${search}%` } },
       { mobile_number: { [Op.like]: `%${search}%` } },
       { service: { [Op.like]: `%${search}%` } },
+      { symptom_or_condition: { [Op.like]: `%${search}%` } },
+      { hospital_location: { [Op.like]: `%${search}%` } },
       { utm_source: { [Op.like]: `%${search}%` } },
     ];
   }
 
   if (service) queryFilters.service = service;
   if (utm_source) queryFilters.utm_source = utm_source;
+  if (symptom_or_condition) queryFilters.symptom_or_condition = symptom_or_condition;
+  if (hospital_location) queryFilters.hospital_location = hospital_location;
+  if (lead_source === "appointment") queryFilters.lead_type = "appointment_enquiry";
+  if (lead_source === "landing_page") {
+    queryFilters[Op.and] = [
+      { [Op.or]: [{ lead_type: null }, { lead_type: { [Op.ne]: "appointment_enquiry" } }] },
+    ];
+  }
 
   if (start_date || end_date) {
     const { start, end } = getInclusiveDateRange(start_date, end_date);
@@ -189,6 +216,10 @@ const buildCsvBuffer = (rows) => {
         row.name,
         row.mobile_number,
         row.service,
+        row.symptom_or_condition,
+        row.hospital_location,
+        row.appointment_date,
+        row.appointment_time_slot,
         row.ip_address,
         row.utm_source,
         row.created_at,
@@ -367,6 +398,10 @@ export const exportPixelEyeWebsiteLeadReport = async (filters, tenant) => {
     name: row.name || "",
     mobile_number: row.mobile_number || "",
     service: row.service || "",
+    symptom_or_condition: row.symptom_or_condition || "",
+    hospital_location: row.hospital_location || "",
+    appointment_date: row.appointment_date || "",
+    appointment_time_slot: row.appointment_time_slot || "",
     ip_address: row.ip_address || "",
     utm_source: row.utm_source || "",
     created_at: formatTimestamp(row.created_at),
@@ -393,7 +428,7 @@ export const getPixelEyeWebsiteLeadSummary = async (filters, tenant) => {
   const where = await buildLeadWhere(filters, tenant);
   const { now, todayStart, monthStart } = getIstRangeBounds();
 
-  const [totalLeads, todayLeads, thisMonthLeads, topServiceRow] = await Promise.all([
+  const [totalLeads, todayLeads, thisMonthLeads, topServiceRow, topSymptomRow] = await Promise.all([
     db.PixelEyeWebsiteLead.count({ where }),
     db.PixelEyeWebsiteLead.count({
       where: withCreatedAtRange(where, todayStart, now),
@@ -413,6 +448,21 @@ export const getPixelEyeWebsiteLeadSummary = async (filters, tenant) => {
       order: [[fn("COUNT", col("service")), "DESC"], ["service", "ASC"]],
       raw: true,
     }),
+    db.PixelEyeWebsiteLead.findOne({
+      attributes: [
+        "symptom_or_condition",
+        [fn("COUNT", col("symptom_or_condition")), "symptom_count"],
+      ],
+      where: {
+        ...where,
+        symptom_or_condition: {
+          [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: "" }],
+        },
+      },
+      group: ["symptom_or_condition"],
+      order: [[fn("COUNT", col("symptom_or_condition")), "DESC"], ["symptom_or_condition", "ASC"]],
+      raw: true,
+    }),
   ]);
 
   return {
@@ -421,6 +471,8 @@ export const getPixelEyeWebsiteLeadSummary = async (filters, tenant) => {
     this_month_leads: thisMonthLeads,
     top_service: topServiceRow?.service || null,
     top_service_count: Number(topServiceRow?.service_count || 0),
+    top_symptom_or_condition: topSymptomRow?.symptom_or_condition || null,
+    top_symptom_or_condition_count: Number(topSymptomRow?.symptom_count || 0),
   };
 };
 
@@ -546,7 +598,7 @@ export const createPixelEyeWebsiteAppointmentLead = async (payload, clientId) =>
     utm_term: attribution.utm_term || null,
     utm_content: attribution.utm_content || null,
     dedupe_key: dedupeKey,
-    source_key: "main_website",
+    source_key: "pixel_eye_hospital",
     // The website continues to deliver to its existing Apps Script directly.
     sheet_sync_status: "skipped",
     raw_submission_json: payload,
