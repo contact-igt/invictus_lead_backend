@@ -63,6 +63,7 @@ import { ensurePixelEyeWebsiteLeadSheetSyncColumns } from "./database/migrations
 import { startPixelEyeSheetSyncScheduler } from "./modules/pixelEyeWebsiteLeads/pixelEyeSheetSync.service.js";
 import { ensureAaravEyeCareSheetSyncColumns } from "./database/migrations/ensureAaravEyeCareSheetSyncColumns.js";
 import { ensurePhoenixFitnessSheetSyncColumns } from "./database/migrations/ensurePhoenixFitnessSheetSyncColumns.js";
+import { ensureNamokarOculoplastyDeliveryColumns } from "./database/migrations/ensureNamokarOculoplastyDeliveryColumns.js";
 import { startRioSheetSyncScheduler } from "./modules/rio/rioSheetSync.service.js";
 import { startAaravEyeCareSheetSyncScheduler } from "./modules/aaravEyeCare/aaravEyeCareSheetSync.service.js";
 import { startPhoenixFitnessSheetSyncScheduler } from "./modules/phoenixFitness/phoenixFitnessSheetSync.service.js";
@@ -141,6 +142,7 @@ const connect_mysql = async () => {
     await ensurePixelEyeWebsiteLeadSheetSyncColumns();
     await ensureAaravEyeCareSheetSyncColumns();
     await ensurePhoenixFitnessSheetSyncColumns();
+    await ensureNamokarOculoplastyDeliveryColumns();
     await db.sequelize.sync();
     await ensureBirthwaveLeadIntegrationColumns();
     await ensureIntegrationWebhookEventsTable();
