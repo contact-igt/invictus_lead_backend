@@ -1,0 +1,13 @@
+import express from "express";
+import { authenticateToken, authorizeManagementRole } from "../../middlewares/auth/authMiddlewares.js";
+import { attachTenantContext } from "../../middlewares/auth/tenantMiddleware.js";
+import { scopeSuperAdminToClient } from "../../middlewares/auth/clientContextMiddleware.js";
+import { resolvePublicTenantForModule } from "../../middlewares/auth/publicTenantMiddleware.js";
+import { createOculoplastyLead, listOculoplastyLeads, retryOculoplastySheetSync, updateOculoplastyLead } from "./namokarOculoplasty.service.js";
+const router = express.Router();
+router.post("/leads", resolvePublicTenantForModule("namokar"), async (req, res, next) => { try { const { row, created } = await createOculoplastyLead(req.publicTenantId, req.body); res.status(created ? 201 : 200).json({ success: true, duplicate: !created, lead_id: row.id }); } catch (error) { next(error); } });
+router.use(authenticateToken, attachTenantContext, scopeSuperAdminToClient("namokar"));
+router.get("/leads", async (req, res, next) => { try { const result = await listOculoplastyLeads(req.tenant.id, req.query); res.json({ success: true, data: result.rows, pagination: { total: result.count, page: Math.max(Number(req.query.page) || 1, 1), limit: Math.min(Math.max(Number(req.query.limit) || 25, 1), 100) } }); } catch (error) { next(error); } });
+router.patch("/leads/:id", authorizeManagementRole, async (req, res, next) => { try { res.json({ success: true, data: await updateOculoplastyLead(req.tenant.id, Number(req.params.id), req.body) }); } catch (error) { next(error); } });
+router.post("/leads/:id/retry-sheet-sync", authorizeManagementRole, async (req, res, next) => { try { res.json({ success: true, data: await retryOculoplastySheetSync(req.tenant.id, Number(req.params.id)) }); } catch (error) { next(error); } });
+export default router;
