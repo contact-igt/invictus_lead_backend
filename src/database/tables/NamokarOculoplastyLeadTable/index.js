@@ -14,6 +14,7 @@ export const NamokarOculoplastyLeadTable = (Sequelize, sequelize) => sequelize.d
   source: { type: Sequelize.STRING(80), allowNull: false, defaultValue: "website" },
   page_url: { type: Sequelize.STRING(500), allowNull: true },
   referrer: { type: Sequelize.STRING(500), allowNull: true },
+  ip_address: { type: Sequelize.STRING(64), allowNull: true },
   utm_source: { type: Sequelize.STRING(150), allowNull: true }, utm_medium: { type: Sequelize.STRING(150), allowNull: true }, utm_campaign: { type: Sequelize.STRING(150), allowNull: true }, utm_term: { type: Sequelize.STRING(150), allowNull: true }, utm_content: { type: Sequelize.STRING(150), allowNull: true },
   form_payload_json: { type: Sequelize.JSON, allowNull: true },
   lead_status: { type: Sequelize.STRING(30), allowNull: false, defaultValue: "new" },

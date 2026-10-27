@@ -7,6 +7,7 @@ export const ensureNamokarOculoplastyDeliveryColumns = async () => {
   try {
     const columns = await queryInterface.describeTable(TABLE);
     const fields = {
+      ip_address: { type: db.Sequelize.STRING(64), allowNull: true },
       pulseos_status: { type: db.Sequelize.STRING(20), allowNull: false, defaultValue: "pending" },
       pulseos_attempts: { type: db.Sequelize.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0 },
       pulseos_error: { type: db.Sequelize.STRING(255), allowNull: true },

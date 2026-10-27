@@ -5,7 +5,14 @@ import { scopeSuperAdminToClient } from "../../middlewares/auth/clientContextMid
 import { resolvePublicTenantForModule } from "../../middlewares/auth/publicTenantMiddleware.js";
 import { createOculoplastyLead, listOculoplastyLeads, retryOculoplastySheetSync, updateOculoplastyLead } from "./namokarOculoplasty.service.js";
 const router = express.Router();
-router.post("/leads", resolvePublicTenantForModule("namokar"), async (req, res, next) => { try { const { row, created } = await createOculoplastyLead(req.publicTenantId, req.body); res.status(created ? 201 : 200).json({ success: true, duplicate: !created, lead_id: row.id }); } catch (error) { next(error); } });
+const getClientIp = (req) => {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) return forwarded.split(",")[0].trim();
+  const realIp = req.headers["x-real-ip"];
+  if (typeof realIp === "string" && realIp.trim()) return realIp.trim();
+  return req.ip || req.socket?.remoteAddress || null;
+};
+router.post("/leads", resolvePublicTenantForModule("namokar"), async (req, res, next) => { try { const { row, created } = await createOculoplastyLead(req.publicTenantId, { ...req.body, ip_address: getClientIp(req) }); res.status(created ? 201 : 200).json({ success: true, duplicate: !created, lead_id: row.id }); } catch (error) { next(error); } });
 router.use(authenticateToken, attachTenantContext, scopeSuperAdminToClient("namokar"));
 router.get("/leads", async (req, res, next) => { try { const result = await listOculoplastyLeads(req.tenant.id, req.query); res.json({ success: true, data: result.rows, pagination: { total: result.count, page: Math.max(Number(req.query.page) || 1, 1), limit: Math.min(Math.max(Number(req.query.limit) || 25, 1), 100) } }); } catch (error) { next(error); } });
 router.patch("/leads/:id", authorizeManagementRole, async (req, res, next) => { try { res.json({ success: true, data: await updateOculoplastyLead(req.tenant.id, Number(req.params.id), req.body) }); } catch (error) { next(error); } });

@@ -31,7 +31,7 @@ export async function syncToSheet(row) {
 
       name: row.name,
       phone: row.phone,
-      ip_address: "",
+      ip_address: row.ip_address || "",
       utm_source: row.utm_source || "direct",
       utm_medium: row.utm_medium || "none",
       utm_campaign: row.utm_campaign || "none",
@@ -56,7 +56,7 @@ export async function createOculoplastyLead(clientId, input = {}) {
   const name = clean(input.name, 120); const normalizedPhone = phone(input.phone); const service = clean(input.service, 120) || "Oculoplasty consultation";
   const submissionId = clean(input.submission_id, 100);
   if (!submissionId || !name || !normalizedPhone) throw fail(422, "Name, phone and submission_id are required");
-  const [row, created] = await db.NamokarOculoplastyLead.findOrCreate({ where: { client_id: clientId, submission_id: submissionId }, defaults: { name, phone: normalizedPhone, doctor: clean(input.doctor, 120), service, message: clean(input.message, 2000), form_name: clean(input.form_name, 100) || "oculoplasty_appointment", page_name: clean(input.page_name, 100) || "namokar_oculoplasty_landing", source: clean(input.source, 80) || "website", page_url: clean(input.page_url), referrer: clean(input.referrer), utm_source: clean(input.utm_source, 150), utm_medium: clean(input.utm_medium, 150), utm_campaign: clean(input.utm_campaign, 150), utm_term: clean(input.utm_term, 150), utm_content: clean(input.utm_content, 150), form_payload_json: input } });
+  const [row, created] = await db.NamokarOculoplastyLead.findOrCreate({ where: { client_id: clientId, submission_id: submissionId }, defaults: { name, phone: normalizedPhone, doctor: clean(input.doctor, 120), service, message: clean(input.message, 2000), form_name: clean(input.form_name, 100) || "oculoplasty_appointment", page_name: clean(input.page_name, 100) || "namokar_oculoplasty_landing", source: clean(input.source, 80) || "website", page_url: clean(input.page_url), referrer: clean(input.referrer), ip_address: clean(input.ip_address, 64), utm_source: clean(input.utm_source, 150), utm_medium: clean(input.utm_medium, 150), utm_campaign: clean(input.utm_campaign, 150), utm_term: clean(input.utm_term, 150), utm_content: clean(input.utm_content, 150), form_payload_json: input } });
   if (created) deliver(row).catch(() => {});
   return { row, created };
 }
