@@ -24,7 +24,22 @@ export async function syncToPulseOS(row) {
 export async function syncToSheet(row) {
   const attempts = row.sheet_sync_attempts + 1;
   try {
-    const response = await fetch(SHEET_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ form: "Namokar Oculoplasty Lead", lead_id: row.id, submission_id: row.submission_id, data: row.toJSON() }), signal: AbortSignal.timeout(8000) });
+    // This Apps Script is the original Namokar appointment sheet endpoint. It
+    // reads its flat fields from both the request body and query string.
+    const payload = {
+      timestamp: new Date(row.created_at || Date.now()).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+
+      name: row.name,
+      phone: row.phone,
+      ip_address: "",
+      utm_source: row.utm_source || "direct",
+      utm_medium: row.utm_medium || "none",
+      utm_campaign: row.utm_campaign || "none",
+      utm_term: row.utm_term || "none",
+      utm_content: row.utm_content || "none",
+    };
+    const targetUrl = `${SHEET_URL}?${new URLSearchParams(payload).toString()}`;
+    const response = await fetch(targetUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(8000) });
     if (!response.ok) throw new Error(`Sheet returned ${response.status}`);
     await row.update({ sheet_sync_status: "synced", sheet_sync_attempts: attempts, sheet_sync_error: null, sheet_synced_at: new Date() });
   } catch (error) {
