@@ -217,6 +217,19 @@ const buildLeadWhere = (tenant, query = {}) => {
     ];
   }
 
+  // Clinic registrations only: integration_metadata.clinic_registration.heard_about_us
+  // is a JSON array (checkboxes), so this is containment, not equality.
+  if (query.heard_from) {
+    where[Op.and] = [
+      ...(where[Op.and] || []),
+      literal(
+        `JSON_CONTAINS(JSON_EXTRACT(integration_metadata, '$.clinic_registration.heard_about_us'), ${db.sequelize.escape(
+          JSON.stringify(String(query.heard_from)),
+        )})`,
+      ),
+    ];
+  }
+
   return where;
 };
 
