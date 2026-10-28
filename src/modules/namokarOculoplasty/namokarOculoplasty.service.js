@@ -12,7 +12,7 @@ export async function syncToPulseOS(row) {
   if (!token) return row.update({ pulseos_status: "pending" });
   const attempts = row.pulseos_attempts + 1;
   try {
-    const response = await fetch(PULSEOS_URL, { method: "POST", headers: { "Content-Type": "application/json", "X-PulseOS-Intake-Token": token }, body: JSON.stringify({ submissionId: row.submission_id, formId: row.form_name, name: row.name, phone: row.phone, email: row.email, service: row.service, message: row.message, pageUrl: row.page_url, language: "en" }), signal: AbortSignal.timeout(8000) });
+    const response = await fetch(PULSEOS_URL, { method: "POST", headers: { "Content-Type": "application/json", "X-PulseOS-Intake-Token": token }, body: JSON.stringify({ submissionId: row.submission_id, formId: row.form_name, name: row.name, phone: row.phone, email: row.email, service: row.service, referralCode: clean(row.form_payload_json?.referralCode, 40), message: row.message, pageUrl: row.page_url, language: "en" }), signal: AbortSignal.timeout(8000) });
     const body = await response.json().catch(() => null);
     if (!response.ok || body?.ok === false || body?.success === false || body?.error) throw new Error(`PulseOS delivery failed${response.ok ? "" : ` (${response.status})`}`);
     await row.update({ pulseos_status: "synced", pulseos_attempts: attempts, pulseos_error: null, pulseos_synced_at: new Date() });
