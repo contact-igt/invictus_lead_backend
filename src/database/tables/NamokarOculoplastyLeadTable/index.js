@@ -6,6 +6,7 @@ export const NamokarOculoplastyLeadTable = (Sequelize, sequelize) => sequelize.d
   submission_id: { type: Sequelize.STRING(100), allowNull: false },
   name: { type: Sequelize.STRING(120), allowNull: false },
   phone: { type: Sequelize.STRING(20), allowNull: false },
+  email: { type: Sequelize.STRING(254), allowNull: true },
   doctor: { type: Sequelize.STRING(120), allowNull: true },
   service: { type: Sequelize.STRING(120), allowNull: false },
   message: { type: Sequelize.TEXT, allowNull: true },

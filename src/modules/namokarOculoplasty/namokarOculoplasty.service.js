@@ -12,7 +12,7 @@ export async function syncToPulseOS(row) {
   if (!token) return row.update({ pulseos_status: "pending" });
   const attempts = row.pulseos_attempts + 1;
   try {
-    const response = await fetch(PULSEOS_URL, { method: "POST", headers: { "Content-Type": "application/json", "X-PulseOS-Intake-Token": token }, body: JSON.stringify({ submissionId: row.submission_id, formId: row.form_name, name: row.name, phone: row.phone, service: row.service, message: row.message, pageUrl: row.page_url, language: "en" }), signal: AbortSignal.timeout(8000) });
+    const response = await fetch(PULSEOS_URL, { method: "POST", headers: { "Content-Type": "application/json", "X-PulseOS-Intake-Token": token }, body: JSON.stringify({ submissionId: row.submission_id, formId: row.form_name, name: row.name, phone: row.phone, email: row.email, service: row.service, message: row.message, pageUrl: row.page_url, language: "en" }), signal: AbortSignal.timeout(8000) });
     const body = await response.json().catch(() => null);
     if (!response.ok || body?.ok === false || body?.success === false || body?.error) throw new Error(`PulseOS delivery failed${response.ok ? "" : ` (${response.status})`}`);
     await row.update({ pulseos_status: "synced", pulseos_attempts: attempts, pulseos_error: null, pulseos_synced_at: new Date() });
@@ -31,6 +31,7 @@ export async function syncToSheet(row) {
 
       name: row.name,
       phone: row.phone,
+      email: row.email || "",
       ip_address: row.ip_address || "",
       utm_source: row.utm_source || "direct",
       utm_medium: row.utm_medium || "none",
@@ -56,7 +57,8 @@ export async function createOculoplastyLead(clientId, input = {}) {
   const name = clean(input.name, 120); const normalizedPhone = phone(input.phone); const service = clean(input.service, 120) || "Oculoplasty consultation";
   const submissionId = clean(input.submission_id || input.submissionId, 100);
   if (!submissionId || !name || !normalizedPhone) throw fail(422, "Name, phone and submission_id are required");
-  const [row, created] = await db.NamokarOculoplastyLead.findOrCreate({ where: { client_id: clientId, submission_id: submissionId }, defaults: { name, phone: normalizedPhone, doctor: clean(input.doctor, 120), service, message: clean(input.message, 2000), form_name: clean(input.form_name || input.formId, 100) || "oculoplasty_appointment", page_name: clean(input.page_name, 100) || "namokar_oculoplasty_landing", source: clean(input.source, 80) || "website", page_url: clean(input.page_url || input.pageUrl), referrer: clean(input.referrer), ip_address: clean(input.ip_address, 64), utm_source: clean(input.utm_source, 150), utm_medium: clean(input.utm_medium, 150), utm_campaign: clean(input.utm_campaign, 150), utm_term: clean(input.utm_term, 150), utm_content: clean(input.utm_content, 150), form_payload_json: input } });
+  const email = clean(input.email, 254); if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw fail(422, "A valid email address is required");
+  const [row, created] = await db.NamokarOculoplastyLead.findOrCreate({ where: { client_id: clientId, submission_id: submissionId }, defaults: { name, phone: normalizedPhone, email, doctor: clean(input.doctor, 120), service, message: clean(input.message, 2000), form_name: clean(input.form_name || input.formId, 100) || "oculoplasty_appointment", page_name: clean(input.page_name, 100) || "namokar_oculoplasty_landing", source: clean(input.source, 80) || "website", page_url: clean(input.page_url || input.pageUrl), referrer: clean(input.referrer), ip_address: clean(input.ip_address, 64), utm_source: clean(input.utm_source, 150), utm_medium: clean(input.utm_medium, 150), utm_campaign: clean(input.utm_campaign, 150), utm_term: clean(input.utm_term, 150), utm_content: clean(input.utm_content, 150), form_payload_json: input } });
   if (created) deliver(row).catch(() => {});
   return { row, created };
 }
@@ -64,7 +66,7 @@ export async function createOculoplastyLead(clientId, input = {}) {
 export async function listOculoplastyLeads(clientId, query = {}) {
   const page = Math.max(Number(query.page) || 1, 1); const limit = Math.min(Math.max(Number(query.limit) || 25, 1), 100); const where = { client_id: clientId };
   ["lead_status", "source", "service", "sheet_sync_status"].forEach((key) => { if (clean(query[key], 120)) where[key] = clean(query[key], 120); });
-  if (clean(query.search, 120)) { const value = `%${clean(query.search, 120)}%`; where[db.Sequelize.Op.or] = ["name", "phone", "service"].map((field) => ({ [field]: { [db.Sequelize.Op.like]: value } })); }
+  if (clean(query.search, 120)) { const value = `%${clean(query.search, 120)}%`; where[db.Sequelize.Op.or] = ["name", "phone", "email", "service"].map((field) => ({ [field]: { [db.Sequelize.Op.like]: value } })); }
   return db.NamokarOculoplastyLead.findAndCountAll({ where, order: [["created_at", "DESC"]], limit, offset: (page - 1) * limit });
 }
 
