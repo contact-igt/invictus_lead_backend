@@ -3,6 +3,7 @@ import {
   createDoctor,
   updateDoctor,
   listLeads,
+  listLeadsForExport,
   getLeadById,
   createLead,
   updateLead,
@@ -67,6 +68,106 @@ export const getLeadsHandler = async (req, res, next) => {
   try {
     const result = await listLeads(req.tenant, req.query, req.user);
     return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const CLINIC_CONCERN_LABELS = {
+  pregnancy: "Pregnancy",
+  fertility: "Fertility",
+  gynaecology: "Gynaecology",
+  paediatrics: "Paediatrics",
+  vbac: "VBAC",
+  vaginismus: "Vaginismus",
+  not_sure: "Not sure yet",
+};
+
+const CLINIC_HEARD_FROM_LABELS = {
+  doctor: "Doctor",
+  google_maps: "Google Maps",
+  google_search: "Google Search",
+  friends_family: "Friends / Family",
+  chatgpt: "ChatGPT",
+  instagram: "Instagram",
+  facebook: "Facebook",
+  youtube: "YouTube",
+  other: "Other",
+};
+
+const clinicListLabel = (values, labels) =>
+  Array.isArray(values) && values.length ? values.map((v) => labels[v] || v).join(", ") : "";
+
+const escapeCsvValue = (value) => {
+  if (value === null || value === undefined) return "";
+  const text = String(value).replace(/\r?\n|\r/g, " ").trim();
+  return /[",]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+const toCsvRow = (values) => values.map(escapeCsvValue).join(",");
+
+export const exportLeadsHandler = async (req, res, next) => {
+  try {
+    const isClinicView = req.query.source === "clinic_registration";
+    const isInstagramView = req.query.source === "instagram";
+    const leads = await listLeadsForExport(req.tenant, req.query, req.user);
+
+    const headers = [
+      "Name",
+      "Phone",
+      ...(isInstagramView ? ["Instagram"] : []),
+      isClinicView ? "Here for" : "Service",
+      "Source",
+      ...(isClinicView ? ["Heard about us", "Registered on"] : []),
+      "Status",
+      "Team",
+      "Owner",
+      "Assignment",
+      "Assigned Doctor",
+      "Created at",
+    ];
+
+    const rows = leads.map((lead) => {
+      const clinic = isClinicView ? lead.integration_metadata?.clinic_registration || {} : null;
+      const instagramUsername =
+        typeof lead.integration_metadata?.instagram_username === "string"
+          ? lead.integration_metadata.instagram_username
+          : "";
+
+      return toCsvRow([
+        lead.name,
+        lead.phone || "",
+        ...(isInstagramView ? [instagramUsername ? `@${instagramUsername}` : ""] : []),
+        isClinicView ? clinicListLabel(clinic.concerns, CLINIC_CONCERN_LABELS) : lead.service || "",
+        lead.source || "",
+        ...(isClinicView
+          ? [
+              [clinicListLabel(clinic.heard_about_us, CLINIC_HEARD_FROM_LABELS), clinic.heard_about_us_other]
+                .filter(Boolean)
+                .join(" - "),
+              clinic.registered_at || lead.created_at || "",
+            ]
+          : []),
+        lead.status,
+        lead.current_team?.name || "Unassigned",
+        lead.current_owner?.username || "Unassigned",
+        lead.assignment_status,
+        lead.assignedDoctor?.name || "Unassigned",
+        lead.created_at,
+      ]);
+    });
+
+    const csvPayload = [toCsvRow(headers), ...rows].join("\n");
+    const csvBuffer = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(csvPayload, "utf8")]);
+
+    const rangeSuffix =
+      req.query.start_date && req.query.end_date ? `${req.query.start_date}-to-${req.query.end_date}` : new Date().toISOString().slice(0, 10);
+    const viewSlug = isClinicView ? "clinic-registrations" : isInstagramView ? "instagram-leads" : req.query.source_provider || "leads";
+    const fileName = `birthwave-${viewSlug}-${rangeSuffix}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    return res.status(200).send(csvBuffer);
   } catch (error) {
     return next(error);
   }
