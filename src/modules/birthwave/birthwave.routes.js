@@ -5,6 +5,7 @@ import {
   createDoctorHandler,
   updateDoctorHandler,
   getLeadsHandler,
+  exportLeadsHandler,
   getLeadHandler,
   getLeadTimelineHandler,
   createLeadHandler,
@@ -122,6 +123,8 @@ router.post("/doctors", authorizeManagementRole, validateBirthwaveDoctorCreate, 
 router.patch("/doctors/:id", authorizeManagementRole, validateBirthwaveId, validateBirthwaveDoctorUpdate, updateDoctorHandler);
 
 router.get("/leads", validateBirthwaveLeadList, getLeadsHandler);
+// Must precede "/leads/:id" — otherwise "export" is matched as an id.
+router.get("/leads/export", validateBirthwaveLeadList, exportLeadsHandler);
 router.get("/tasks", validateBirthwaveTaskList, listTasksHandler);
 router.get("/dispositions", getDispositionOptionsHandler);
 router.get("/work/my", validateBirthwaveWorkQuery, getMyWorkHandler);

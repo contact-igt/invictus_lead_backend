@@ -274,6 +274,36 @@ export const listLeads = async (tenant, query = {}, actor = null) => {
   };
 };
 
+// Same filters as listLeads (status/source/service/team/owner/assignment/date
+// range/heard_from/search/custom field), no pagination — the full matching set
+// for CSV export.
+export const listLeadsForExport = async (tenant, query = {}, actor = null) => {
+  const where = buildLeadWhere(tenant, query);
+  const visibility = await leadVisibilityWhere(tenant.id, actor);
+  const visibilityConditions = Object.entries(visibility).map(([field, value]) => ({ [field]: value }));
+  const existingAssignmentConditions = [];
+  for (const field of ["current_team_id", "current_owner_id"]) {
+    if (where[field] !== undefined) {
+      existingAssignmentConditions.push({ [field]: where[field] });
+      delete where[field];
+    }
+  }
+  if (visibilityConditions.length || existingAssignmentConditions.length) {
+    where[Op.and] = [...(where[Op.and] || []), ...visibilityConditions, ...existingAssignmentConditions];
+  }
+
+  const rows = await db.BirthwaveLead.findAll({
+    where,
+    include: leadInclude(),
+    order: [
+      ["created_at", "DESC"],
+      ["id", "DESC"],
+    ],
+  });
+
+  return rows.map(serializeLead);
+};
+
 export const getLeadById = async (tenant, id, actor = null) => {
   const row = await db.BirthwaveLead.findOne({
     where: clientScope(tenant, { id }),
