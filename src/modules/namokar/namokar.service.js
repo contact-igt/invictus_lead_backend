@@ -27,6 +27,17 @@ const phone = (value) => {
       ? `+${d}`
       : "";
 };
+const sheetTimestamp = (value) =>
+  new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(value)).replace(",", "");
 
 export async function deliver(row) {
   const token = process.env.PULSEOS_NAMOKAR_INTAKE_TOKEN;
@@ -52,9 +63,10 @@ export async function deliver(row) {
     pulseos_error: pulseok || !token ? null : "delivery_failed",
     pulseos_synced_at: pulseok ? new Date() : null,
   });
+  const timestamp = sheetTimestamp(row.created_at || Date.now());
   const sheetok = await post(SHEETS_URL, {
     form: "Namokar Website Lead",
-    data: row.toJSON(),
+    data: { ...row.toJSON(), timestamp, receivedAt: timestamp, created_at: timestamp },
   });
   await row.update({
     sheet_sync_status: sheetok ? "synced" : "failed",
@@ -86,6 +98,7 @@ export async function createNamokarLead(clientId, input) {
       form_id: String(input.formId).slice(0, 100),
       name: String(input.name).trim().slice(0, 120),
       phone: normalized,
+      email: input.email ? String(input.email).trim().slice(0, 254) : null,
       service: String(input.service).trim().slice(0, 120),
       message: input.message
         ? String(input.message).trim().slice(0, 1000)

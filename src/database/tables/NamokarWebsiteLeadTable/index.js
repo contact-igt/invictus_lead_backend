@@ -5,7 +5,7 @@ export const NamokarWebsiteLeadTable = (Sequelize, sequelize) => sequelize.defin
   client_id: { type: Sequelize.INTEGER, allowNull: false, references: { model: tableName.CLIENTS, key: "id" } },
   submission_id: { type: Sequelize.STRING(100), allowNull: false },
   form_id: { type: Sequelize.STRING(100), allowNull: false },
-  name: { type: Sequelize.STRING(120), allowNull: false }, phone: { type: Sequelize.STRING(20), allowNull: false },
+  name: { type: Sequelize.STRING(120), allowNull: false }, phone: { type: Sequelize.STRING(20), allowNull: false }, email: { type: Sequelize.STRING(254), allowNull: true },
   service: { type: Sequelize.STRING(120), allowNull: false }, message: { type: Sequelize.TEXT, allowNull: true },
   referral_code: { type: Sequelize.STRING(40), allowNull: true }, consent: { type: Sequelize.BOOLEAN, allowNull: false },
   page_url: { type: Sequelize.STRING(500), allowNull: true }, status: { type: Sequelize.STRING(20), allowNull: false, defaultValue: "new" },
