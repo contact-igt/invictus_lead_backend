@@ -112,13 +112,14 @@ export const exportLeadsHandler = async (req, res, next) => {
     const isInstagramView = req.query.source === "instagram";
     const leads = await listLeadsForExport(req.tenant, req.query, req.user);
 
+    // Clinic registrations mirror the clinic's own check-in sheet column
+    // order (Date of visit, Name, DOB, Phone, Email, Address, Concern,
+    // Referred by) so the download matches what staff see on screen.
     const headers = [
-      "Name",
-      "Phone",
-      ...(isInstagramView ? ["Instagram"] : []),
-      isClinicView ? "Here for" : "Service",
+      ...(isClinicView
+        ? ["Date of visit", "Name", "DOB", "Phone", "Email", "Address", "Here for", "Referred by"]
+        : ["Name", "Phone", ...(isInstagramView ? ["Instagram"] : []), "Service"]),
       "Source",
-      ...(isClinicView ? ["Heard about us", "Registered on"] : []),
       "Status",
       "Team",
       "Owner",
@@ -133,21 +134,29 @@ export const exportLeadsHandler = async (req, res, next) => {
         typeof lead.integration_metadata?.instagram_username === "string"
           ? lead.integration_metadata.instagram_username
           : "";
+      const clinicAddress = clinic?.address
+        ? [clinic.address.line1, clinic.address.city].filter(Boolean).join(", ")
+        : "";
+      const referredBy = isClinicView
+        ? [clinicListLabel(clinic.heard_about_us, CLINIC_HEARD_FROM_LABELS), clinic.heard_about_us_other]
+            .filter(Boolean)
+            .join(" - ")
+        : "";
 
       return toCsvRow([
-        lead.name,
-        lead.phone || "",
-        ...(isInstagramView ? [instagramUsername ? `@${instagramUsername}` : ""] : []),
-        isClinicView ? clinicListLabel(clinic.concerns, CLINIC_CONCERN_LABELS) : lead.service || "",
-        lead.source || "",
         ...(isClinicView
           ? [
-              [clinicListLabel(clinic.heard_about_us, CLINIC_HEARD_FROM_LABELS), clinic.heard_about_us_other]
-                .filter(Boolean)
-                .join(" - "),
-              clinic.registered_at || lead.created_at || "",
+              clinic.clinic_date || clinic.registered_at || lead.created_at || "",
+              lead.name,
+              clinic.date_of_birth || "",
+              lead.phone || "",
+              lead.email || "",
+              clinicAddress,
+              clinicListLabel(clinic.concerns, CLINIC_CONCERN_LABELS),
+              referredBy,
             ]
-          : []),
+          : [lead.name, lead.phone || "", ...(isInstagramView ? [instagramUsername ? `@${instagramUsername}` : ""] : []), lead.service || ""]),
+        lead.source || "",
         lead.status,
         lead.current_team?.name || "Unassigned",
         lead.current_owner?.username || "Unassigned",
