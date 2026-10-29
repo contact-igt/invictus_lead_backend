@@ -1,7 +1,7 @@
 import db from "../../database/index.js";
 
 export const PULSEOS_URL = "https://pulseosapi-production-a7a9.up.railway.app/forms/website/328e8ec9-eff6-476f-ad2f-b3dd6a988739";
-const SHEETS_URL = "https://script.google.com/macros/s/AKfycbxmRm8qPkURPx-kYEFqmjQX3tIltfIroCou7gcewvNRk2_FAJo1z9JpBDac_r3vVcH_/exec";
+const SHEETS_URL = "https://script.google.com/macros/s/AKfycbzWm3QoJdqgtRB111V9-O2b9CRnQEAZij2sWtr1OnbOVaB9MVLPV57_13tjTKcWcBNl/exec";
 const post = async (url, body, headers = {}) => { try { const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body), signal: AbortSignal.timeout(8000) }); if (!r.ok) return false; const j = await r.json().catch(() => null); return j?.ok !== false && j?.success !== false && !j?.error; } catch { return false; } };
 const phone = (value) => { const d = String(value || "").replace(/\D/g, ""); return d.length === 10 ? `+91${d}` : d.length === 12 && d.startsWith("91") ? `+${d}` : ""; };
 
