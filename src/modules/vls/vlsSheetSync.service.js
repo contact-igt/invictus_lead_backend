@@ -25,6 +25,18 @@ const SUBMISSION_TYPE_LABELS = {
 };
 
 const SYNC_TARGETS = {
+  constitutionalBootcamp: {
+    model: () => db.VlsConstitutionalBootcamp,
+    webhookEnv: "https://script.google.com/macros/s/AKfycbzvmdeq-LMlXIDUCdVW1XUCi413-vXW2UmrLxXffMVRvE8OxRLyw3-q-ubdiiSfhTZoyQ/exec",
+    formType: "constitutional_bootcamp",
+    buildFields: (record) => ({
+      name: value(record.name), email: value(record.email), mobile: value(record.mobile),
+      current_status: value(record.current_status), city: value(record.city), amount: value(record.amount),
+      page_name: value(record.page_name), payment_status: value(record.payment_status),
+      programm_date: value(record.programm_date), ip_address: value(record.ip_address),
+      utm_source: value(record.utm_source),
+    }),
+  },
   contact: {
     model: () => db.VlsContact,
     formType: "contact",
@@ -65,10 +77,10 @@ export const sendSheetRecord = async (
   formType,
   { env = process.env, fetchImpl = fetch, timeoutMs = SYNC_TIMEOUT_MS } = {},
 ) => {
-  const url = env.VLS_SHEET_WEBHOOK_URL || SHEET_URL;
+  const target = resolveTarget(formType);
+  const url = env[target.webhookEnv] || env.VLS_SHEET_WEBHOOK_URL || SHEET_URL;
   if (!url) throw new Error("Missing VLS_SHEET_WEBHOOK_URL configuration.");
 
-  const target = resolveTarget(formType);
   const body = new URLSearchParams({
     form_type: target.formType,
     ...target.buildFields(record),
@@ -199,6 +211,7 @@ const retryPendingSheetSyncsFor = async (formType) => {
 };
 
 export const retryPendingSheetSyncs = async () => {
+  await retryPendingSheetSyncsFor("constitutionalBootcamp");
   await retryPendingSheetSyncsFor("contact");
   await retryPendingSheetSyncsFor("course");
 };
