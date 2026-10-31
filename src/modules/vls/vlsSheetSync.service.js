@@ -27,7 +27,7 @@ const SUBMISSION_TYPE_LABELS = {
 const SYNC_TARGETS = {
   constitutionalBootcamp: {
     model: () => db.VlsConstitutionalBootcamp,
-    webhookEnv: "https://script.google.com/macros/s/AKfycbzvmdeq-LMlXIDUCdVW1XUCi413-vXW2UmrLxXffMVRvE8OxRLyw3-q-ubdiiSfhTZoyQ/exec",
+    webhookUrl: "https://script.google.com/macros/s/AKfycbzvmdeq-LMlXIDUCdVW1XUCi413-vXW2UmrLxXffMVRvE8OxRLyw3-q-ubdiiSfhTZoyQ/exec",
     formType: "constitutional_bootcamp",
     buildFields: (record) => ({
       name: value(record.name), email: value(record.email), mobile: value(record.mobile),
@@ -78,7 +78,7 @@ export const sendSheetRecord = async (
   { env = process.env, fetchImpl = fetch, timeoutMs = SYNC_TIMEOUT_MS } = {},
 ) => {
   const target = resolveTarget(formType);
-  const url = env[target.webhookEnv] || env.VLS_SHEET_WEBHOOK_URL || SHEET_URL;
+  const url = target.webhookUrl || env.VLS_SHEET_WEBHOOK_URL || SHEET_URL;
   if (!url) throw new Error("Missing VLS_SHEET_WEBHOOK_URL configuration.");
 
   const body = new URLSearchParams({
