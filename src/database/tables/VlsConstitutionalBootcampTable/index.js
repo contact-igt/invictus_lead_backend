@@ -79,6 +79,13 @@ export const VlsConstitutionalBootcampTable = (Sequelize, sequelize) => {
       allowNull: true,
     },
 
+    utm_medium: { type: Sequelize.STRING(255), allowNull: true },
+    utm_campaign: { type: Sequelize.STRING(255), allowNull: true },
+    utm_term: { type: Sequelize.STRING(255), allowNull: true },
+    utm_content: { type: Sequelize.STRING(255), allowNull: true },
+    razorpay_order_id: { type: Sequelize.STRING(255), allowNull: true },
+    razorpay_payment_id: { type: Sequelize.STRING(255), allowNull: true },
+
     sheet_sync_status: { type: Sequelize.STRING(20), allowNull: false, defaultValue: "pending" },
     sheet_sync_attempts: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 },
     sheet_sync_last_error: { type: Sequelize.STRING(1000), allowNull: true },
