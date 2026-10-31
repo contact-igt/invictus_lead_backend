@@ -68,6 +68,12 @@ const normalizePayload = (data) => ({
   page_name: normalizeOptionalText(data.page_name),
   ip_address: normalizeOptionalText(data.ip_address),
   utm_source: normalizeOptionalText(data.utm_source),
+  utm_medium: normalizeOptionalText(data.utm_medium),
+  utm_campaign: normalizeOptionalText(data.utm_campaign),
+  utm_term: normalizeOptionalText(data.utm_term),
+  utm_content: normalizeOptionalText(data.utm_content),
+  razorpay_order_id: normalizeOptionalText(data.razorpay_order_id),
+  razorpay_payment_id: normalizeOptionalText(data.razorpay_payment_id),
 });
 
 const getIstRangeBounds = () => {

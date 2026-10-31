@@ -20,6 +20,12 @@ const editableFields = {
   page_name: optionalText(255),
   ip_address: optionalText(45),
   utm_source: optionalText(255),
+  utm_medium: optionalText(255),
+  utm_campaign: optionalText(255),
+  utm_term: optionalText(255),
+  utm_content: optionalText(255),
+  razorpay_order_id: optionalText(255),
+  razorpay_payment_id: optionalText(255),
 };
 
 export const vlsConstitutionalBootcampCreateSchema = Joi.object(editableFields).unknown(false);

@@ -18,6 +18,14 @@ export const ensureVlsConstitutionalBootcampColumns = async () => {
         allowNull: true,
       });
     }
+    for (const column of ["utm_medium", "utm_campaign", "utm_term", "utm_content", "razorpay_order_id", "razorpay_payment_id"]) {
+      if (!Object.prototype.hasOwnProperty.call(columns, column)) {
+        await queryInterface.addColumn(tableName.VLS_CONSTITUTIONAL_BOOTCAMP, column, {
+          type: db.Sequelize.STRING(255),
+          allowNull: true,
+        });
+      }
+    }
     if (!Object.prototype.hasOwnProperty.call(columns, "sheet_sync_status")) {
       await queryInterface.addColumn(tableName.VLS_CONSTITUTIONAL_BOOTCAMP, "sheet_sync_status", {
         type: db.Sequelize.STRING(20),
