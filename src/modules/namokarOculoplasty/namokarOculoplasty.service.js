@@ -1,7 +1,7 @@
 import db from "../../database/index.js";
 
 // Requested to remain in code because this is the browser-fallback destination too.
-const SHEET_URL = "https://script.google.com/macros/s/AKfycbzZ_XF4n6yYVU_aLLCyTcxBjnOM-7HpsWkwIRAX81Gq3rutfLhFnAkuLQrAcTgsNpHtqg/exec";
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbxH9lY7TciBeb2_lHJAMjcv8ujk6UXN29Go_MquZqi0b7FFEPGq1pM-Vh6UhgsaI-X-3Q/exec";
 const PULSEOS_URL = "https://pulseosapi-production-a7a9.up.railway.app/forms/website/328e8ec9-eff6-476f-ad2f-b3dd6a988739";
 const clean = (value, max = 500) => typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
 const phone = (value) => { const digits = String(value || "").replace(/\D/g, ""); return digits.length === 10 ? `+91${digits}` : digits.length === 12 && digits.startsWith("91") ? `+${digits}` : ""; };
