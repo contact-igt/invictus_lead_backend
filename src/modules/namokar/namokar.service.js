@@ -51,6 +51,7 @@ export async function deliver(row) {
         name: row.name,
         phone: row.phone,
         service: row.service,
+        referralCode: row.referral_code,
         message: row.message,
         pageUrl: row.page_url,
         language: "en",
