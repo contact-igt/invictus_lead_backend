@@ -24,6 +24,7 @@ const PAGE_LABELS = {
   birthwave_naturalbirth: 'Natural Birth',
   birthwave_pregnancycare: 'Pregnancy Care',
   birthwave_vbac: 'VBAC',
+  birthwave_vaginismus: 'Vaginismus',
 };
 export const runoPageLabel = (sourceKey) => PAGE_LABELS[sourceKey] || 'Landing Page';
 
