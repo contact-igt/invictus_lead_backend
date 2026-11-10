@@ -4,10 +4,12 @@ import { tableName } from "../tableName.js";
 // admin frontend; the backend only needs the stable keys.
 export const BIRTHWAVE_WEBSITE_SOURCE_KEYS = [
   "birthwave_website",
+  "birthwave_workshop",
   "birthwave_normalbirth",
   "birthwave_naturalbirth",
   "birthwave_pregnancycare",
   "birthwave_vbac",
+  "birthwave_vaginismus",
 ];
 
 export const BIRTHWAVE_WEBSITE_LEAD_STATUSES = [
