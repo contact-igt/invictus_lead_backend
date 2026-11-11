@@ -4,6 +4,9 @@ const vlsDopAiAssistedRegistrationSchema = Joi.object({
   name: Joi.string().trim().optional().allow(null, ""),
   email: Joi.string().email().lowercase().optional().allow(null, ""),
   mobile: Joi.string().trim().required(),
+  who_are_you: Joi.string().trim().max(100).optional().allow(null, ""),
+  why_join: Joi.string().trim().max(500).optional().allow(null, ""),
+  attending: Joi.string().trim().valid("yes", "no").optional().allow(null, ""),
 
   programm_date: Joi.string().optional().allow(null, ""),
   amount: Joi.alternatives().try(Joi.number(), Joi.string()).optional().allow(null, ""),

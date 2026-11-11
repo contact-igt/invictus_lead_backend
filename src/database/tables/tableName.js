@@ -10,7 +10,7 @@ export const tableName = {
   VLS_MACT_MASTER_CLASS: "vls_mact_master_class_leads",
   VLS_CONSTITUTIONAL_BOOTCAMP: "vls_constitutional_bootcamp_leads",
   VLS_CONSUMER_PROTECTION_LAW_MASTER_CLASS: "vls_consumer_protection_law_master_classes",
-  VLS_DOP_AI_ASSISTED: "vls_dop_ai_assisted",
+  VLS_DOP_AI_ASSISTED: "vls_dop_ai_assisteds",
   VLS_AI_FOR_ADVOCATES: "vls_ai_for_advocates",
   VLS_TAXATION_LAW: "vls_taxation_law_leads",
   VLS_BUSINESS_LAW: "vls_business_law_leads",

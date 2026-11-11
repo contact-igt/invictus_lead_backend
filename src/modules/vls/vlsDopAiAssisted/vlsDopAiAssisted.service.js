@@ -2,6 +2,7 @@ import { Op } from "sequelize";
 import db from "../../../database/index.js";
 import { tenantSafe } from "../../../utils/tenantContext.js";
 import { normalizeClientKey, extractClientModuleKey } from "../../../utils/clientKey.js";
+import { attemptSheetSync } from "../vlsSheetSync.service.js";
 
 const resolveClientIdFromKey = async (clientKeyRaw) => {
   const clientKey = normalizeClientKey(clientKeyRaw);
@@ -26,6 +27,9 @@ export const registerVlsDopAiAssisted = async (data, clientId) => {
     name,
     email,
     mobile,
+    who_are_you,
+    why_join,
+    attending,
     amount,
     programm_date,
     razorpay_order_id,
@@ -42,11 +46,14 @@ export const registerVlsDopAiAssisted = async (data, clientId) => {
     utm_content,
   } = data;
 
-  return await db.VlsDopAiAssisted.create({
+  const record = await db.VlsDopAiAssisted.create({
     client_id: clientId,
     name: name ?? null,
     email: email ?? null,
     mobile,
+    who_are_you: who_are_you ?? null,
+    why_join: why_join ?? null,
+    attending: attending ?? null,
     amount: amount ?? null,
     programm_date: programm_date ?? null,
     registered_date: new Date(),
@@ -63,6 +70,8 @@ export const registerVlsDopAiAssisted = async (data, clientId) => {
     utm_term: utm_term ?? null,
     utm_content: utm_content ?? null,
   });
+  await attemptSheetSync(record, "dopAiAssisted");
+  return record;
 };
 
 export const createVlsDopAiAssistedByAdmin = async (data, tenant) => {
@@ -81,6 +90,9 @@ export const createVlsDopAiAssistedByAdmin = async (data, tenant) => {
     name,
     email,
     mobile,
+    who_are_you,
+    why_join,
+    attending,
     amount,
     programm_date,
     razorpay_order_id,
@@ -97,11 +109,14 @@ export const createVlsDopAiAssistedByAdmin = async (data, tenant) => {
     utm_content,
   } = data;
 
-  return await db.VlsDopAiAssisted.create({
+  const record = await db.VlsDopAiAssisted.create({
     client_id: clientId,
     name: name ?? null,
     email: email ?? null,
     mobile,
+    who_are_you: who_are_you ?? null,
+    why_join: why_join ?? null,
+    attending: attending ?? null,
     amount: amount ?? null,
     programm_date: programm_date ?? null,
     registered_date: new Date(),
@@ -118,6 +133,8 @@ export const createVlsDopAiAssistedByAdmin = async (data, tenant) => {
     utm_term: utm_term ?? null,
     utm_content: utm_content ?? null,
   });
+  await attemptSheetSync(record, "dopAiAssisted");
+  return record;
 };
 
 export const updateVlsDopAiAssistedById = async (id, data, tenant) => {

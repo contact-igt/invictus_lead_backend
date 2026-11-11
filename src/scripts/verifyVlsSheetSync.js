@@ -27,4 +27,23 @@ assert.deepEqual([...params.keys()], [
 ]);
 assert.equal(params.get("amount"), "499");
 assert.equal(params.get("utm_content"), "video-a");
+
+await sendSheetRecord(
+  {
+    name: "Test", mobile: "+919876543210", who_are_you: "Advocate",
+    why_join: "Learn AI-assisted legal workflows", attending: "yes", payment_status: "waitlist",
+    programm_date: "Sunday, 15 November 2026", page_name: "decoding-of-practice",
+  },
+  "dopAiAssisted",
+  { env: {}, fetchImpl: async (requestUrl, init) => {
+    url = requestUrl;
+    body = init.body.toString();
+    return { ok: true, status: 200, text: async () => JSON.stringify({ result: "success" }) };
+  } },
+);
+const dopParams = new URLSearchParams(body);
+assert.match(url, /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/);
+assert.equal(dopParams.get("who_are_you"), "Advocate");
+assert.equal(dopParams.get("why_join"), "Learn AI-assisted legal workflows");
+assert.equal(dopParams.get("attending"), "yes");
 console.log("VLS Constitutional Bootcamp sheet sync verification passed.");

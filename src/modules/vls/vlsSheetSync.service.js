@@ -16,6 +16,8 @@ const RETRY_BATCH_SIZE = 50;
 const DEFAULT_SHEET_URL =
   "https://script.google.com/macros/s/AKfycbzVVIIbSADz1z5RnWVPU2SsZ510cnnQ-lz2TRv29fpejKSD5l0lvMjVeITEehFdt0VXbg/exec";
 const SHEET_URL = process.env.VLS_SHEET_WEBHOOK_URL || DEFAULT_SHEET_URL;
+const DOP_AI_ASSISTED_SHEET_URL = process.env.VLS_DOP_AI_ASSISTED_SHEET_WEBHOOK_URL ||
+  "https://script.google.com/macros/s/AKfycbwEJkW8LbUaYO6kT_15vLTjuB-6BUR2291MxB7OGhgbB5LGrcEOvzLoruIHID2CHI88/exec";
 
 const value = (input) => (input === undefined || input === null ? "" : String(input));
 
@@ -25,6 +27,34 @@ const SUBMISSION_TYPE_LABELS = {
 };
 
 const SYNC_TARGETS = {
+  dopAiAssisted: {
+    model: () => db.VlsDopAiAssisted,
+    webhookUrl: DOP_AI_ASSISTED_SHEET_URL,
+    formType: "ads_lead",
+    buildFields: (record) => ({
+      name: value(record.name),
+      email: value(record.email),
+      mobile: value(record.mobile),
+      who_are_you: value(record.who_are_you),
+      why_join: value(record.why_join),
+      attending: value(record.attending),
+      amount: value(record.amount),
+      page_name: value(record.page_name),
+      razorpay_order_id: value(record.razorpay_order_id),
+      razorpay_payment_id: value(record.razorpay_payment_id),
+      razorpay_signature: value(record.razorpay_signature),
+      payment_status: value(record.payment_status),
+      programm_date: value(record.programm_date),
+      registered_date: value(record.registered_date),
+      ip_address: value(record.ip_address),
+      client_key: "vls_law",
+      utm_source: value(record.utm_source),
+      utm_medium: value(record.utm_medium),
+      utm_campaign: value(record.utm_campaign),
+      utm_term: value(record.utm_term),
+      utm_content: value(record.utm_content),
+    }),
+  },
   constitutionalBootcamp: {
     model: () => db.VlsConstitutionalBootcamp,
     webhookUrl: "https://script.google.com/macros/s/AKfycbzLp1NgPWU2fnaiYTFwrVetRd82RNDo3XwiFJsXRQolsu45EVqtwrxNL4fPFC1fVFn0/exec",
@@ -222,6 +252,7 @@ const retryPendingSheetSyncsFor = async (formType) => {
 };
 
 export const retryPendingSheetSyncs = async () => {
+  await retryPendingSheetSyncsFor("dopAiAssisted");
   await retryPendingSheetSyncsFor("constitutionalBootcamp");
   await retryPendingSheetSyncsFor("contact");
   await retryPendingSheetSyncsFor("course");
