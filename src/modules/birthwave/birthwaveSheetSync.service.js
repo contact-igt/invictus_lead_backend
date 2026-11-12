@@ -17,7 +17,7 @@ const VAGINISMUS_SHEET_URL =
   "https://script.google.com/macros/s/AKfycbwzfF1_XyxxkS8Ow30PYNKNeYeA2HZgUc-k8LV8JrAZi2ouTtulLRqb6PKTEGO7XrZaCA/exec";
 const WORKSHOP_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_URL_BIRTHWAVE_WORKSHOP ||
-  "https://script.google.com/macros/s/AKfycbwJSPavPeWqpyoVNdLEYY6kmLyKRJwRTYJodVrOF7z8Y-LDdnQ2t4B-t1AFaPTv4e3l/exec";
+  "https://script.google.com/macros/s/AKfycbyppwMpd8kzo0r62tOhiY-k1CEq7XahdBU94gMLOkrH4ris5BXR38MceSZ3-RSbg3s/exec";
 
 const value = (input) => (input === undefined || input === null ? "" : String(input));
 
@@ -83,14 +83,16 @@ export const buildSheetPayload = (record, env = process.env) => {
   const leadConsent = record.consent === false ? false : true;
 
   // Extract structured workshop & payment details from message block
-  const stageMatch = leadMessage.match(/Pregnancy stage:\s*([^\n]+)/i);
+  const stageMatch = leadMessage.match(/^Pregnancy stage:[ \t]*([^\r\n]*)/im);
+  const registrationStatusMatch = leadMessage.match(/^Registration status:[ \t]*([^\r\n]*)/im);
   const paymentStatusMatch = leadMessage.match(/Payment status:\s*([^\n]+)/i);
   const amountMatch = leadMessage.match(/Advance amount paid:\s*₹?([0-9]+)/i);
   const rzpPaymentIdMatch = leadMessage.match(/Razorpay Payment ID:\s*([^\n]+)/i);
   const rzpOrderIdMatch = leadMessage.match(/Razorpay Order ID:\s*([^\n]+)/i);
-  const sessionMatch = leadMessage.match(/Workshop session:\s*([^\n]+)/i);
+  const sessionMatch = leadMessage.match(/^Workshop session:[ \t]*([^\r\n]*)/im);
 
   const stage = stageMatch ? stageMatch[1].trim() : "";
+  const registrationStatus = registrationStatusMatch ? registrationStatusMatch[1].trim().toLowerCase() : "";
   const paymentStatus = paymentStatusMatch ? paymentStatusMatch[1].trim() : "";
   const amount = amountMatch ? amountMatch[1].trim() : "";
   const rzpPaymentId = rzpPaymentIdMatch ? rzpPaymentIdMatch[1].trim() : "";
@@ -113,6 +115,10 @@ export const buildSheetPayload = (record, env = process.env) => {
     "What do you need help with?": leadService,
     "Email": leadEmail,
     "Message": leadMessage,
+    "Questions / Message": leadMessage,
+    "Lead ID": value(record.external_lead_id || record.id),
+    "Submission ID": value(record.external_lead_id || record.id),
+    "Registration Status": registrationStatus.toUpperCase(),
     "Source": value(record.source) || (record.source_key === "birthwave_workshop" ? "Childbirth Workshop Landing Page" : record.source_key === "birthwave_vaginismus" ? "Vaginismus Landing Page" : "Website Inquiries"),
     "UTM Source": value(record.utm_source),
     "UTM Medium": value(record.utm_medium),
@@ -146,6 +152,7 @@ export const buildSheetPayload = (record, env = process.env) => {
 
     stage,
     pregnancy_stage: stage,
+    registration_status: registrationStatus,
     payment_status: paymentStatus,
     amount,
     balance: amount ? 3000 : 0,

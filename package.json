@@ -13,6 +13,7 @@
     "seed:birthwave": "node src/scripts/seedBirthwave.js",
     "backfill:birthwave-contacts": "node src/scripts/backfillBirthwaveContacts.js",
     "test:birthwave-contact": "node src/scripts/verifyBirthwaveContactFoundation.js",
+    "test:birthwave-lead-deletion": "node src/scripts/verifyBirthwaveLeadDeletion.js",
     "test:birthwave-teams": "node src/scripts/verifyBirthwaveTeamsAssignment.js",
     "test:birthwave-tasks": "node src/scripts/verifyBirthwaveTasks.js",
     "test:birthwave-work": "node src/scripts/verifyBirthwaveWork.js",
