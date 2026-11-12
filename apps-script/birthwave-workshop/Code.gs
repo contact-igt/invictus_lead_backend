@@ -29,6 +29,11 @@ function messageField(message, label) {
   return match ? match[1].trim() : "";
 }
 
+function questionMessage(message) {
+  return message.replace(/^(?:(?:Registration status|Pregnancy stage|Workshop session):[^\r\n]*(?:\r?\n|$))+/i, "")
+    .replace(/^\s*Questions\s*\/\s*Message:[ \t]*(?:\r?\n)?/i, "").trim();
+}
+
 function doPost(e) {
   var lock = LockService.getScriptLock();
   var locked = false;
@@ -84,7 +89,7 @@ function doPost(e) {
       "Pregnancy Stage": firstValue(data, ["stage", "pregnancy_stage", "Pregnancy Stage"]) || messageField(message, "Pregnancy stage"),
       "Registration Status": status === "registered" || status === "waitlist" ? status.toUpperCase() : "",
       "Workshop Date": firstValue(data, ["workshop_date", "programm_date", "Workshop Date"]) || messageField(message, "Workshop session"),
-      "Questions / Message": message,
+      "Questions / Message": questionMessage(message),
       "Service": firstValue(data, ["service", "Service"]) || "All-in-One Prenatal Workshop",
       "Lead ID": leadId,
       "Submission ID": submissionId,
@@ -113,5 +118,5 @@ function doPost(e) {
 }
 
 function doGet() {
-  return jsonResponse({ status: "active", service: "The Birthwave Workshop Registration Receiver", version: "sheet1-only-v1", sheet: "Sheet1", creates_sheets: false, columns: WORKSHOP_HEADERS.length });
+  return jsonResponse({ status: "active", service: "The Birthwave Workshop Registration Receiver", version: "sheet1-only-v2", sheet: "Sheet1", creates_sheets: false, columns: WORKSHOP_HEADERS.length });
 }

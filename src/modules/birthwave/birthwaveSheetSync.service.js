@@ -17,7 +17,7 @@ const VAGINISMUS_SHEET_URL =
   "https://script.google.com/macros/s/AKfycbwzfF1_XyxxkS8Ow30PYNKNeYeA2HZgUc-k8LV8JrAZi2ouTtulLRqb6PKTEGO7XrZaCA/exec";
 const WORKSHOP_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_URL_BIRTHWAVE_WORKSHOP ||
-  "https://script.google.com/macros/s/AKfycbyppwMpd8kzo0r62tOhiY-k1CEq7XahdBU94gMLOkrH4ris5BXR38MceSZ3-RSbg3s/exec";
+  "https://script.google.com/macros/s/AKfycbyZU-XaYcL5tDib7nwpCkpn2acxklx7_wpVLvViYwgJfaoFQmac5EXe2HwDY0kozcrt/exec";
 
 const value = (input) => (input === undefined || input === null ? "" : String(input));
 
@@ -80,6 +80,12 @@ export const buildSheetPayload = (record, env = process.env) => {
   const leadEmail = value(record.email);
   const leadService = value(record.service);
   const leadMessage = value(record.message);
+  // Intake stores registration metadata before the user's question in CRM notes.
+  // Only remove that leading block; preserve metadata-like text inside a question.
+  const sheetMessage = record.source_key === "birthwave_workshop"
+    ? leadMessage.replace(/^(?:(?:Registration status|Pregnancy stage|Workshop session):[^\r\n]*(?:\r?\n|$))+/i, "")
+      .replace(/^\s*Questions\s*\/\s*Message:[ \t]*(?:\r?\n)?/i, "").trim()
+    : leadMessage;
   const leadConsent = record.consent === false ? false : true;
 
   // Extract structured workshop & payment details from message block
@@ -114,8 +120,8 @@ export const buildSheetPayload = (record, env = process.env) => {
     "Phone": leadPhone,
     "What do you need help with?": leadService,
     "Email": leadEmail,
-    "Message": leadMessage,
-    "Questions / Message": leadMessage,
+    "Message": sheetMessage,
+    "Questions / Message": sheetMessage,
     "Lead ID": value(record.external_lead_id || record.id),
     "Submission ID": value(record.external_lead_id || record.id),
     "Registration Status": registrationStatus.toUpperCase(),
@@ -147,7 +153,7 @@ export const buildSheetPayload = (record, env = process.env) => {
     helpOption: leadService,
     consultation_focus: leadService,
     consultationFocus: leadService,
-    message: leadMessage,
+    message: sheetMessage,
     consent: leadConsent,
 
     stage,
