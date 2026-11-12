@@ -13,7 +13,8 @@ assert.equal(payload.registration_status, "registered");
 assert.equal(payload["Registration Status"], "REGISTERED");
 assert.equal(payload["Lead ID"], payload.lead_id);
 assert.equal(payload["Submission ID"], payload.submission_id);
-assert.equal(payload["Questions / Message"], message);
+assert.equal(payload["Questions / Message"], "");
+assert.equal(payload.message, "");
 const blank = buildSheetPayload({ message: "Pregnancy stage:\nWorkshop session:\nRegistration status: waitlist" });
 assert.equal(blank.stage, "");
 assert.equal(blank.workshop_date, "");
@@ -62,7 +63,7 @@ for (const headers of [[], legacy, [...legacy].reverse()]) {
   assert.equal(post(payload).success, true);
   const read = (header) => rows[1][rows[0].indexOf(header)];
   assert.equal(read("Workshop Date"), "Sunday, Dec 6th, 2026");
-  assert.equal(read("Questions / Message"), message);
+  assert.equal(read("Questions / Message"), "");
   assert.equal(read("Service"), payload.service);
   assert.equal(read("Lead ID"), payload.lead_id);
   assert.equal(read("Submission ID"), payload.submission_id);
@@ -71,7 +72,7 @@ for (const headers of [[], legacy, [...legacy].reverse()]) {
   assert.equal(post(payload).duplicate, true);
   assert.equal(rows.length, 2);
   assert.equal(createdSheets(), 0);
-  assert.equal(get().version, "sheet1-only-v1");
+  assert.equal(get().version, "sheet1-only-v2");
   assert.equal(get().sheet, "Sheet1");
   assert.equal(get().creates_sheets, false);
 }
@@ -84,4 +85,18 @@ assert.equal(missingResult.success, false);
 assert.match(missingResult.error, /Sheet1.*not found/);
 assert.equal(missing.rows.length, 0);
 assert.equal(missing.createdSheets(), 0);
+const question = "Can my partner attend?\nWorkshop session: please explain the schedule.";
+const fullMessage = message + "\nQuestions / Message:\n" + question;
+const questionPayload = buildSheetPayload({ source_key: "birthwave_workshop", message: fullMessage });
+assert.equal(questionPayload.message, question);
+assert.equal(questionPayload["Questions / Message"], question);
+assert.equal(questionPayload.stage, "second trimester");
+assert.equal(questionPayload.workshop_date, "Sunday, Dec 6th, 2026");
+assert.equal(buildSheetPayload({ source_key: "birthwave_website", message: fullMessage }).message, fullMessage);
+for (const raw of [message, fullMessage, "A plain question\nwith a second line"]) {
+  const api = receiver([]);
+  assert.equal(api.post({ ...payload, message: raw }).success, true);
+  const expected = raw === message ? "" : raw === fullMessage ? question : raw;
+  assert.equal(api.rows[1][api.rows[0].indexOf("Questions / Message")], expected);
+}
 console.log("Birthwave workshop receiver verification passed: Sheet1 only, zero tabs created (including missing Sheet1), legacy/reordered headers, duplicate retries and blank fields.");
