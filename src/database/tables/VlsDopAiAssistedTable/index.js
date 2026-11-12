@@ -21,6 +21,21 @@ export const vlsDopAiAssistedTable = (Sequelize, sequelize) => {
       allowNull: true,
     },
 
+    who_are_you: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+
+    why_join: {
+      type: Sequelize.TEXT,
+      allowNull: true,
+    },
+
+    attending: {
+      type: Sequelize.STRING(10),
+      allowNull: true,
+    },
+
     email: {
       type: Sequelize.STRING,
       allowNull: true,
@@ -102,6 +117,33 @@ export const vlsDopAiAssistedTable = (Sequelize, sequelize) => {
 
     utm_content: {
       type: Sequelize.STRING,
+      allowNull: true,
+    },
+
+    sheet_sync_status: {
+      type: Sequelize.STRING(20),
+      allowNull: false,
+      defaultValue: "pending",
+    },
+
+    sheet_sync_attempts: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+
+    sheet_sync_last_error: {
+      type: Sequelize.STRING(1000),
+      allowNull: true,
+    },
+
+    sheet_synced_at: {
+      type: Sequelize.DATE,
+      allowNull: true,
+    },
+
+    sheet_sync_next_attempt_at: {
+      type: Sequelize.DATE,
       allowNull: true,
     },
 

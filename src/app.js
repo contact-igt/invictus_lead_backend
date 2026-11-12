@@ -45,6 +45,7 @@ import ensureAddFollowUpHistoryMetadataColumn from "./database/migrations/ensure
 import { ensurePixelEyeLeadNotesColumn } from "./database/migrations/ensurePixelEyeLeadNotesColumn.js";
 import { ensureVlsPaymentStatusColumns } from "./database/migrations/ensureVlsPaymentStatusColumns.js";
 import { ensureVlsConstitutionalBootcampColumns } from "./database/migrations/ensureVlsConstitutionalBootcampColumns.js";
+import { ensureVlsDopAiAssistedColumns } from "./database/migrations/ensureVlsDopAiAssistedColumns.js";
 import { ensureInvictusEnquiryColumns } from "./database/migrations/ensureInvictusEnquiryColumns.js";
 
 import ShantiEyeTechRouter from './modules/shantiEyeTech/shantiEyeTech.routes.js';
@@ -148,6 +149,7 @@ const connect_mysql = async () => {
     await ensureNamokarOculoplastyDeliveryColumns();
     await ensureNamokarWebsiteLeadEmailColumn();
     await ensureVlsConstitutionalBootcampColumns();
+    await ensureVlsDopAiAssistedColumns();
     await db.sequelize.sync();
     await ensureBirthwaveLeadIntegrationColumns();
     await ensureIntegrationWebhookEventsTable();

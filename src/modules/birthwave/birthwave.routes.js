@@ -10,6 +10,7 @@ import {
   getLeadTimelineHandler,
   createLeadHandler,
   updateLeadHandler,
+  deleteLeadHandler,
   addLeadNoteHandler,
   getAppointmentsHandler,
   createAppointmentHandler,
@@ -145,6 +146,7 @@ router.get("/leads/:id/assignments", validateBirthwaveId, listLeadAssignmentsHan
 router.post("/leads/:id/assign", validateBirthwaveId, validateBirthwaveAssignment, assignLeadHandler);
 router.post("/leads/:id/route", validateBirthwaveId, routeLeadHandler);
 router.patch("/leads/:id", validateBirthwaveId, validateBirthwaveLeadUpdate, updateLeadHandler);
+router.delete("/leads/:id", authorizeManagementRole, validateBirthwaveId, deleteLeadHandler);
 router.post("/leads/:id/notes", validateBirthwaveId, validateBirthwaveLeadNote, addLeadNoteHandler);
 
 router.get("/appointments", validateBirthwaveAppointmentList, getAppointmentsHandler);
