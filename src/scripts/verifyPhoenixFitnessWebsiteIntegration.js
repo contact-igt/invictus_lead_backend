@@ -4,9 +4,9 @@ import db from "../database/index.js";
 import { phoenixWebsiteSchema } from "../modules/phoenixFitness/phoenixFitnessWebsite.validation.js";
 import { createPhoenixFitnessWebsiteLead } from "../modules/phoenixFitness/phoenixFitnessWebsite.service.js";
 import { mapPhoenixLeadToRunoPayload, sendPhoenixLeadToRuno, attemptPhoenixFitnessRunoSync, getPhoenixRunoConfig } from "../modules/phoenixFitness/phoenixFitnessRuno.service.js";
-import { attemptPhoenixFitnessSheetSync, sendPhoenixFitnessSheetRecord, retryPendingPhoenixFitnessSheetSyncs } from "../modules/phoenixFitness/phoenixFitnessSheetSync.service.js";
+import { WEBSITE_SHEET_URL, attemptPhoenixFitnessSheetSync, sendPhoenixFitnessSheetRecord, retryPendingPhoenixFitnessSheetSyncs } from "../modules/phoenixFitness/phoenixFitnessSheetSync.service.js";
 
-const env = { RUNO_PHOENIX_ENABLED: "true", RUNO_PHOENIX_WEBSITE_FORM_API_URL: "https://runo.example.test/phoenix", RUNO_PHOENIX_TIMEOUT_MS: "20" };
+const env = { RUNO_PHOENIX_ENABLED: "true", RUNO_PHOENIX_WEBSITE_FORM_API_URL: "https://runo.example.test/phoenix" };
 const response = (status, body = { success: true }) => ({ ok: status >= 200 && status < 300, status, headers: { get: () => "application/json" }, text: async () => JSON.stringify(body) });
 const trial = { formType: "Free Trial", requestId: randomUUID(), data: { name: "Phoenix Test", phone: "9876543210", branch: "Hope Farm", time: "Morning", goal: "Strength" } };
 const contact = { formType: "Contact Message", requestId: randomUUID(), data: { name: "Test", mobile: "+919876543210", email: "test@example.com", service: "Training", subject: "Enquiry" } };
@@ -20,11 +20,9 @@ const oldFindAll = db.PhoenixFitness.findAll;
 const oldFetch = globalThis.fetch;
 const oldClientFindOne = db.Client.findOne;
 const oldEnabled = process.env.RUNO_PHOENIX_ENABLED;
-const oldSheet = process.env.PHOENIX_FITNESS_WEBSITE_SHEET_URL;
 const oldConsole = console.error;
 console.error = () => {};
 process.env.RUNO_PHOENIX_ENABLED = "false";
-process.env.PHOENIX_FITNESS_WEBSITE_SHEET_URL = "https://sheet.example.test/website";
 let lead;
 try {
   const rows = new Map();
@@ -50,7 +48,7 @@ try {
   let sheetCalls = 0;
   globalThis.fetch = async (url, options) => {
     sheetCalls++;
-    assert.equal(url, process.env.PHOENIX_FITNESS_WEBSITE_SHEET_URL);
+    assert.equal(url, WEBSITE_SHEET_URL);
     const payload = JSON.parse(options.body);
     assert.equal(payload.formType, "Free Trial"); assert.equal(payload.time, "Morning"); assert.equal(payload.goal, "Strength");
     assert.equal(payload.requestId, trial.requestId);
@@ -75,9 +73,10 @@ try {
   assert.ok(payload.your_message.includes("investmentBudget: 50 lakh"));
   assert.equal(payload.custom_source, "Website"); assert.equal("custom_status" in payload, false);
   assert.equal(getPhoenixRunoConfig({}).enabled, false);
+  assert.equal(getPhoenixRunoConfig({}).timeoutMs, 8000);
   assert.equal(getPhoenixRunoConfig({ ...env, RUNO_PHOENIX_WEBSITE_FORM_API_URL: "http://insecure.test" }).valid, false);
   let calls = 0;
-  const send = (options = {}) => sendPhoenixLeadToRuno({ lead, env, sleep: async () => {}, ...options });
+  const send = (options = {}) => sendPhoenixLeadToRuno({ lead, env, timeoutMs: 20, sleep: async () => {}, ...options });
   let r = await send({ fetchImpl: async (url, options) => { calls++; assert.equal(url, env.RUNO_PHOENIX_WEBSITE_FORM_API_URL); assert.equal(JSON.parse(options.body).your_subject, "Phoenix Fitness Free Trial"); return response(200); } });
   assert.equal(r.success, true); assert.equal(calls, 1);
   calls = 0; r = await send({ fetchImpl: async () => { calls++; return response(400); } });
@@ -115,7 +114,7 @@ try {
     const row = { ...defaults, id: 99, created_at: new Date(), async update(values) { Object.assign(this, values); if (values.runo_sync_status === "synced") order.push("runo-synced"); return this; } };
     return [row, true];
   };
-  globalThis.fetch = async (url) => { order.push(url.includes("sheet.example") ? "sheet" : "runo"); return response(200); };
+  globalThis.fetch = async (url) => { order.push(url === WEBSITE_SHEET_URL ? "sheet" : "runo"); return response(200); };
   await createPhoenixFitnessWebsiteLead({ ...trial, requestId: randomUUID() }, 1);
   for (let i = 0; i < 20 && !order.includes("runo-synced"); i++) await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(order, ["db", "sheet", "runo", "runo-synced"]);
@@ -152,6 +151,5 @@ try {
   db.PhoenixFitness.findOrCreate = oldFindOrCreate; db.PhoenixFitness.update = oldUpdate; db.PhoenixFitness.findAll = oldFindAll;
   globalThis.fetch = oldFetch; db.Client.findOne = oldClientFindOne; console.error = oldConsole;
   if (oldEnabled === undefined) delete process.env.RUNO_PHOENIX_ENABLED; else process.env.RUNO_PHOENIX_ENABLED = oldEnabled;
-  if (oldSheet === undefined) delete process.env.PHOENIX_FITNESS_WEBSITE_SHEET_URL; else process.env.PHOENIX_FITNESS_WEBSITE_SHEET_URL = oldSheet;
   await db.sequelize.close();
 }

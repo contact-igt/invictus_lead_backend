@@ -3,14 +3,15 @@ import db from "../../database/index.js";
 import { postOnce } from "../integrations/runo/runo.service.js";
 import { formatPhoneForRuno } from "../integrations/runo/runo.mapper.js";
 
+export const RUNO_PHOENIX_TIMEOUT_MS = 8000;
+
 const sleepDefault = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 export const getPhoenixRunoConfig = (env = process.env) => {
   const enabled = String(env.RUNO_PHOENIX_ENABLED || "").trim().toLowerCase() === "true";
   const url = String(env.RUNO_PHOENIX_WEBSITE_FORM_API_URL || "").trim();
   let valid = false;
   try { valid = new URL(url).protocol === "https:"; } catch { /* fail closed */ }
-  const configured = Number(env.RUNO_PHOENIX_TIMEOUT_MS);
-  return { enabled, url, valid, timeoutMs: Number.isFinite(configured) && configured > 0 ? Math.min(configured, 30000) : 8000 };
+  return { enabled, url, valid, timeoutMs: RUNO_PHOENIX_TIMEOUT_MS };
 };
 
 export const mapPhoenixLeadToRunoPayload = (lead) => {
@@ -30,7 +31,7 @@ export const mapPhoenixLeadToRunoPayload = (lead) => {
   return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined && value !== null));
 };
 
-export const sendPhoenixLeadToRuno = async ({ lead, env = process.env, fetchImpl = globalThis.fetch, sleep = sleepDefault } = {}) => {
+export const sendPhoenixLeadToRuno = async ({ lead, env = process.env, fetchImpl = globalThis.fetch, sleep = sleepDefault, timeoutMs = RUNO_PHOENIX_TIMEOUT_MS } = {}) => {
   const config = getPhoenixRunoConfig(env);
   if (!config.enabled) return { success: false, attempted: false, errorCode: "RUNO_DISABLED", retryable: true };
   if (!config.valid) return { success: false, attempted: false, errorCode: "RUNO_CONFIG_INVALID", retryable: true };
@@ -38,7 +39,7 @@ export const sendPhoenixLeadToRuno = async ({ lead, env = process.env, fetchImpl
   if (!payload.your_name || !/^[6-9]\d{9}$/.test(payload.your_phone || "")) return { success: false, attempted: false, errorCode: "RUNO_PAYLOAD_INVALID", retryable: false };
   let result;
   for (let attempt = 1; attempt <= 3; attempt++) {
-    result = await postOnce({ url: config.url, payload, timeoutMs: config.timeoutMs, fetchImpl });
+    result = await postOnce({ url: config.url, payload, timeoutMs, fetchImpl });
     if (result.ok) {
       // Runo may reject an otherwise HTTP-successful request at the application layer.
       if (result.body?.success === false || result.body?.error || result.body?.status === "error") return { success: false, attempted: true, attempts: attempt, errorCode: "RUNO_REJECTED", retryable: false };

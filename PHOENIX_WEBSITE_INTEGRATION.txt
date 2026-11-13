@@ -20,8 +20,6 @@ and delivery statuses. Existing report formats remain unchanged.
 Backend server-only environment:
 RUNO_PHOENIX_ENABLED=true
 RUNO_PHOENIX_WEBSITE_FORM_API_URL=<Phoenix webhook from the Runo Website integration>
-RUNO_PHOENIX_TIMEOUT_MS=8000
-PHOENIX_FITNESS_WEBSITE_SHEET_URL=<existing website Apps Script /exec URL>
 
 Website server-only environment:
 PHOENIX_LEADS_API_URL=<backend origin>/api/v1/phoenix-fitness/website/register
@@ -46,3 +44,5 @@ These use stubbed database/fetch implementations and send no real enquiries.
 
 Website proxy/browser retry checks: npm run test:forms (in phoenixfitness-website).
 An unchanged browser retry retains its UUID until a successful response.
+
+Website Sheet URL is configured by WEBSITE_SHEET_URL in phoenixFitnessSheetSync.service.js. Runo timeout is configured by RUNO_PHOENIX_TIMEOUT_MS in phoenixFitnessRuno.service.js (milliseconds). Neither setting is read from .env.
