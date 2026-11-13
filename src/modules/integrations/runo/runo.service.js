@@ -38,7 +38,7 @@ export const getRunoBirthwaveConfig = (env = process.env) => {
 const maskId = (lead) => ({ leadId: lead?.id ?? null });
 
 // One HTTP attempt. Never includes the URL in any returned/logged value.
-const postOnce = async ({ url, payload, timeoutMs, fetchImpl }) => {
+export const postOnce = async ({ url, payload, timeoutMs, fetchImpl }) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -52,7 +52,7 @@ const postOnce = async ({ url, payload, timeoutMs, fetchImpl }) => {
     // Body is only read for diagnostics; malformed/non-JSON bodies are fine.
     const bodyText = await response.text().catch(() => "");
     let bodyJson = null;
-    if (bodyText && /json/i.test(response.headers?.get?.("content-type") || "")) {
+    if (bodyText) {
       try {
         bodyJson = JSON.parse(bodyText);
       } catch {

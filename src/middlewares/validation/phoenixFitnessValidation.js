@@ -48,6 +48,7 @@ export const phoenixFitnessIdSchema = Joi.object({
   id: Joi.number().integer().positive().required(),
 }).unknown(false);
 export const phoenixFitnessListSchema = Joi.object({
+  lead_source: Joi.string().valid("landing_page", "website").optional(),
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(20),
   search: Joi.string().trim().max(255).allow("").optional(),
