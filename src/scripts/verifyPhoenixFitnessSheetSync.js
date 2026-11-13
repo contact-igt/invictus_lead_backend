@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  WEBHOOK_URL,
   buildPhoenixFitnessSheetPayload,
   sendPhoenixFitnessSheetRecord,
 } from "../modules/phoenixFitness/phoenixFitnessSheetSync.service.js";
@@ -30,7 +31,7 @@ await sendPhoenixFitnessSheetRecord(lead, {
 });
 assert.equal(
   request.url,
-  "https://script.google.com/macros/s/AKfycbzuiQ1Da44AORS2eLGhtyVH-8h689HiRlJI-J16fT7bd3gLCAXunP9MK7RPN6BwW0GT/exec",
+  WEBHOOK_URL,
 );
 assert.equal(
   request.options.body,

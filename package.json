@@ -47,7 +47,8 @@
     "test:pixeleye-followup-outcome-metadata": "node src/scripts/verifyPixelEyeCallLogIdempotency.js",
     "test:runo-birthwave": "node src/scripts/verifyRunoBirthwaveIntegration.js",
     "test:pixeleye-sheet-sync": "node src/scripts/verifyPixelEyeWebsiteLeadSheetSync.js",
-    "test:namokar-pulseos-referral": "node --test src/scripts/verifyNamokarPulseOSReferral.js"
+    "test:namokar-pulseos-referral": "node --test src/scripts/verifyNamokarPulseOSReferral.js",
+    "test:phoenix-website": "node src/scripts/verifyPhoenixFitnessWebsiteIntegration.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

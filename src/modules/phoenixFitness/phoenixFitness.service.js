@@ -18,6 +18,11 @@ const LEAD_ATTRIBUTES = [
   "utm_source",
   "created_at",
   "updated_at",
+  "source_provider",
+  "form_type",
+  "website_data",
+  "sheet_sync_status",
+  "runo_sync_status",
 ];
 const CSV_HEADERS = [
   "S.No",
@@ -82,6 +87,15 @@ const buildLeadFilters = (filters = {}) => {
     ];
   }
 
+  // Historical records have no provider; keep them with landing-page leads.
+  if (filters.lead_source === "website") {
+    queryFilters.source_provider = "phoenix_website";
+  } else if (filters.lead_source === "landing_page") {
+    queryFilters[Op.and] = [{ [Op.or]: [
+      { source_provider: { [Op.is]: null } },
+      { source_provider: { [Op.ne]: "phoenix_website" } },
+    ] }];
+  }
   if (branch) queryFilters.branch = branch;
   if (utm_source) queryFilters.utm_source = utm_source;
 

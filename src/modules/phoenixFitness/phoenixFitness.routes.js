@@ -25,7 +25,18 @@ import {
   validatePhoenixFitnessContext,
 } from "../../middlewares/validation/phoenixFitnessValidation.js";
 
+import { phoenixWebsiteSchema } from "./phoenixFitnessWebsite.validation.js";
+import { createPhoenixFitnessWebsiteLead } from "./phoenixFitnessWebsite.service.js";
+
 const router = express.Router();
+router.post("/website/register", resolvePublicTenantForModule("phoenix_fitness"), async (req, res, next) => {
+  const { error, value } = phoenixWebsiteSchema.validate(req.body, { abortEarly: false });
+  if (error) return res.status(400).json({ success: false, message: "Invalid website enquiry", details: error.details.map((item) => item.message) });
+  try {
+    const result = await createPhoenixFitnessWebsiteLead(value, req.publicTenantId);
+    return res.status(result.duplicate ? 200 : 201).json({ success: true, ...result });
+  } catch (error) { return next(error); }
+});
 
 router.post(
   "/register",

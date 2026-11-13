@@ -1,0 +1,48 @@
+Phoenix Fitness website enquiries
+
+POST /api/v1/phoenix-fitness/website/register
+Header: X-Client-Key (the existing Phoenix client_key)
+Body: {formType, requestId: UUID v4, data: {...form fields}}
+Supported formType: Free Trial, Contact Message, Franchise Enquiry.
+
+Flow: unique database row -> website Google Sheet -> Phoenix Runo webhook.
+The database is the API success boundary. Downstream services retry every minute;
+an outage does not cause a saved enquiry to be reported as lost. Runo is gated
+by sheet_sync_status=synced. Permanent Runo rejections are marked rejected for
+operator review; transient failures back off up to one hour.
+
+Existing landing-page and manually entered leads use their existing Sheet and
+are not sent to the new Runo webhook. No historical enquiries are backfilled.
+website_data preserves all form fields (including trial time/goal and franchise
+property/budget/consent). The list/detail API exposes the form type, website_data,
+and delivery statuses. Existing report formats remain unchanged.
+
+Backend server-only environment:
+RUNO_PHOENIX_ENABLED=true
+RUNO_PHOENIX_WEBSITE_FORM_API_URL=<Phoenix webhook from the Runo Website integration>
+
+Website server-only environment:
+PHOENIX_LEADS_API_URL=<backend origin>/api/v1/phoenix-fitness/website/register
+PHOENIX_LEADS_CLIENT_KEY=<existing Phoenix tenant key>
+Local .env.local uses the configured backend port. Set the real backend origin
+in hosting configuration when deploying. No NEXT_PUBLIC secrets are needed.
+
+Restart the backend to apply the additive startup migration, then restart the
+website to pick up environment configuration. Startup fails on migration error.
+Do not run migration scripts or delivery tests against a production database.
+
+Request UUIDs deduplicate repeated requests within the tenant; keep the same UUID
+when retrying an ambiguous submission. Runo's supplied contract has no remote
+idempotency key. A timeout or process crash after remote acceptance can still
+produce duplicate downstream records on retry (at-least-once delivery). The
+Sheet payload includes requestId/leadId for optional Apps Script deduplication.
+Runo uses only supported your_* fields plus custom_source=Website, and no
+invented appointment/status. Branch, time and franchise details go in the message.
+
+Checks: npm run test:phoenix-website; npm run test:phoenix-sheet-sync.
+These use stubbed database/fetch implementations and send no real enquiries.
+
+Website proxy/browser retry checks: npm run test:forms (in phoenixfitness-website).
+An unchanged browser retry retains its UUID until a successful response.
+
+Website Sheet URL is configured by WEBSITE_SHEET_URL in phoenixFitnessSheetSync.service.js. Runo timeout is configured by RUNO_PHOENIX_TIMEOUT_MS in phoenixFitnessRuno.service.js (milliseconds). Neither setting is read from .env.
