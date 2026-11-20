@@ -58,6 +58,8 @@ import { InvictusGeneralEnquiryTable } from "./tables/InvictusGeneralEnquiryTabl
 import { InvictusCareersApplicationTable } from "./tables/InvictusCareersApplicationTable/index.js";
 import { DATABASE_TIME_ZONE_OFFSET } from "../config/timezone.config.js";
 
+import { neyaniLeadTable } from '../modules/neyani/neyani.model.js';
+
 const dbconfig =
   ServerEnvironmentConfig?.server?.line === "production"
     ? DatabaseEnvironmentConfig?.live
@@ -82,6 +84,7 @@ const db = {};
 db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
+db.NeyaniLead = neyaniLeadTable(Sequelize, sequelize);
 db.Client = clientTable(Sequelize, sequelize);
 db.VlsLawPractice = vlslawpracticeTable(Sequelize, sequelize);
 db.Management = managementTable(Sequelize, sequelize);
