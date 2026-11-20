@@ -49,6 +49,8 @@ import { ensureVlsDopAiAssistedColumns } from "./database/migrations/ensureVlsDo
 import { ensureInvictusEnquiryColumns } from "./database/migrations/ensureInvictusEnquiryColumns.js";
 
 import ShantiEyeTechRouter from './modules/shantiEyeTech/shantiEyeTech.routes.js';
+import NeyaniRouter from './modules/neyani/neyani.routes.js';
+import { startNeyaniDeliveryScheduler } from './modules/neyani/neyani.delivery.js';
 import PhoenixFitnessRouter from './modules/phoenixFitness/phoenixFitness.routes.js';
 import ApiLogsRouter from "./modules/apiLogs/apiLogs.routes.js";
 import InvictusEnquiryRouter from "./modules/invictusEnquiry/invictusEnquiry.routes.js";
@@ -177,6 +179,7 @@ const connect_mysql = async () => {
     startPixelEyeSheetSyncScheduler();
     startVlsSheetSyncScheduler();
     startAaravEyeCareSheetSyncScheduler();
+    startNeyaniDeliveryScheduler();
     startPhoenixFitnessSheetSyncScheduler();
   } catch (error) {
     console.error("Failed to synchronize database:", error);
@@ -212,6 +215,7 @@ app.use("/api/v1/rio", RioRouter);
 app.use("/api/v1/rio-vaccine-chart", RioVaccineChartRouter);
 
 app.use('/api/v1/shanti-eye-tech', ShantiEyeTechRouter);
+app.use('/api/v1/neyani', NeyaniRouter);
 app.use('/api/v1/phoenix-fitness', PhoenixFitnessRouter);
 app.use("/api/v1/api-logs", ApiLogsRouter);
 app.use("/api/v1/invictus-enquiries", InvictusEnquiryRouter);
