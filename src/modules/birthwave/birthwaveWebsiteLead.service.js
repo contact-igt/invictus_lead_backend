@@ -67,6 +67,10 @@ const serialize = (row) => ({
   sheet_sync_attempts: row.sheet_sync_attempts,
   sheet_sync_last_error: row.sheet_sync_last_error,
   sheet_synced_at: row.sheet_synced_at,
+  pulseos_sync_status: row.pulseos_sync_status,
+  pulseos_sync_attempts: row.pulseos_sync_attempts,
+  pulseos_sync_last_error: row.pulseos_sync_last_error,
+  pulseos_synced_at: row.pulseos_synced_at,
   created_at: row.created_at,
   updated_at: row.updated_at,
 });
@@ -181,6 +185,7 @@ export const createWebsiteLead = async (clientId, payload = {}, options = {}) =>
         fbclid: str(attribution.fbclid, 255),
         status: "New",
         sheet_sync_status: "pending",
+        ...(options.queuePulseOS && { pulseos_sync_status: "pending", pulseos_sync_next_attempt_at: new Date() }),
       }, { transaction });
 
       const leadRow = await db.BirthwaveLead.create({

@@ -300,7 +300,7 @@ export const postWebsiteLeadPublicHandler = async (req, res, next) => {
       ...req.body,
       _idempotency_key: req.headers["idempotency-key"] || req.headers["x-idempotency-key"] || null,
       ip_address: cleanIp(req.body.ip_address) || forwardedIp || socketIp || null,
-    });
+    }, { queuePulseOS: true });
     return res.status(data.duplicate ? 200 : 201).json({
       success: true,
       message: data.duplicate ? "Enquiry already received" : "Enquiry received",

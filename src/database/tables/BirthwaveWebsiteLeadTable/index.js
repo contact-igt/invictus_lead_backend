@@ -22,6 +22,14 @@ export const BIRTHWAVE_WEBSITE_LEAD_STATUSES = [
 
 export const SHEET_SYNC_STATUSES = ["pending", "synced", "failed"];
 
+export const birthwavePulseOSColumns = (Sequelize) => ({
+  pulseos_sync_status: { type: Sequelize.STRING(16), allowNull: true },
+  pulseos_sync_attempts: { type: Sequelize.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0 },
+  pulseos_sync_next_attempt_at: { type: Sequelize.DATE, allowNull: true },
+  pulseos_sync_last_error: { type: Sequelize.STRING(40), allowNull: true },
+  pulseos_synced_at: { type: Sequelize.DATE, allowNull: true },
+});
+
 export const BirthwaveWebsiteLeadTable = (Sequelize, sequelize) =>
   sequelize.define(
     "BirthwaveWebsiteLead",
@@ -70,6 +78,8 @@ export const BirthwaveWebsiteLeadTable = (Sequelize, sequelize) =>
       notes: { type: Sequelize.TEXT, allowNull: true },
       // When an admin promotes this enquiry into a CRM lead.
       birthwave_lead_id: { type: Sequelize.INTEGER, allowNull: true },
+
+      ...birthwavePulseOSColumns(Sequelize),
 
       // Google Sheet mirror (handled server-side, retried up to 3 times)
       sheet_sync_status: {
