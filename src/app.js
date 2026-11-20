@@ -74,6 +74,7 @@ import { ensureNamokarWebsiteLeadEmailColumn } from "./database/migrations/ensur
 import { startRioSheetSyncScheduler } from "./modules/rio/rioSheetSync.service.js";
 import { startAaravEyeCareSheetSyncScheduler } from "./modules/aaravEyeCare/aaravEyeCareSheetSync.service.js";
 import { startPhoenixFitnessSheetSyncScheduler } from "./modules/phoenixFitness/phoenixFitnessSheetSync.service.js";
+import { ensureBirthwavePulseOSColumns, startBirthwavePulseOSSyncScheduler } from "./modules/birthwave/birthwavePulseOSSync.service.js";
 import { startBirthwaveSheetSyncScheduler } from "./modules/birthwave/birthwaveSheetSync.service.js";
 import { startBirthwaveAttentionScheduler } from "./modules/birthwave/birthwaveAttentionScheduler.js";
 import { startInvictusSheetSyncScheduler } from "./modules/invictusEnquiry/invictusSheetSync.service.js";
@@ -156,6 +157,7 @@ const connect_mysql = async () => {
     await ensurePhoenixFitnessWebsiteColumns();
     await db.sequelize.sync();
     await ensureBirthwaveLeadIntegrationColumns();
+    await ensureBirthwavePulseOSColumns();
     await ensureIntegrationWebhookEventsTable();
     await ensurePixelEyeLeadStateCurrentDayColumn();
     await ensurePixelEyeLeadStateLeadIdColumn();
@@ -174,6 +176,7 @@ const connect_mysql = async () => {
     startPixelEyeFollowUpComplianceScheduler();
     startInvictusSheetSyncScheduler();
     startBirthwaveSheetSyncScheduler();
+    startBirthwavePulseOSSyncScheduler();
     startBirthwaveAttentionScheduler();
     startRioSheetSyncScheduler();
     startPixelEyeSheetSyncScheduler();
