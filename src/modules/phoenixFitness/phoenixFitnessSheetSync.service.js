@@ -6,7 +6,7 @@ import db from "../../database/index.js";
 
 export const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycby1WuPwU5mCSNcDMFmPBjttJuJlnNrCof0iPsq2u8DtRZVG9RKjB5wuMpjLJmyf4Qql/exec";
 export const WEBSITE_SHEET_URL = "https://script.google.com/macros/s/AKfycbzM2H9rwMS-mGswPnwicaG9eU0zc2juvfQK9uqiWdReldx5RpNaG7AGBCRZlokR9lyw/exec";
-export const FRANCHISE_LANDING_SHEET_URL = "https://script.google.com/macros/s/AKfycbz29JKLMZcriRlIbV-uqiSkBzRTdu9b8op9wymIy3K87rIWxBH0Oi5kRRiMKUR1kaSC/exec";
+export const FRANCHISE_LANDING_SHEET_URL = "https://script.google.com/macros/s/AKfycbzdwqE1K6V23Irnga4huUWDCVnwUB1ICZ7zku-u5fFep6k9a5hPsgZVie5aOt1VLIYT/exec";
 const TIMEOUT_MS = 8_000;
 const BATCH_SIZE = 50;
 const MAX_RETRY_DELAY_MS = 60 * 60 * 1000;
