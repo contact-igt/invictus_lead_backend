@@ -1,3 +1,4 @@
+import { WEBSITE_SOURCE, FRANCHISE_LANDING_SOURCE, WEBSITE_DELIVERY_SOURCES } from "./phoenixFitnessSources.js";
 import PDFDocument from "pdfkit";
 import { Op, fn, col } from "sequelize";
 import db from "../../database/index.js";
@@ -88,12 +89,14 @@ const buildLeadFilters = (filters = {}) => {
   }
 
   // Historical records have no provider; keep them with landing-page leads.
-  if (filters.lead_source === "website") {
-    queryFilters.source_provider = "phoenix_website";
+  if (filters.lead_source === "franchise") {
+    queryFilters.source_provider = FRANCHISE_LANDING_SOURCE;
+  } else if (filters.lead_source === "website") {
+    queryFilters.source_provider = WEBSITE_SOURCE;
   } else if (filters.lead_source === "landing_page") {
     queryFilters[Op.and] = [{ [Op.or]: [
       { source_provider: { [Op.is]: null } },
-      { source_provider: { [Op.ne]: "phoenix_website" } },
+      { source_provider: { [Op.notIn]: WEBSITE_DELIVERY_SOURCES } },
     ] }];
   }
   if (branch) queryFilters.branch = branch;

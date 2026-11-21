@@ -1,3 +1,4 @@
+import { WEBSITE_SOURCE } from "./phoenixFitnessSources.js";
 import db from "../../database/index.js";
 import { attemptPhoenixFitnessSheetSync } from "./phoenixFitnessSheetSync.service.js";
 
@@ -9,7 +10,7 @@ export const createPhoenixFitnessWebsiteLead = async ({ formType, data, requestI
       client_id: clientId, website_request_id: requestId,
       name: data.name, mobile_number: data.phone || data.mobile,
       branch: data.branch || null, utm_source: data.utm_source || "website",
-      source_provider: "phoenix_website", form_type: formType, website_data: data,
+      source_provider: options.sourceProvider ?? WEBSITE_SOURCE, form_type: formType, website_data: data,
       sheet_sync_status: "pending", runo_sync_status: "pending",
     },
   });
