@@ -1,3 +1,4 @@
+import { WEBSITE_DELIVERY_SOURCES } from "./phoenixFitnessSources.js";
 import { Op } from "sequelize";
 import db from "../../database/index.js";
 import { postOnce } from "../integrations/runo/runo.service.js";
@@ -51,14 +52,14 @@ export const sendPhoenixLeadToRuno = async ({ lead, env = process.env, fetchImpl
 };
 
 const dueWhere = (now) => ({
-  source_provider: "phoenix_website", sheet_sync_status: "synced",
+  source_provider: { [Op.in]: WEBSITE_DELIVERY_SOURCES }, sheet_sync_status: "synced",
   runo_sync_status: { [Op.in]: ["pending", "failed", "processing"] },
   [Op.or]: [{ runo_sync_next_attempt_at: null }, { runo_sync_next_attempt_at: { [Op.lte]: now } }],
 });
 export const attemptPhoenixFitnessRunoSync = async (lead, options = {}) => {
   // A disabled integration leaves its durable pending rows available for later enablement.
   if (!getPhoenixRunoConfig(options.env).enabled) return false;
-  if (lead.source_provider !== "phoenix_website" || lead.sheet_sync_status !== "synced") return false;
+  if (!WEBSITE_DELIVERY_SOURCES.includes(lead.source_provider) || lead.sheet_sync_status !== "synced") return false;
   const now = new Date();
   // Atomic lease prevents overlapping inline/worker calls from sending the same row.
   const [claimed] = await db.PhoenixFitness.update({ runo_sync_status: "processing", runo_sync_next_attempt_at: new Date(now.getTime() + 120000) }, {

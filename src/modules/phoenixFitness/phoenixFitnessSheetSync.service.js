@@ -1,3 +1,4 @@
+import { FRANCHISE_LANDING_SOURCE, WEBSITE_DELIVERY_SOURCES } from "./phoenixFitnessSources.js";
 import cron from "node-cron";
 import { attemptPhoenixFitnessRunoSync, retryPendingPhoenixFitnessRunoSyncs } from "./phoenixFitnessRuno.service.js";
 import { Op } from "sequelize";
@@ -5,6 +6,7 @@ import db from "../../database/index.js";
 
 export const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycby1WuPwU5mCSNcDMFmPBjttJuJlnNrCof0iPsq2u8DtRZVG9RKjB5wuMpjLJmyf4Qql/exec";
 export const WEBSITE_SHEET_URL = "https://script.google.com/macros/s/AKfycbzM2H9rwMS-mGswPnwicaG9eU0zc2juvfQK9uqiWdReldx5RpNaG7AGBCRZlokR9lyw/exec";
+export const FRANCHISE_LANDING_SHEET_URL = "https://script.google.com/macros/s/AKfycbz29JKLMZcriRlIbV-uqiSkBzRTdu9b8op9wymIy3K87rIWxBH0Oi5kRRiMKUR1kaSC/exec";
 const TIMEOUT_MS = 8_000;
 const BATCH_SIZE = 50;
 const MAX_RETRY_DELAY_MS = 60 * 60 * 1000;
@@ -17,8 +19,10 @@ export const buildPhoenixFitnessSheetPayload = (lead) => ({
 });
 
 export const sendPhoenixFitnessSheetRecord = async (lead, { fetchImpl = fetch, timeoutMs = TIMEOUT_MS } = {}) => {
-  const websiteLead = lead.source_provider === "phoenix_website";
-  const url = websiteLead ? WEBSITE_SHEET_URL : WEBHOOK_URL;
+  const websiteLead = WEBSITE_DELIVERY_SOURCES.includes(lead.source_provider);
+  const url = lead.source_provider === FRANCHISE_LANDING_SOURCE
+    ? FRANCHISE_LANDING_SHEET_URL
+    : websiteLead ? WEBSITE_SHEET_URL : WEBHOOK_URL;
   if (!url) throw new Error("Website Google Sheets URL is not configured.");
   const payload = websiteLead ? {
     ...lead.website_data, name: lead.name, phone: lead.mobile_number, mobile: lead.mobile_number,
@@ -54,7 +58,7 @@ export const sendPhoenixFitnessSheetRecord = async (lead, { fetchImpl = fetch, t
 
 const nextRetryAt = (attempts) => new Date(Date.now() + Math.min(60_000 * 2 ** Math.max(0, attempts - 1), MAX_RETRY_DELAY_MS));
 export const attemptPhoenixFitnessSheetSync = async (lead, options) => {
-  if (lead.source_provider === "phoenix_website") {
+  if (WEBSITE_DELIVERY_SOURCES.includes(lead.source_provider)) {
     const [claimed] = await db.PhoenixFitness.update({ sheet_sync_status: "syncing", sheet_sync_next_attempt_at: new Date(Date.now() + 120000) }, {
       where: { id: lead.id, client_id: lead.client_id,
         sheet_sync_status: { [Op.in]: ["pending", "failed", "syncing"] },
@@ -67,7 +71,7 @@ export const attemptPhoenixFitnessSheetSync = async (lead, options) => {
   try {
     await sendPhoenixFitnessSheetRecord(lead, options);
     await lead.update({ sheet_sync_status: "synced", sheet_sync_attempts: attempts, sheet_sync_last_error: null, sheet_synced_at: new Date(), sheet_sync_next_attempt_at: null });
-    if (lead.source_provider === "phoenix_website") {
+    if (WEBSITE_DELIVERY_SOURCES.includes(lead.source_provider)) {
       await attemptPhoenixFitnessRunoSync(lead).catch(() => console.error("[Phoenix Runo] Delivery deferred", { leadId: lead.id }));
     }
     return true;

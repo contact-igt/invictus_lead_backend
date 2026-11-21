@@ -1,3 +1,4 @@
+import { FRANCHISE_LANDING_SOURCE } from "./phoenixFitnessSources.js";
 import express from "express";
 import {
   exportPhoenixFitnessLeads,
@@ -29,14 +30,24 @@ import { phoenixWebsiteSchema } from "./phoenixFitnessWebsite.validation.js";
 import { createPhoenixFitnessWebsiteLead } from "./phoenixFitnessWebsite.service.js";
 
 const router = express.Router();
-router.post("/website/register", resolvePublicTenantForModule("phoenix_fitness"), async (req, res, next) => {
+const registerWebsiteLead = (options = {}) => async (req, res, next) => {
   const { error, value } = phoenixWebsiteSchema.validate(req.body, { abortEarly: false });
   if (error) return res.status(400).json({ success: false, message: "Invalid website enquiry", details: error.details.map((item) => item.message) });
   try {
-    const result = await createPhoenixFitnessWebsiteLead(value, req.publicTenantId);
+    const result = await createPhoenixFitnessWebsiteLead(value, req.publicTenantId, options);
     return res.status(result.duplicate ? 200 : 201).json({ success: true, ...result });
   } catch (error) { return next(error); }
-});
+};
+
+router.post("/website/register", resolvePublicTenantForModule("phoenix_fitness"), registerWebsiteLead());
+router.post(
+  "/franchise/register",
+  resolvePublicTenantForModule("phoenix_fitness"),
+  (req, res, next) => req.body?.formType === "Franchise Enquiry"
+    ? next()
+    : res.status(400).json({ success: false, message: "Expected Franchise Enquiry" }),
+  registerWebsiteLead({ sourceProvider: FRANCHISE_LANDING_SOURCE }),
+);
 
 router.post(
   "/register",
