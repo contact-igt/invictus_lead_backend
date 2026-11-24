@@ -42,4 +42,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+/apps-script/birthwave-website/Code.gs
+
 .vercel
