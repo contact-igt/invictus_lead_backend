@@ -10,6 +10,7 @@ export const BIRTHWAVE_ACTIVITY_EVENT_TYPES = [
   "call_logged",
   "note_added",
   "contact_resolved",
+  "contact_identity_conflict",
   "team_selected",
   "assigned",
   "reassigned",

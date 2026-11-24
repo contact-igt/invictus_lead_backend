@@ -59,6 +59,7 @@ export const resolveOrCreateBirthwaveContact = async ({
   email,
   transaction,
   allowUnidentified = false,
+  conflictPolicy = "reject",
 }) => {
   if (!clientId) throw httpError(403, "A valid client context is required");
 
@@ -87,7 +88,8 @@ export const resolveOrCreateBirthwaveContact = async ({
       : null,
   ]);
 
-  if (phoneMatch && emailMatch && phoneMatch.id !== emailMatch.id) {
+  const identityConflict = phoneMatch && emailMatch && phoneMatch.id !== emailMatch.id;
+  if (identityConflict && conflictPolicy !== "phone_primary") {
     throw httpError(
       409,
       "Phone and email resolve to different Contacts; review is required",
@@ -104,9 +106,23 @@ export const resolveOrCreateBirthwaveContact = async ({
       patch.display_name = displayName;
     }
     if (!existing.normalized_phone && normalizedPhone) patch.normalized_phone = normalizedPhone;
-    if (!existing.normalized_email && normalizedEmail) patch.normalized_email = normalizedEmail;
+    // When phone and email resolve to different Contacts, phone remains the
+    // primary identity. Do not attach the other Contact's email to it or merge
+    // the two records; the lead is marked for manual review by the caller.
+    if (!identityConflict && !existing.normalized_email && normalizedEmail) patch.normalized_email = normalizedEmail;
     if (Object.keys(patch).length) await existing.update(patch, options);
-    return { contact: serializeContact(existing), created: false, matchMethod: phoneMatch ? "phone" : "email" };
+    return {
+      contact: serializeContact(existing),
+      created: false,
+      matchMethod: phoneMatch ? "phone" : "email",
+      contactIdentityConflict: identityConflict
+        ? {
+            review_required: true,
+            phone_contact_id: phoneMatch.id,
+            email_contact_id: emailMatch.id,
+          }
+        : null,
+    };
   }
 
   try {
@@ -132,6 +148,7 @@ export const resolveOrCreateBirthwaveContact = async ({
       email,
       transaction,
       allowUnidentified,
+      conflictPolicy,
     });
     return retry;
   }
