@@ -17,6 +17,8 @@ const LANDING_PAGE_SHEET_URLS = new Map(Object.entries({
 const DEFAULT_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_WEBHOOK_URL ||
   "https://script.google.com/macros/s/AKfycbzWmx3G9q2hkYUQVFkX_WhNDmBIinAoSlnCNZeLDg4Xv2XPf3SdhfvpPh1HNDcUO5fU/exec";
+const WEBSITE_INQUIRIES_SHEET_URL =
+  "https://script.google.com/macros/s/AKfycbx7H4xQ0serxp62mxUXZ-kWmJ3FRqWsF0qjEMShe2t61f5HaHddh9pUvHu8tBJoCYuEgQ/exec";
 const VAGINISMUS_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_URL_BIRTHWAVE_VAGINISMUS ||
   "https://script.google.com/macros/s/AKfycbwzfF1_XyxxkS8Ow30PYNKNeYeA2HZgUc-k8LV8JrAZi2ouTtulLRqb6PKTEGO7XrZaCA/exec";
@@ -71,6 +73,9 @@ const formatIstTimestamp = (input) => {
 };
 
 export const resolveSheetWebhookUrl = (sourceKey, env = process.env) => {
+  if (sourceKey === "birthwave_website") {
+    return env.BIRTHWAVE_SHEET_URL_BIRTHWAVE_WEBSITE || WEBSITE_INQUIRIES_SHEET_URL;
+  }
   if (sourceKey === "birthwave_vaginismus") return VAGINISMUS_SHEET_URL;
   if (sourceKey === "birthwave_workshop") return WORKSHOP_SHEET_URL;
   if (sourceKey === "birthwave_prenatal_yoga") {
