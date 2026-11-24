@@ -93,6 +93,7 @@ const serializeLead = (row) => {
     source_key: row.integration_metadata?.source_page ??
       (row.source_provider?.startsWith?.("birthwave_") ? row.source_provider : null),
     integration_metadata: row.integration_metadata ?? null,
+    contact_review_required: Boolean(row.integration_metadata?.contact_review_required),
     custom_fields: row.custom_fields ?? {},
     created_at: row.created_at,
     updated_at: row.updated_at,

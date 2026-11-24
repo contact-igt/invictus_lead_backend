@@ -151,6 +151,7 @@ export const createWebsiteLead = async (clientId, payload = {}, options = {}) =>
         phone,
         email: payload.email,
         transaction,
+        conflictPolicy: "phone_primary",
       });
 
       // BW-SVC-001: the website form now submits service_id (or a landing page's
@@ -219,6 +220,8 @@ export const createWebsiteLead = async (clientId, payload = {}, options = {}) =>
           source_page: sourceKey,
           website_lead_id: websiteRow.id,
           pregnancy_weeks: websiteRow.pregnancy_weeks,
+          contact_review_required: Boolean(resolved.contactIdentityConflict),
+          contact_identity_conflict: resolved.contactIdentityConflict,
           channel: websiteRow.channel,
           campaign: websiteRow.campaign,
           creative: websiteRow.creative,
@@ -233,6 +236,18 @@ export const createWebsiteLead = async (clientId, payload = {}, options = {}) =>
           fbclid: websiteRow.fbclid,
         },
       }, { transaction });
+
+      if (resolved.contactIdentityConflict) {
+        await logBirthwaveActivity({
+          clientId,
+          leadId: leadRow.id,
+          actor: SYSTEM_ACTOR,
+          eventType: "contact_identity_conflict",
+          title: "Contact identity conflict requires review",
+          description: `Phone matched Contact ${resolved.contactIdentityConflict.phone_contact_id}; email matched Contact ${resolved.contactIdentityConflict.email_contact_id}. Phone was kept as the primary Contact and no merge was performed.`,
+          transaction,
+        });
+      }
 
       await websiteRow.update({
         contact_id: resolved.contact?.id ?? null,
