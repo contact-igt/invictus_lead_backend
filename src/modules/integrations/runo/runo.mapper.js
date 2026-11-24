@@ -26,6 +26,7 @@ const PAGE_LABELS = {
   birthwave_prenatal_yoga: 'Prenatal Yoga',
   birthwave_vbac: 'VBAC',
   birthwave_vaginismus: 'Vaginismus',
+  birthwave_workshop: 'Childbirth Workshop',
 };
 export const runoPageLabel = (sourceKey) => PAGE_LABELS[sourceKey] || 'Landing Page';
 
@@ -45,6 +46,27 @@ export const formatPhoneForRuno = (phone, format = "national") => {
 const clean = (value, max = 2000) =>
   typeof value === "string" && value.trim() ? value.trim().slice(0, max) : undefined;
 
+const WEBSITE_PAGE_LABELS = {
+  "vbac": "VBAC",
+  "faq": "FAQ",
+};
+
+const websitePageLabel = (page) => {
+  const input = clean(page, 255);
+  if (!input || !/^(\/[^/]|\/$|https?:\/\/)/i.test(input)) return undefined;
+
+  const pathname = URL.parse(input, "https://birthwave.invalid")?.pathname;
+  if (!pathname) return undefined;
+  const segments = pathname.split("/").filter(Boolean);
+  if (!segments.length) return "Home";
+  if (!segments.every((segment) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(segment))) return undefined;
+
+  return segments.map((segment) => {
+    const slug = segment.toLowerCase();
+    return WEBSITE_PAGE_LABELS[slug] ?? slug.replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }).join(" / ");
+};
+
 const statusLabel = (status) =>
   clean(String(status || "").replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()));
 
@@ -57,17 +79,22 @@ export const mapBirthwaveLeadToRunoPayload = (lead, context = {}) => {
   const { sourceKey = lead?.source_provider, phoneFormat = "national" } = context;
   const service = clean(lead?.service, 160);
   const pregnancyWeeks = lead?.pregnancy_weeks ? `Pregnancy weeks: ${lead.pregnancy_weeks}` : null;
+  const isWebsite = sourceKey === BIRTHWAVE_MAIN_WEBSITE_SOURCE_KEY;
+  const submissionPage = isWebsite ? websitePageLabel(context.submissionPage) : undefined;
+  const trackedPage = isWebsite ? websitePageLabel(context.landingPage) : undefined;
+  const websitePage = submissionPage ? ` — ${submissionPage} Page` : trackedPage ? ` — Tracked Page: ${trackedPage}` : "";
   const payload = {
     your_name: clean(lead?.name, 150),
     your_email: clean(lead?.email, 200),
     your_phone: formatPhoneForRuno(lead?.phone, phoneFormat) || undefined,
-    // Service moves into the message so it isn't lost now that the subject
-    // names the page (e.g. "Birthwave Natural Birth Enquiry").
+    // Keep the requested service separate from the page named in the subject.
     your_message: clean(
       [service ? `Service: ${service}` : null, pregnancyWeeks, context.message ?? lead?.notes].filter(Boolean).join("\n"),
       5000,
     ),
-    your_subject: `Birthwave ${runoPageLabel(sourceKey)} Enquiry`,
+    your_subject: isWebsite
+      ? `Birthwave Website Enquiry${websitePage}`
+      : `Birthwave ${runoPageLabel(sourceKey)} Landing Page Enquiry`,
     custom_status: statusLabel(lead?.status),
     custom_source: runoSourceLabel(sourceKey),
   };

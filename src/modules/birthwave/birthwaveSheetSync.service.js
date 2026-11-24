@@ -1,4 +1,4 @@
-import cron from "node-cron";
+﻿import cron from "node-cron";
 import { Op } from "sequelize";
 import db from "../../database/index.js";
 
@@ -6,9 +6,14 @@ const SYNC_TIMEOUT_MS = 25_000;
 const MAX_ATTEMPTS = 3;
 const RETRY_BATCH_SIZE = 50;
 
-// All Birthwave sites currently mirror into one Apps Script sheet. Per-source
-// overrides can be supplied via env (BIRTHWAVE_SHEET_URL_<SOURCE_KEY_UPPER>)
-// without any code change.
+// Dedicated landing-page receivers accept the payload without a shared secret.
+const LANDING_PAGE_SHEET_URLS = new Map(Object.entries({
+  birthwave_naturalbirth: "https://script.google.com/macros/s/AKfycbzVY22Gx5gt-L-B615K0zsSWNBcCz8FqBZRnEMJIPqL-XVgMEqyIZUAu4D4_anRiPrFwg/exec",
+  birthwave_normalbirth: "https://script.google.com/macros/s/AKfycbwTqwQeBOMjK2QBCjehJQeA87onF5_s8vmf97PwdC_YtNI_2gJYbHvQY_fHnsRI17On/exec",
+  birthwave_vbac: "https://script.google.com/macros/s/AKfycbzMY_mAP65vtTYkVheZEGqzqDXFANBSan0HPuzTi5AGQbC1vKKVLnsMkLts3fE-AUpWyg/exec",
+  birthwave_pregnancycare: "https://script.google.com/macros/s/AKfycbwsNF7_Y18tCqxPs30zUhtlTaqhown8iLmPdWaIfMGxwsky1SiMGSW0xOzaBr6XzNbB/exec",
+}));
+
 const DEFAULT_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_WEBHOOK_URL ||
   "https://script.google.com/macros/s/AKfycbzWmx3G9q2hkYUQVFkX_WhNDmBIinAoSlnCNZeLDg4Xv2XPf3SdhfvpPh1HNDcUO5fU/exec";
@@ -73,6 +78,8 @@ export const resolveSheetWebhookUrl = (sourceKey, env = process.env) => {
     // The Apps Script selects the Prenatal Yoga tab using source_key.
     return env.BIRTHWAVE_SHEET_WEBHOOK_URL || DEFAULT_SHEET_URL;
   }
+  const dedicatedUrl = LANDING_PAGE_SHEET_URLS.get(sourceKey);
+  if (dedicatedUrl) return dedicatedUrl;
   const override = env[`BIRTHWAVE_SHEET_URL_${String(sourceKey || "").toUpperCase()}`];
   return override || DEFAULT_SHEET_URL;
 };
@@ -250,18 +257,21 @@ export const sendSheetRecord = async (
 ) => {
   const url = resolveSheetWebhookUrl(record.source_key, env);
   if (!url) throw new Error("Missing Google Sheets webhook configuration.");
-  if (record.source_key !== "birthwave_vaginismus" && !resolveSheetSecret(record.source_key, env).trim()) {
+  const usesSecretlessReceiver = LANDING_PAGE_SHEET_URLS.has(record.source_key) && url !== DEFAULT_SHEET_URL;
+  if (!usesSecretlessReceiver && record.source_key !== "birthwave_vaginismus" && !resolveSheetSecret(record.source_key, env).trim()) {
     throw new Error("Missing BIRTHWAVE_SHEET_WEBHOOK_SECRET.");
   }
 
   const controller = new AbortController();
+  const payload = buildSheetPayload(record, env);
+  if (usesSecretlessReceiver) delete payload.secret;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetchImpl(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildSheetPayload(record, env)),
+      body: JSON.stringify(payload),
       redirect: "follow",
       signal: controller.signal,
     });
