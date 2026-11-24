@@ -30,12 +30,13 @@ const value = (input) => (input === undefined || input === null ? "" : String(in
 
 const SHEET_SERVICE_CODES = {
   "General Contact": "general-contact",
+  "Doctor Enquiry": "doctor-enquiry",
   "Fertility & Preconception": "fertility-preconception",
-  vaginismus: "vaginismus",
   "Vaginismus & Intimate Wellness": "vaginismus",
   "Vaginismus & Intimate Health": "vaginismus",
   "Pregnancy & Antenatal Care": "pregnancy-antenatal-care",
   "Normal Birth & Delivery Care": "normal-birth-delivery",
+  "Caesarean Birth": "caesarean-birth",
   "VBAC (Vaginal Birth After Caesarean)": "vbac",
   "Birth Preparation & Childbirth Education": "birth-preparation",
   "All-in-One Prenatal Workshop": "birth-preparation",
@@ -49,7 +50,13 @@ const SHEET_SERVICE_CODES = {
   "Nutrition & Emotional Well-being": "nutrition-emotional-wellbeing",
 };
 
-const resolveSheetServiceCode = (record) => SHEET_SERVICE_CODES[value(record.service).trim()] || "unclassified";
+const CANONICAL_SHEET_SERVICE_CODES = new Set(Object.values(SHEET_SERVICE_CODES));
+
+const resolveSheetServiceCode = (record) => {
+  const service = value(record.service).trim().replace(/’/g, "'");
+  if (Object.hasOwn(SHEET_SERVICE_CODES, service)) return SHEET_SERVICE_CODES[service];
+  return CANONICAL_SHEET_SERVICE_CODES.has(service) ? service : "unclassified";
+};
 
 // A Date rendered with String()/toString() picks up whatever timezone the
 // Node process happens to run in (IST locally, UTC on some hosts, etc.),
