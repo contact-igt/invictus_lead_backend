@@ -131,6 +131,9 @@ const assignmentSchema = Joi.object({
 }).unknown(false);
 export const validateBirthwaveAssignment = validate("body", assignmentSchema);
 export const validateBirthwaveBulkAssignment = validate("body", assignmentSchema.keys({ lead_ids: Joi.array().items(Joi.number().integer().positive()).min(1).max(100).required() }));
+export const validateBirthwaveBulkDeletion = validate("body", Joi.object({
+  lead_ids: Joi.array().items(Joi.number().integer().positive()).min(1).max(100).required(),
+}));
 
 const assignmentRuleSchema = Joi.object({
   name: Joi.string().trim().max(160).required(),

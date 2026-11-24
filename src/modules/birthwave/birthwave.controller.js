@@ -13,7 +13,16 @@ import {
   getDashboard,
 } from "./birthwave.service.js";
 import { addBirthwaveLeadNote, getLeadTimeline } from "./birthwaveActivity.service.js";
-import { deleteLead } from "./birthwaveLeadDeletion.service.js";
+import { bulkDeleteLeads, deleteLead } from "./birthwaveLeadDeletion.service.js";
+
+export const bulkDeleteLeadsHandler = async (req, res, next) => {
+  try {
+    const data = await bulkDeleteLeads(req.tenant, req.body.lead_ids, req.user);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 export const deleteLeadHandler = async (req, res, next) => {
   try {
