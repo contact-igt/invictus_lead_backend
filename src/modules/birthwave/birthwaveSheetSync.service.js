@@ -18,6 +18,8 @@ const VAGINISMUS_SHEET_URL =
 const WORKSHOP_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_URL_BIRTHWAVE_WORKSHOP ||
   "https://script.google.com/macros/s/AKfycbyZU-XaYcL5tDib7nwpCkpn2acxklx7_wpVLvViYwgJfaoFQmac5EXe2HwDY0kozcrt/exec";
+const PRENATAL_YOGA_SHEET_URL =
+  process.env.BIRTHWAVE_SHEET_URL_BIRTHWAVE_PRENATAL_YOGA || "";
 
 const value = (input) => (input === undefined || input === null ? "" : String(input));
 
@@ -67,9 +69,17 @@ const formatIstTimestamp = (input) => {
 export const resolveSheetWebhookUrl = (sourceKey, env = process.env) => {
   if (sourceKey === "birthwave_vaginismus") return VAGINISMUS_SHEET_URL;
   if (sourceKey === "birthwave_workshop") return WORKSHOP_SHEET_URL;
+  if (sourceKey === "birthwave_prenatal_yoga") {
+    return env.BIRTHWAVE_SHEET_URL_BIRTHWAVE_PRENATAL_YOGA || PRENATAL_YOGA_SHEET_URL;
+  }
   const override = env[`BIRTHWAVE_SHEET_URL_${String(sourceKey || "").toUpperCase()}`];
   return override || DEFAULT_SHEET_URL;
 };
+
+const resolveSheetSecret = (sourceKey, env = process.env) =>
+  sourceKey === "birthwave_prenatal_yoga"
+    ? value(env.BIRTHWAVE_SHEET_SECRET_BIRTHWAVE_PRENATAL_YOGA)
+    : value(env.BIRTHWAVE_SHEET_WEBHOOK_SECRET);
 
 // Matches the `NormalizedLead` JSON body the Birthwave landing pages have
 // always POSTed to the Apps Script, so the existing deployment needs no change.
@@ -78,6 +88,18 @@ export const buildSheetPayload = (record, env = process.env) => {
   const leadName = value(record.name);
   const leadPhone = value(record.phone);
   const leadEmail = value(record.email);
+  if (record.source_key === "birthwave_prenatal_yoga") {
+    return {
+      timestamp: new Date(record.created_at || record.createdAt || Date.now()).toISOString(),
+      fullName: leadName,
+      mobile: leadPhone,
+      email: leadEmail,
+      pregnancyWeeks: record.pregnancy_weeks ?? "",
+      question: value(record.message),
+      contactConsent: record.consent === false ? false : true,
+      apiKey: resolveSheetSecret(record.source_key, env),
+    };
+  }
   const leadService = value(record.service);
   const leadMessage = value(record.message);
   // Intake stores registration metadata before the user's question in CRM notes.
@@ -200,8 +222,12 @@ export const sendSheetRecord = async (
 ) => {
   const url = resolveSheetWebhookUrl(record.source_key, env);
   if (!url) throw new Error("Missing Google Sheets webhook configuration.");
-  if (record.source_key !== "birthwave_vaginismus" && !value(env.BIRTHWAVE_SHEET_WEBHOOK_SECRET).trim()) {
-    throw new Error("Missing BIRTHWAVE_SHEET_WEBHOOK_SECRET.");
+  if (record.source_key !== "birthwave_vaginismus" && !resolveSheetSecret(record.source_key, env).trim()) {
+    throw new Error(
+      record.source_key === "birthwave_prenatal_yoga"
+        ? "Missing BIRTHWAVE_SHEET_SECRET_BIRTHWAVE_PRENATAL_YOGA."
+        : "Missing BIRTHWAVE_SHEET_WEBHOOK_SECRET.",
+    );
   }
 
   const controller = new AbortController();

@@ -26,6 +26,15 @@ const SYSTEM_ACTOR = { id: null, role: "super-admin", name: "Website Intake" };
 const str = (v, max = 255) =>
   typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null;
 
+const normalizePregnancyWeeks = (value) => {
+  if (value === undefined || value === null || String(value).trim() === "") return null;
+  const weeks = Number(value);
+  if (!Number.isInteger(weeks) || weeks < 1 || weeks > 99) {
+    throw httpError(400, "Pregnancy weeks must be a whole number between 1 and 99");
+  }
+  return weeks;
+};
+
 export const normalizePhone = (phone) => {
   const digits = String(phone || "").replace(/\D/g, "");
   if (digits.length === 10) return `+91${digits}`;
@@ -45,6 +54,7 @@ const serialize = (row) => ({
   email: row.email,
   service: row.service,
   message: row.message,
+  pregnancy_weeks: row.pregnancy_weeks ?? null,
   consent: Boolean(row.consent),
   source: row.source,
   campaign: row.campaign,
@@ -101,6 +111,7 @@ export const createWebsiteLead = async (clientId, payload = {}, options = {}) =>
 
   const name = str(payload.name, 150);
   const phone = normalizePhone(payload.phone);
+  const pregnancyWeeks = normalizePregnancyWeeks(payload.pregnancy_weeks ?? payload.pregnancyWeeks);
   if (!name) throw httpError(400, "Name is required");
   if (!phone || phone.replace(/\D/g, "").length < 7) throw httpError(400, "A valid phone number is required");
 
@@ -167,6 +178,7 @@ export const createWebsiteLead = async (clientId, payload = {}, options = {}) =>
         // Staging row keeps the resolved display name (or the raw submitted text
         // when the value did not match a service) for the Google Sheet mirror.
         service: websiteService?.name ?? str(payload.service, 160),
+        pregnancy_weeks: pregnancyWeeks,
         message: str(payload.message, 5000),
         consent: payload.consent === false ? false : true,
         source: str(attribution.source, 120),
@@ -194,6 +206,7 @@ export const createWebsiteLead = async (clientId, payload = {}, options = {}) =>
         name,
         phone,
         email: websiteRow.email,
+        pregnancy_weeks: websiteRow.pregnancy_weeks,
         service_id: websiteService?.id ?? null,
         service: websiteRow.service,
         source: "website",
@@ -205,6 +218,7 @@ export const createWebsiteLead = async (clientId, payload = {}, options = {}) =>
         integration_metadata: {
           source_page: sourceKey,
           website_lead_id: websiteRow.id,
+          pregnancy_weeks: websiteRow.pregnancy_weeks,
           channel: websiteRow.channel,
           campaign: websiteRow.campaign,
           creative: websiteRow.creative,
