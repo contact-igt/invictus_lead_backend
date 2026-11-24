@@ -18,7 +18,7 @@ const DEFAULT_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_WEBHOOK_URL ||
   "https://script.google.com/macros/s/AKfycbzWmx3G9q2hkYUQVFkX_WhNDmBIinAoSlnCNZeLDg4Xv2XPf3SdhfvpPh1HNDcUO5fU/exec";
 const WEBSITE_INQUIRIES_SHEET_URL =
-  "https://script.google.com/macros/s/AKfycbzCqWMIczEjmghbmRBZgmkWVuuflcZrZgadKCZxJwahFmhOJ0CC_m0uTGdUlaYjwW9-Aw/exec";
+  "https://script.google.com/macros/s/AKfycbxjNTvAApOIUbH4a9iJn8VXMus9eXpyirBoii-3ChD49sysWLpin5avM3qCXxcn77jHjg/exec";
 const VAGINISMUS_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_URL_BIRTHWAVE_VAGINISMUS ||
   "https://script.google.com/macros/s/AKfycbwzfF1_XyxxkS8Ow30PYNKNeYeA2HZgUc-k8LV8JrAZi2ouTtulLRqb6PKTEGO7XrZaCA/exec";
@@ -31,6 +31,7 @@ const value = (input) => (input === undefined || input === null ? "" : String(in
 const SHEET_SERVICE_CODES = {
   "General Contact": "general-contact",
   "Fertility & Preconception": "fertility-preconception",
+  vaginismus: "vaginismus",
   "Vaginismus & Intimate Wellness": "vaginismus",
   "Vaginismus & Intimate Health": "vaginismus",
   "Pregnancy & Antenatal Care": "pregnancy-antenatal-care",
