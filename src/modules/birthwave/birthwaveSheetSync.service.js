@@ -18,7 +18,7 @@ const DEFAULT_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_WEBHOOK_URL ||
   "https://script.google.com/macros/s/AKfycbzWmx3G9q2hkYUQVFkX_WhNDmBIinAoSlnCNZeLDg4Xv2XPf3SdhfvpPh1HNDcUO5fU/exec";
 const WEBSITE_INQUIRIES_SHEET_URL =
-  "https://script.google.com/macros/s/AKfycbx7H4xQ0serxp62mxUXZ-kWmJ3FRqWsF0qjEMShe2t61f5HaHddh9pUvHu8tBJoCYuEgQ/exec";
+  "https://script.google.com/macros/s/AKfycbzCqWMIczEjmghbmRBZgmkWVuuflcZrZgadKCZxJwahFmhOJ0CC_m0uTGdUlaYjwW9-Aw/exec";
 const VAGINISMUS_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_URL_BIRTHWAVE_VAGINISMUS ||
   "https://script.google.com/macros/s/AKfycbwzfF1_XyxxkS8Ow30PYNKNeYeA2HZgUc-k8LV8JrAZi2ouTtulLRqb6PKTEGO7XrZaCA/exec";
