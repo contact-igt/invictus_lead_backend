@@ -10,6 +10,7 @@ export const BIRTHWAVE_WEBSITE_SOURCE_KEYS = [
   "birthwave_pregnancycare",
   "birthwave_vbac",
   "birthwave_vaginismus",
+  "birthwave_prenatal_yoga",
 ];
 
 export const BIRTHWAVE_WEBSITE_LEAD_STATUSES = [
@@ -54,6 +55,7 @@ export const BirthwaveWebsiteLeadTable = (Sequelize, sequelize) =>
       phone: { type: Sequelize.STRING(30), allowNull: false },
       email: { type: Sequelize.STRING(200), allowNull: true },
       service: { type: Sequelize.STRING(160), allowNull: true },
+      pregnancy_weeks: { type: Sequelize.INTEGER.UNSIGNED, allowNull: true },
       message: { type: Sequelize.TEXT, allowNull: true },
       consent: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true },
 

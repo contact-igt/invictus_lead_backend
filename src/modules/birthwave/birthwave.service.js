@@ -87,6 +87,7 @@ const serializeLead = (row) => {
       : null,
     next_follow_up: row.next_follow_up ?? null,
     notes: row.notes ?? null,
+    pregnancy_weeks: row.pregnancy_weeks ?? null,
     source_provider: row.source_provider ?? null,
     source_external_id: row.source_external_id ?? null,
     source_key: row.integration_metadata?.source_page ??

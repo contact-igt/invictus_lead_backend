@@ -62,6 +62,7 @@ import RepliWebhookRouter from "./modules/integrations/repli/repliWebhook.routes
 import NamokarRouter from "./modules/namokar/namokar.routes.js";
 import NamokarOculoplastyRouter from "./modules/namokarOculoplasty/namokarOculoplasty.routes.js";
 import { ensureBirthwaveLeadIntegrationColumns } from "./database/migrations/ensureBirthwaveLeadIntegrationColumns.js";
+import { ensureBirthwavePrenatalYogaColumns } from "./database/migrations/ensureBirthwavePrenatalYogaColumns.js";
 import { ensureIntegrationWebhookEventsTable } from "./database/migrations/ensureIntegrationWebhookEventsTable.js";
 import { ensureRioSheetSyncColumns } from "./database/migrations/ensureRioSheetSyncColumns.js";
 import { ensurePixelEyeWebsiteLeadSheetSyncColumns } from "./database/migrations/ensurePixelEyeWebsiteLeadSheetSyncColumns.js";
@@ -157,6 +158,7 @@ const connect_mysql = async () => {
     await ensurePhoenixFitnessWebsiteColumns();
     await db.sequelize.sync();
     await ensureBirthwaveLeadIntegrationColumns();
+    await ensureBirthwavePrenatalYogaColumns();
     await ensureBirthwavePulseOSColumns();
     await ensureIntegrationWebhookEventsTable();
     await ensurePixelEyeLeadStateCurrentDayColumn();

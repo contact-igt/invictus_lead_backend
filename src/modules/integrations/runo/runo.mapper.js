@@ -23,6 +23,7 @@ const PAGE_LABELS = {
   birthwave_normalbirth: 'Normal Birth',
   birthwave_naturalbirth: 'Natural Birth',
   birthwave_pregnancycare: 'Pregnancy Care',
+  birthwave_prenatal_yoga: 'Prenatal Yoga',
   birthwave_vbac: 'VBAC',
   birthwave_vaginismus: 'Vaginismus',
 };
@@ -55,6 +56,7 @@ const statusLabel = (status) =>
 export const mapBirthwaveLeadToRunoPayload = (lead, context = {}) => {
   const { sourceKey = lead?.source_provider, phoneFormat = "national" } = context;
   const service = clean(lead?.service, 160);
+  const pregnancyWeeks = lead?.pregnancy_weeks ? `Pregnancy weeks: ${lead.pregnancy_weeks}` : null;
   const payload = {
     your_name: clean(lead?.name, 150),
     your_email: clean(lead?.email, 200),
@@ -62,7 +64,7 @@ export const mapBirthwaveLeadToRunoPayload = (lead, context = {}) => {
     // Service moves into the message so it isn't lost now that the subject
     // names the page (e.g. "Birthwave Natural Birth Enquiry").
     your_message: clean(
-      [service ? `Service: ${service}` : null, context.message ?? lead?.notes].filter(Boolean).join("\n"),
+      [service ? `Service: ${service}` : null, pregnancyWeeks, context.message ?? lead?.notes].filter(Boolean).join("\n"),
       5000,
     ),
     your_subject: `Birthwave ${runoPageLabel(sourceKey)} Enquiry`,

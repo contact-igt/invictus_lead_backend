@@ -59,6 +59,7 @@ export const BirthwaveLeadTable = (Sequelize, sequelize) =>
       name: { type: Sequelize.STRING(150), allowNull: false },
       phone: { type: Sequelize.STRING(30), allowNull: true },
       email: { type: Sequelize.STRING(200), allowNull: true },
+      pregnancy_weeks: { type: Sequelize.INTEGER.UNSIGNED, allowNull: true },
       // BW-SVC-001: `service` is now LEGACY / COMPATIBILITY. `service_id` is the
       // canonical reference into birthwave_services; the text is still written
       // alongside it so anything not yet migrated keeps working. Not dropped.
