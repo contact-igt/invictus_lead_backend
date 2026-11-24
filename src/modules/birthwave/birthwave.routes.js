@@ -11,6 +11,7 @@ import {
   createLeadHandler,
   updateLeadHandler,
   deleteLeadHandler,
+  bulkDeleteLeadsHandler,
   addLeadNoteHandler,
   getAppointmentsHandler,
   createAppointmentHandler,
@@ -58,6 +59,7 @@ import {
   validateBirthwaveTeamMemberUpdate,
   validateBirthwaveAssignment,
   validateBirthwaveBulkAssignment,
+  validateBirthwaveBulkDeletion,
   validateBirthwaveAssignmentRuleCreate,
   validateBirthwaveAssignmentRuleUpdate,
   validateBirthwaveWorkQuery,
@@ -138,6 +140,7 @@ router.post("/tasks/:id/reschedule", validateBirthwaveId, validateBirthwaveTaskR
 router.post("/tasks/:id/cancel", validateBirthwaveId, validateBirthwaveTaskCancel, cancelTaskHandler);
 router.post("/tasks/:id/outcome", validateBirthwaveId, validateBirthwaveOutcome, recordTaskOutcomeHandler);
 router.post("/leads/bulk-assign", validateBirthwaveBulkAssignment, bulkAssignLeadsHandler);
+router.post("/leads/bulk-delete", authorizeManagementRole, validateBirthwaveBulkDeletion, bulkDeleteLeadsHandler);
 router.post("/leads", validateBirthwaveLeadCreate, createLeadHandler);
 router.get("/leads/:id", validateBirthwaveId, getLeadHandler);
 router.get("/leads/:id/timeline", validateBirthwaveId, getLeadTimelineHandler);
