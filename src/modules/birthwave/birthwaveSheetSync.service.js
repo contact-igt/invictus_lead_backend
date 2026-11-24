@@ -11,15 +11,13 @@ const RETRY_BATCH_SIZE = 50;
 // without any code change.
 const DEFAULT_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_WEBHOOK_URL ||
-  "https://script.google.com/macros/s/AKfycbx7H4xQ0serxp62mxUXZ-kWmJ3FRqWsF0qjEMShe2t61f5HaHddh9pUvHu8tBJoCYuEgQ/exec";
+  "https://script.google.com/macros/s/AKfycbzWmx3G9q2hkYUQVFkX_WhNDmBIinAoSlnCNZeLDg4Xv2XPf3SdhfvpPh1HNDcUO5fU/exec";
 const VAGINISMUS_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_URL_BIRTHWAVE_VAGINISMUS ||
   "https://script.google.com/macros/s/AKfycbwzfF1_XyxxkS8Ow30PYNKNeYeA2HZgUc-k8LV8JrAZi2ouTtulLRqb6PKTEGO7XrZaCA/exec";
 const WORKSHOP_SHEET_URL =
   process.env.BIRTHWAVE_SHEET_URL_BIRTHWAVE_WORKSHOP ||
   "https://script.google.com/macros/s/AKfycbyZU-XaYcL5tDib7nwpCkpn2acxklx7_wpVLvViYwgJfaoFQmac5EXe2HwDY0kozcrt/exec";
-const PRENATAL_YOGA_SHEET_URL =
-  process.env.BIRTHWAVE_SHEET_URL_BIRTHWAVE_PRENATAL_YOGA || "";
 
 const value = (input) => (input === undefined || input === null ? "" : String(input));
 
@@ -35,6 +33,7 @@ const SHEET_SERVICE_CODES = {
   "All-in-One Prenatal Workshop": "birth-preparation",
   "Childbirth Preparation Workshop": "birth-preparation",
   "Natural Birth": "natural-birth",
+  "Prenatal Yoga": "prenatal-yoga",
   "Postpartum Recovery & Care": "postpartum-care",
   "Lactation & Breastfeeding Support": "lactation",
   "Newborn & Pediatric Care": "newborn-pediatric-care",
@@ -70,7 +69,9 @@ export const resolveSheetWebhookUrl = (sourceKey, env = process.env) => {
   if (sourceKey === "birthwave_vaginismus") return VAGINISMUS_SHEET_URL;
   if (sourceKey === "birthwave_workshop") return WORKSHOP_SHEET_URL;
   if (sourceKey === "birthwave_prenatal_yoga") {
-    return env.BIRTHWAVE_SHEET_URL_BIRTHWAVE_PRENATAL_YOGA || PRENATAL_YOGA_SHEET_URL;
+    // Prenatal Yoga is routed through the common Birthwave spreadsheet webhook.
+    // The Apps Script selects the Prenatal Yoga tab using source_key.
+    return env.BIRTHWAVE_SHEET_WEBHOOK_URL || DEFAULT_SHEET_URL;
   }
   const override = env[`BIRTHWAVE_SHEET_URL_${String(sourceKey || "").toUpperCase()}`];
   return override || DEFAULT_SHEET_URL;
@@ -78,7 +79,7 @@ export const resolveSheetWebhookUrl = (sourceKey, env = process.env) => {
 
 const resolveSheetSecret = (sourceKey, env = process.env) =>
   sourceKey === "birthwave_prenatal_yoga"
-    ? value(env.BIRTHWAVE_SHEET_SECRET_BIRTHWAVE_PRENATAL_YOGA)
+    ? value(env.BIRTHWAVE_SHEET_WEBHOOK_SECRET)
     : value(env.BIRTHWAVE_SHEET_WEBHOOK_SECRET);
 
 // Matches the `NormalizedLead` JSON body the Birthwave landing pages have
@@ -89,15 +90,42 @@ export const buildSheetPayload = (record, env = process.env) => {
   const leadPhone = value(record.phone);
   const leadEmail = value(record.email);
   if (record.source_key === "birthwave_prenatal_yoga") {
+    const pregnancyWeeks = record.pregnancy_weeks ?? "";
+    const message = value(record.message);
+    const sourceLabel = "Prenatal Yoga Landing Page";
     return {
-      timestamp: new Date(record.created_at || record.createdAt || Date.now()).toISOString(),
+      secret: resolveSheetSecret(record.source_key, env),
+      apiKey: resolveSheetSecret(record.source_key, env),
+      source_key: record.source_key,
+      sheet_tab: "Prenatal Yoga",
+      timestamp: istTime,
+      created_at: istTime,
+      submitted_at: istTime,
+      submission_id: value(record.external_submission_id || record.external_lead_id || record.id),
+      lead_id: value(record.external_lead_id || record.id),
       fullName: leadName,
       mobile: leadPhone,
       email: leadEmail,
-      pregnancyWeeks: record.pregnancy_weeks ?? "",
-      question: value(record.message),
+      pregnancyWeeks,
+      question: message,
       contactConsent: record.consent === false ? false : true,
-      apiKey: resolveSheetSecret(record.source_key, env),
+      "Timestamp": istTime,
+      "Name": leadName,
+      "Phone": leadPhone,
+      "Email": leadEmail,
+      "Service": "Prenatal Yoga",
+      "Pregnancy Weeks": pregnancyWeeks,
+      "Message": message,
+      "Questions / Message": message,
+      "Consent": record.consent === false ? "No" : "Yes",
+      "Source": sourceLabel,
+      source: sourceLabel,
+      service: "Prenatal Yoga",
+      name: leadName,
+      phone: leadPhone,
+      pregnancy_weeks: pregnancyWeeks,
+      message,
+      consent: record.consent === false ? false : true,
     };
   }
   const leadService = value(record.service);
@@ -223,11 +251,7 @@ export const sendSheetRecord = async (
   const url = resolveSheetWebhookUrl(record.source_key, env);
   if (!url) throw new Error("Missing Google Sheets webhook configuration.");
   if (record.source_key !== "birthwave_vaginismus" && !resolveSheetSecret(record.source_key, env).trim()) {
-    throw new Error(
-      record.source_key === "birthwave_prenatal_yoga"
-        ? "Missing BIRTHWAVE_SHEET_SECRET_BIRTHWAVE_PRENATAL_YOGA."
-        : "Missing BIRTHWAVE_SHEET_WEBHOOK_SECRET.",
-    );
+    throw new Error("Missing BIRTHWAVE_SHEET_WEBHOOK_SECRET.");
   }
 
   const controller = new AbortController();
