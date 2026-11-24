@@ -26,9 +26,20 @@ let p = mapBirthwaveLeadToRunoPayload(lead(), { message: "hello" });
 assert.deepEqual(p, { your_name: "Runo Test", your_email: "t@example.test", your_phone: "9898989898", your_message: "Service: Pregnancy Care\nhello", your_subject: "Birthwave Website Enquiry", custom_status: "New", custom_source: "Website" });
 p = mapBirthwaveLeadToRunoPayload(lead({ email: null, notes: null, service: null, source_provider: "birthwave_vbac" }));
 assert.equal("your_email" in p, false); assert.equal("your_message" in p, false);
-assert.equal(p.custom_source, "Landing Page"); assert.equal(p.your_subject, "Birthwave VBAC Enquiry");
-assert.equal(mapBirthwaveLeadToRunoPayload(lead({ source_provider: "birthwave_naturalbirth" })).your_subject, "Birthwave Natural Birth Enquiry");
-assert.equal(mapBirthwaveLeadToRunoPayload(lead({ source_provider: "birthwave_normalbirth" })).your_subject, "Birthwave Normal Birth Enquiry");
+assert.equal(p.custom_source, "Landing Page"); assert.equal(p.your_subject, "Birthwave VBAC Landing Page Enquiry");
+assert.equal(mapBirthwaveLeadToRunoPayload(lead({ source_provider: "birthwave_naturalbirth" })).your_subject, "Birthwave Natural Birth Landing Page Enquiry");
+assert.equal(mapBirthwaveLeadToRunoPayload(lead({ source_provider: "birthwave_normalbirth" })).your_subject, "Birthwave Normal Birth Landing Page Enquiry");
+assert.equal(mapBirthwaveLeadToRunoPayload(lead({ source_provider: "birthwave_workshop" })).your_subject, "Birthwave Childbirth Workshop Landing Page Enquiry");
+const vaginismusService = "Vaginismus & Intimate Health";
+assert.equal(mapBirthwaveLeadToRunoPayload(lead({ service: vaginismusService, source_provider: "birthwave_vaginismus" })).your_subject, "Birthwave Vaginismus Landing Page Enquiry");
+assert.equal(mapBirthwaveLeadToRunoPayload(lead({ service: vaginismusService })).your_subject, "Birthwave Website Enquiry");
+p = mapBirthwaveLeadToRunoPayload(lead({ service: vaginismusService }), {
+  submissionPage: "/services/vaginismus?utm_source=google",
+  landingPage: "/natural-birth",
+});
+assert.equal(p.your_subject, "Birthwave Website Enquiry — Services / Vaginismus Page");
+assert.equal(p.custom_source, "Website");
+assert.equal(mapBirthwaveLeadToRunoPayload(lead(), { landingPage: "/natural-birth" }).your_subject, "Birthwave Website Enquiry — Tracked Page: Natural Birth");
 assert.equal(formatPhoneForRuno("+919898989898", "e164"), "+919898989898");
 assert.equal(formatPhoneForRuno("+919898989898", "digits"), "919898989898");
 

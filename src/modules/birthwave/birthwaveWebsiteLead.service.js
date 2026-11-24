@@ -315,7 +315,15 @@ export const createWebsiteLead = async (clientId, payload = {}, options = {}) =>
   // is fire-and-forget, and never affects the lead, the sheet or the response.
   // Seed/test callers that skip the sheet also skip Runo.
   if (!(options.skipRuno ?? options.skipSheetSync)) {
-    dispatchBirthwaveRunoDelivery({ clientId, lead, formContext: { message: row.message } }).catch(() => {});
+    dispatchBirthwaveRunoDelivery({
+      clientId,
+      lead,
+      formContext: {
+        message: row.message,
+        landingPage: row.landing_page,
+        submissionPage: attribution.submission_page,
+      },
+    }).catch(() => {});
   }
 
   return { id: row.id, lead_id: row.external_lead_id || String(row.id), birthwave_lead_id: lead.id, duplicate: false };
